@@ -1,0 +1,261 @@
+using System;
+using System.Collections.Generic;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using System.Net;
+using System.Net.Http;
+using System.Text;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+
+namespace PayrollEngine.Lex;
+
+/// <summary>
+/// Readability of a source document
+/// </summary>
+internal enum SourceState
+{
+    /// <summary>Text could be extracted</summary>
+    Readable,
+
+    /// <summary>The page could not be requested or holds no text (blocked host, script-only page)</summary>
+    Unreadable,
+
+    /// <summary>The format cannot be read (e.g. PDF)</summary>
+    Unsupported,
+
+    /// <summary>No local evidence file exists</summary>
+    Missing
+}
+
+/// <summary>
+/// Text of a source document, split into sections (HTML headings, spreadsheet sheets)
+/// </summary>
+public sealed class SourceDocument
+{
+    private const int MinimumTextLength = 400;
+
+    internal SourceState State { get; init; }
+    internal string Reason { get; init; }
+    internal List<(string Heading, string Text)> Sections { get; init; } = [];
+
+    /// <summary>
+    /// Numbers of one section as normalized decimal values (every separator interpretation)
+    /// </summary>
+    internal static HashSet<decimal> Numbers(string text)
+    {
+        var values = new HashSet<decimal>();
+        foreach (Match match in NumberToken.Matches(text))
+        {
+            foreach (var value in Interpretations(match.Value))
+            {
+                values.Add(Math.Round(value, 6));
+            }
+        }
+        return values;
+    }
+
+    private static readonly Regex NumberToken = new(
+        @"\d{1,3}(?:[ \u00a0\u202f.,'’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?", RegexOptions.Compiled);
+
+    private static IEnumerable<decimal> Interpretations(string token)
+    {
+        // integer reading: every separator is a group separator
+        var digits = new string(token.Where(char.IsDigit).ToArray());
+        if (digits.Length is > 0 and <= 15 &&
+            decimal.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
+        {
+            yield return integer;
+        }
+        // decimal reading: the last '.' or ',' is the decimal separator when 1-4 digits follow
+        var last = token.LastIndexOfAny(['.', ',']);
+        if (last > 0 && token.Length - last - 1 is >= 1 and <= 4)
+        {
+            var whole = new string(token[..last].Where(char.IsDigit).ToArray());
+            var fraction = token[(last + 1)..];
+            if (decimal.TryParse($"{whole}.{fraction}", NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
+            {
+                yield return number;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Build a document from HTML
+    /// </summary>
+    internal static SourceDocument FromHtml(string html) =>
+        Create(HtmlReader.Read(html));
+
+    /// <summary>
+    /// Build a document from plain text
+    /// </summary>
+    internal static SourceDocument FromText(string text) =>
+        Create([("(text)", HtmlReader.CleanLines(text))]);
+
+    /// <summary>
+    /// User agent of all lex source requests: snapshot and check must request a source the same way
+    /// </summary>
+    internal const string UserAgent = "Mozilla/5.0 (compatible; PayrollEngine-Lex)";
+
+    /// <summary>
+    /// HTTP client for source requests
+    /// </summary>
+    /// <param name="timeout">Request timeout (default: 60 seconds)</param>
+    public static HttpClient CreateHttpClient(TimeSpan? timeout = null)
+    {
+        var client = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(60) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        return client;
+    }
+
+    /// <summary>
+    /// True if text could be extracted
+    /// </summary>
+    public bool IsReadable => State == SourceState.Readable;
+
+    /// <summary>
+    /// Load the local evidence file of an entry; a missing file gives a document without evidence
+    /// </summary>
+    /// <param name="localPath">Local evidence file, null when the entry has none</param>
+    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    public static Task<SourceDocument> LoadLocal(string localPath,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
+    {
+        if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+        {
+            return Task.FromResult(new SourceDocument { State = SourceState.Missing, Reason = "no local evidence" });
+        }
+        return Load(null, localPath, null, readers);
+    }
+
+    /// <summary>
+    /// Load the live source from its URL
+    /// </summary>
+    /// <param name="url">Source URL</param>
+    /// <param name="client">HTTP client</param>
+    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    public static Task<SourceDocument> LoadLive(string url, HttpClient client,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null) =>
+        Load(url, null, client, readers);
+
+    /// <summary>
+    /// Text used for change detection: the lines of all sections that hold a number (values), without date and
+    /// time stamps and without whitespace (markup changes move spaces around inline elements), sorted, because
+    /// pages may serve their blocks in a varying order. Lines without a number (menus, navigation) are ignored.
+    /// A table row is one line, so a changed value still changes the text.
+    /// </summary>
+    internal string NormalizedText()
+    {
+        var lines = new List<string>();
+        foreach (var (heading, body) in Sections)
+        {
+            AddNormalizedLine(lines, heading);
+            foreach (var line in body.Split('\n'))
+            {
+                AddNormalizedLine(lines, line);
+            }
+        }
+        lines.Sort(StringComparer.Ordinal);
+        return string.Join('\n', lines);
+    }
+
+    private static void AddNormalizedLine(List<string> lines, string line)
+    {
+        foreach (var pattern in DatePatterns)
+        {
+            line = pattern.Replace(line, " ");
+        }
+        line = Whitespace.Replace(line, string.Empty);
+        if (line.Any(char.IsAsciiDigit))
+        {
+            lines.Add(line);
+        }
+    }
+
+    /// <summary>
+    /// Hash of the normalized text (sha256:...), null when the document is not readable
+    /// </summary>
+    internal string TextHash() =>
+        IsReadable ? "sha256:" + ContentHash.StringHash(NormalizedText()) : null;
+
+    private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
+    private const string MonthNames =
+        "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+
+    private static readonly Regex[] DatePatterns =
+    [
+        // ISO date with optional time
+        new(@"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b", RegexOptions.Compiled),
+        // numeric dates: 03.11.2026, 3/11/2026, 03-11-26
+        new(@"\b\d{1,2}[./-]\d{1,2}[./-](?:\d{4}|\d{2})\b", RegexOptions.Compiled),
+        // 3 November 2026, 3rd Nov. 2026
+        new($@"\b\d{{1,2}}(?:st|nd|rd|th)?\.?\s+(?:{MonthNames})\.?,?\s+\d{{4}}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // November 3, 2026
+        new($@"\b(?:{MonthNames})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+\d{{4}}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // times: 14:05, 2:05:10 pm
+        new(@"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?(?![\w:])", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+    ];
+
+    /// <summary>
+    /// Load the source: a local evidence file when present, otherwise the URL
+    /// </summary>
+    /// <param name="url">Source URL</param>
+    /// <param name="localPath">Local evidence file (optional)</param>
+    /// <param name="client">HTTP client for the source URL</param>
+    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension
+    /// (e.g. <c>.xlsx</c>). A reader returns the text sections of the document.</param>
+    public static async Task<SourceDocument> Load(string url, string localPath, HttpClient client,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
+    {
+        try
+        {
+            var name = localPath ?? url;
+            var extension = Path.GetExtension(name.Split('?')[0]).ToLowerInvariant();
+            if (extension == ".pdf")
+            {
+                return new SourceDocument { State = SourceState.Unsupported, Reason = "PDF" };
+            }
+            byte[] bytes;
+            if (localPath != null && File.Exists(localPath))
+            {
+                bytes = await File.ReadAllBytesAsync(localPath);
+            }
+            else
+            {
+                using var response = await client.GetAsync(url);
+                if (response.StatusCode != HttpStatusCode.OK)
+                {
+                    return new SourceDocument { State = SourceState.Unreadable, Reason = $"HTTP {(int)response.StatusCode}" };
+                }
+                bytes = await response.Content.ReadAsByteArrayAsync();
+                var type = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
+                if (type.Contains("pdf", StringComparison.OrdinalIgnoreCase))
+                {
+                    return new SourceDocument { State = SourceState.Unsupported, Reason = "PDF" };
+                }
+                // ReSharper disable once StringLiteralTypo
+                if (type.Contains("spreadsheetml", StringComparison.OrdinalIgnoreCase)) extension = ".xlsx";
+            }
+            if (readers != null && readers.TryGetValue(extension, out var reader))
+            {
+                return new SourceDocument { State = SourceState.Readable, Sections = reader(new MemoryStream(bytes)) };
+            }
+            var text = Encoding.UTF8.GetString(bytes);
+            return extension is ".txt" or ".csv" ? FromText(text) : FromHtml(text);
+        }
+        catch (Exception exception)
+        {
+            return new SourceDocument { State = SourceState.Unreadable, Reason = exception.Message };
+        }
+    }
+
+    private static SourceDocument Create(List<(string Heading, string Text)> sections)
+    {
+        var length = sections.Sum(x => x.Text.Length);
+        return length < MinimumTextLength
+            ? new SourceDocument { State = SourceState.Unreadable, Reason = "no readable text (script-only page?)" }
+            : new SourceDocument { State = SourceState.Readable, Sections = sections };
+    }
+}
