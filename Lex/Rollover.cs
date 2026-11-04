@@ -154,12 +154,14 @@ public static class Rollover
         var newTag = cycleStart.Year.ToString(CultureInfo.InvariantCulture);
 
         var sourceName = Path.GetFileName(source);
-        var targetName = RenameSegment(sourceName, oldTag, newTag);
-        if (string.Equals(sourceName, targetName, StringComparison.Ordinal))
+        var edition = EditionSuffix(sourceName, oldTag);
+        if (edition == null)
         {
             result.Error = $"The folder name {sourceName} has no year tag .{oldTag}";
             return result;
         }
+        string RenameName(string name) => RenameSegment(name, oldTag, newTag, edition);
+        var targetName = RenameName(sourceName);
         var target = Path.Combine(Path.GetDirectoryName(source)!, targetName);
         result.TargetDirectory = target;
         if (Directory.Exists(target) || File.Exists(target))
@@ -200,7 +202,7 @@ public static class Rollover
                 {
                     continue;
                 }
-                var renamed = RenameSegment(parts[i], oldTag, newTag);
+                var renamed = RenameName(parts[i]);
                 if (!string.Equals(renamed, parts[i], StringComparison.Ordinal))
                 {
                     if (names.TryAdd(parts[i], renamed))
@@ -248,7 +250,7 @@ public static class Rollover
             {
                 var editor = ManifestEditor.Parse(File.ReadAllText(file));
                 editor.SetValidFrom(result.ValidFrom);
-                var keys = editor.RollContentFiles(x => RenamePath(x, oldTag, newTag), oldTag, newTag);
+                var keys = editor.RollContentFiles(x => RenamePath(x, RenameName), oldTag, newTag);
                 result.OpenEntries = editor.OpenEntries();
                 var json = editor.ToJson();
                 result.Changed.Add($"{relative}: validFrom {result.ValidFrom}, {result.OpenEntries} open entries" +
@@ -339,13 +341,25 @@ public static class Rollover
     }
 
     /// <summary>
-    /// Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json)
+    /// Edition suffix of the year tag in a folder name: empty for Data.Tax.2026, "b" for the mid-year
+    /// edition Data.Tax.2026b, null without year tag
     /// </summary>
-    internal static string RenameSegment(string name, string oldTag, string newTag) =>
-        Regex.Replace(name, $@"(?<=(^|\.)){oldTag}(?=(\.|$))", newTag, RegexOptions.CultureInvariant);
+    internal static string EditionSuffix(string folderName, string year)
+    {
+        var match = Regex.Match(folderName, $@"(?<=(^|\.)){year}(?<suffix>[a-z]?)(?=(\.|$))", RegexOptions.CultureInvariant);
+        return match.Success ? match.Groups["suffix"].Value : null;
+    }
 
-    private static string RenamePath(string path, string oldTag, string newTag) =>
-        string.Join('/', path.Replace('\\', '/').Split('/').Select(x => RenameSegment(x, oldTag, newTag)));
+    /// <summary>
+    /// Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json); the edition suffix
+    /// of the folder (e.g. 2026b) is dropped in the new cycle
+    /// </summary>
+    internal static string RenameSegment(string name, string oldTag, string newTag, string edition = "") =>
+        Regex.Replace(name, $@"(?<=(^|\.)){oldTag}{(edition.Length > 0 ? $"(?:{Regex.Escape(edition)})?" : string.Empty)}(?=(\.|$))",
+            newTag, RegexOptions.CultureInvariant);
+
+    private static string RenamePath(string path, Func<string, string> renameName) =>
+        string.Join('/', path.Replace('\\', '/').Split('/').Select(renameName));
 
     /// <summary>
     /// Replace the date part of the validFrom tokens, the time part is kept

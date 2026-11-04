@@ -1010,9 +1010,16 @@
             <param name="cycleStart">Start of the new cycle, the new validFrom</param>
             <param name="dryRun">Report without writing</param>
         </member>
-        <member name="M:PayrollEngine.Lex.Rollover.RenameSegment(System.String,System.String,System.String)">
+        <member name="M:PayrollEngine.Lex.Rollover.EditionSuffix(System.String,System.String)">
             <summary>
-            Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json)
+            Edition suffix of the year tag in a folder name: empty for Data.Tax.2026, "b" for the mid-year
+            edition Data.Tax.2026b, null without year tag
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.RenameSegment(System.String,System.String,System.String,System.String)">
+            <summary>
+            Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json); the edition suffix
+            of the folder (e.g. 2026b) is dropped in the new cycle
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">

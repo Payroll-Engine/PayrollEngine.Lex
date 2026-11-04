@@ -88,11 +88,11 @@ public class OpenEntryTests
     }
 
     [Fact]
-    public void OpenFlag_IsPartOfTheSnapshot()
+    public async Task OpenFlag_IsPartOfTheSnapshot()
     {
         using var s = new TestSatellite();
         var open = TestSatellite.Manifest(OpenValue("Rates.A", "8.5"));
-        var snapshot = s.WriteSnapshot(open).GetAwaiter().GetResult();
+        var snapshot = await s.WriteSnapshot(open);
 
         Assert.Empty(Verifier.Verify(open, snapshot, s.LexDirectory));
         Assert.Contains(Verifier.Verify(TestSatellite.Manifest(TestSatellite.Value("Rates.A", "8.5")), snapshot, s.LexDirectory),
@@ -100,12 +100,12 @@ public class OpenEntryTests
     }
 
     [Fact]
-    public void OpenEntry_IsAFindingWithoutRequiredMode()
+    public async Task OpenEntry_IsAFindingWithoutRequiredMode()
     {
         using var s = new TestSatellite();
         s.WriteRegulation("""[ { "name": "Rates", "values": [ { "key": "A", "value": "8.5" } ] } ]""");
         var manifest = TestSatellite.Manifest(OpenValue("Rates.A", "8.5"));
-        s.WriteSnapshot(manifest).GetAwaiter().GetResult();
+        await s.WriteSnapshot(manifest);
 
         var result = Checker.Check(manifest, s.LexPath);
 

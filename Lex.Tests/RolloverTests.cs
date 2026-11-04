@@ -327,6 +327,42 @@ public class RolloverTests
     }
 
     [Fact]
+    public void MidYearEdition_RollsToTheYearWithoutSuffix()
+    {
+        using var s = new Satellite("Data.Test.2026b");
+        File.Move(Path.Combine(s.Root, "Regulation", "XX.Test.Data.Test.2026.json"),
+            Path.Combine(s.Root, "Regulation", "XX.Test.Data.Test.2026b.json"));
+        s.Write("Setup.pecmd", "PayrollImport Regulation/XX.Test.Data.Test.2026b.json\n");
+        s.Write("regulation-package.json", Package.Replace("Test.2026.json", "Test.2026b.json"));
+
+        var result = Rollover.Run(s.Root, CycleStart, dryRun: false);
+
+        Assert.Null(result.Error);
+        Assert.Equal(s.Target, result.TargetDirectory);
+        Assert.Contains("Data.Test.2026b -> Data.Test.2027", result.Renamed);
+        Assert.True(File.Exists(Path.Combine(s.Target, "Regulation", "XX.Test.Data.Test.2027.json")));
+        Assert.Equal("PayrollImport Regulation/XX.Test.Data.Test.2027.json\n", s.ReadTarget("Setup.pecmd"));
+        Assert.Contains("\"Regulation/XX.Test.Data.Test.2027.json\"", s.ReadTarget("regulation-package.json"));
+        Assert.Equal("Table.A.2027", s.TargetManifest().Values[1].Key);
+    }
+
+    [Theory]
+    [InlineData("Data.Tax.2026", "")]
+    [InlineData("Data.Tax.2026b", "b")]
+    [InlineData("Data.Tax.2026B", null)]
+    [InlineData("Data.Tax.2026bc", null)]
+    [InlineData("Data.Tax", null)]
+    public void EditionSuffix_OfTheFolderName(string folderName, string expected) =>
+        Assert.Equal(expected, Rollover.EditionSuffix(folderName, "2026"));
+
+    [Theory]
+    [InlineData("XX.Data.Tax.2026b.json", "XX.Data.Tax.2027.json")]
+    [InlineData("XX.Data.Tax.2026.json", "XX.Data.Tax.2027.json")]
+    [InlineData("XX.Data.Tax.2026c.json", "XX.Data.Tax.2026c.json")]
+    public void RenameSegment_DropsTheEditionSuffix(string name, string expected) =>
+        Assert.Equal(expected, Rollover.RenameSegment(name, "2026", "2027", "b"));
+
+    [Fact]
     public void MissingLex_IsAnError()
     {
         using var s = new Satellite();
