@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+	<PropertyGroup>
+		<AssemblyName>PayrollEngine.Lex</AssemblyName>
+		<RootNamespace>PayrollEngine.Lex</RootNamespace>
+		<Description>Payroll Engine Lex — compliance source manifests, snapshots and checks</Description>
+	</PropertyGroup>
+
+	<!-- help file generation -->
+	<PropertyGroup>
+		<DocumentationFile>$(AssemblyName).xml</DocumentationFile>
+		<PackageReadmeFile>README.md</PackageReadmeFile>
+		<PackageLicenseExpression>MIT</PackageLicenseExpression>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<InternalsVisibleTo Include="PayrollEngine.Lex.Tests" />
+	</ItemGroup>
+
+	<!-- include xml documention files to the nuget package -->
+	<ItemGroup>
+		<None Include="$(OutputDir)*.xml" Pack="true">
+			<PackageCopyToOutput>true</PackageCopyToOutput>
+		</None>
+	</ItemGroup>
+	<ItemGroup>
+	  <None Include="..\README.md">
+	    <Pack>True</Pack>
+	    <PackagePath>\</PackagePath>
+	  </None>
+	</ItemGroup>
+
+	<!-- publish package -->
+	<Target Name="PublishPackage" AfterTargets="Pack" Condition="exists('$(PayrollEnginePackageDir)')">
+		<Message Importance="High" Text="Publish package..." />
+		<Copy SourceFiles="$(OutputPath)..\$(PackageId).$(PackageVersion).nupkg" DestinationFolder="$(PayrollEnginePackageDir)" />
+	</Target>
+
+</Project>

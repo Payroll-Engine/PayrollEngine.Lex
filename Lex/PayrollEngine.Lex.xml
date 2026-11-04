@@ -1,0 +1,674 @@
+<?xml version="1.0"?>
+<doc>
+    <assembly>
+        <name>PayrollEngine.Lex</name>
+    </assembly>
+    <members>
+        <member name="T:PayrollEngine.Lex.LexCheckResult">
+            <summary>
+            Result of a lex check of one data regulation satellite
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.LexPath">
+            <summary>Full path of lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Satellite">
+            <summary>Name of the data regulation satellite folder</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.ValidationErrors">
+            <summary>Structural errors of the manifest</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.HasSnapshot">
+            <summary>snapshot.json exists next to lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.RegulationValues">
+            <summary>Number of regulation lookup values</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.LexEntries">
+            <summary>Number of lex entries</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Uncovered">
+            <summary>Regulation values without lex entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Orphans">
+            <summary>Lex entries without regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.UnresolvedSplit">
+            <summary>Lex entries with a property path that does not resolve in the regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.UncoveredSamples">
+            <summary>Samples of regulation values without lex entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.OrphanSamples">
+            <summary>Samples of lex entries without regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Drift">
+            <summary>Value differences between lex and regulation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.DriftSamples">
+            <summary>Samples of value differences</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.MissingSourceUrl">
+            <summary>Lex entries without sourceUrl</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.MissingSourceLocation">
+            <summary>Lex entries without sourceLocation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.DeadUrls">
+            <summary>Source URLs that do not exist</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.RequireLocation">
+            <summary>A missing sourceLocation is a finding only in the mode Required</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.MissingLegalReference">
+            <summary>Lex entries without legalReference</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.FileProblems">
+            <summary>Problems of the evidence files</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.LexValidFrom">
+            <summary>validFrom of the manifest</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.RegulationValidFrom">
+            <summary>validFrom of the regulation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.ValidFromMatch">
+            <summary>validFrom of manifest and regulation match</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Note">
+            <summary>Information that needs a manual review</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Error">
+            <summary>Error that prevented the check</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.HasFindings">
+            <summary>
+            Any finding that needs action
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexChecker">
+            <summary>
+            Checks a lex manifest against the lookup values of its data regulation satellite:
+            coverage, orphans, value differences, traceability fields, evidence files and validFrom.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexChecker.ReferenceEntryPrefix">
+            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexChecker.Check(PayrollEngine.Lex.LexManifest,System.String,System.Boolean)">
+            <summary>
+            Check one satellite
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="lexPath">Full path of lex.json</param>
+            <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexChecker.GitList(System.String,System.Boolean)">
+            <summary>
+            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexChecker.ScalarEquals(System.String,System.String)">
+            <summary>
+            Numbers are compared numerically, text ignoring case
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexChecker.Splits(System.String)">
+            <summary>
+            Candidate (lookup key, remaining property path) splits of a lex key, longest key first
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexCheckReport">
+            <summary>
+            Writes the LexCheck results as Markdown report and CSV file
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexCheckReport.Write(System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.LexCheckResult},System.String)">
+            <summary>
+            Write the report (Markdown) and a CSV file with the same name
+            </summary>
+            <param name="results">Check results</param>
+            <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexExclusion">
+            <summary>
+            Documented exception to the lex coverage rules. An excluded item is not a finding,
+            but it is listed by name in the check report.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexExclusion.KindCoverage">
+            <summary>Kind: regulation values without a lex entry</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexExclusion.KindSourceLocation">
+            <summary>Kind: lex entries without sourceLocation</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexExclusion.KindOrphan">
+            <summary>Kind: lex entries without a regulation value (evidence of a rule that is implemented in code or derived values)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexExclusion.Kind">
+            <summary>
+            Exclusion kind: <c>coverage</c> (regulation values without lex entry),
+            <c>sourceLocation</c> (lex entries without sourceLocation) or
+            <c>orphan</c> (lex entries without regulation value)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexExclusion.Pattern">
+            <summary>
+            Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
+            SourceLocation: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexExclusion.Reason">
+            <summary>
+            Mandatory justification
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexExclusion.Matches(System.String)">
+            <summary>
+            Test if a key is matched by this exclusion
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexFile">
+            <summary>
+            Source document to copy into the .lex folder
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexFile.FileName">
+            <summary>
+            Target file name in the .lex folder
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexFile.SourcePath">
+            <summary>
+            Local path to the source file (copied by LexSnapshot)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexFile.SourceUrl">
+            <summary>
+            Source URL — file is downloaded automatically when sourcePath is empty
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexFile.Description">
+            <summary>
+            Human-readable description
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexFileResolver">
+            <summary>
+            Resolves lex.json files from a file name or mask
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexFileResolver.Resolve(System.String,System.Boolean)">
+            <summary>
+            Resolve the lex.json files for a file name or mask
+            </summary>
+            <param name="fileMask">File name or mask, default lex.json</param>
+            <param name="recursive">Search all subdirectories, otherwise the top directory only</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexFileResolver.IsBuildOutput(System.String,System.String)">
+            <summary>
+            Test if the file lies in a bin or obj folder below the search root
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexHash">
+            <summary>
+            Hash helpers shared by LexSnapshot, LexVerify and LexCheck.
+            The hash algorithm is part of the snapshot format and must not change.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHash.FileHash(System.String)">
+            <summary>
+            SHA-256 of a file as lower-case hex string
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHash.StringHash(System.String)">
+            <summary>
+            SHA-256 of a string (UTF-8) as lower-case hex string
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHash.ResolvePath(System.String,System.String)">
+            <summary>
+            Resolve a path relative to a base directory
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexManifest">
+            <summary>
+            Deserialized lex.json manifest — source of truth for compliance value provenance
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Schema">
+            <summary>
+            JSON Schema URI ($schema field)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Authority">
+            <summary>
+            Country/jurisdiction code (e.g. DE, CH, SG)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Regulation">
+            <summary>
+            Regulation identifier (e.g. Data.Tax, Data.Rates)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.ValidFrom">
+            <summary>
+            Effective date in YYYY-MM-DD format
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Provider">
+            <summary>
+            Issuing authority (e.g. Tax authority)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Sources">
+            <summary>
+            Document-level source references
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Values">
+            <summary>
+            Compliance values with content and provenance
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Files">
+            <summary>
+            Source documents to copy into the .lex folder
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifest.Exclusions">
+            <summary>
+            Documented exclusions from the coverage and sourceLocation checks
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSchema">
+            <summary>
+            JSON Schema for lex.json (https://payrollengine.org/schemas/lex/v1.json)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSchema.Json">
+            <summary>
+            Schema text
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSnapshot">
+            <summary>
+            Generated snapshot.json — immutable compliance record
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Created">
+            <summary>
+            ISO 8601 UTC creation timestamp
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Tool">
+            <summary>
+            Tool identifier and version (e.g. "pecmd LexSnapshot 1.0")
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Authority">
+            <summary>
+            Country/jurisdiction code — from lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Regulation">
+            <summary>
+            Regulation identifier — from lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.ValidFrom">
+            <summary>
+            Effective date — from lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Provider">
+            <summary>
+            Issuing authority — from lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.SourceHash">
+            <summary>
+            SHA256 hash computed over all value contents and content file hashes
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Sources">
+            <summary>
+            Source document references — copied from lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Values">
+            <summary>
+            Compliance values — copied from lex.json; contentFile paths resolved to .lex-local names
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.Files">
+            <summary>
+            All files in the .lex folder — includes both explicit files[] and values with contentFile
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSnapshotFile">
+            <summary>
+            File entry in snapshot.json — enriched with computed metadata
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.FileName">
+            <summary>
+            Original file name
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.ContentFile">
+            <summary>
+            Relative path to the file in the .lex folder
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.ContentType">
+            <summary>
+            MIME type (detected from extension)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.Sha256">
+            <summary>
+            SHA256 hash of the file content
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.FileSizeBytes">
+            <summary>
+            File size in bytes
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshotFile.Description">
+            <summary>
+            Human-readable description
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSnapshotWriter">
+            <summary>
+            Generates snapshot.json from a validated <see cref="T:PayrollEngine.Lex.LexManifest"/> and copies referenced files.
+            Downloads files from sourceUrl when no local sourcePath is provided.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSnapshotWriter.WriteAsync(PayrollEngine.Lex.LexManifest,System.String,System.String,System.Boolean,System.Action{System.String,System.Boolean})">
+            <summary>
+            Creates the snapshot: downloads/copies files and writes snapshot.json
+            </summary>
+            <param name="manifest">Validated manifest</param>
+            <param name="manifestDirectory">Directory of lex.json (source root)</param>
+            <param name="targetDirectory">Output directory (default: same as manifestDirectory)</param>
+            <param name="dryRun">When true, reports without writing anything</param>
+            <param name="writeFile">Optional callback with the file name and the dry-run flag, invoked for every
+            file downloaded from its source URL, in dry-run mode as well</param>
+            <returns>Written snapshot (for reporting)</returns>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSource">
+            <summary>
+            Document-level source reference in lex.json
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSource.Url">
+            <summary>
+            URL to the source document or page
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSource.Description">
+            <summary>
+            Human-readable description
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSource.LegalBasis">
+            <summary>
+            Legal basis (e.g. Income Tax Act §12)
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSourceState">
+            <summary>
+            Readability of a source document
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceState.Readable">
+            <summary>Text could be extracted</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceState.Unreadable">
+            <summary>The page could not be requested or holds no text (blocked host, script-only page)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceState.Unsupported">
+            <summary>The format cannot be read (e.g. PDF)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSourceDocument">
+            <summary>
+            Text of a source document, split into sections (HTML headings, spreadsheet sheets)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.Numbers(System.String)">
+            <summary>
+            Numbers of one section as normalized decimal values (every separator interpretation)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.FromHtml(System.String)">
+            <summary>
+            Build a document from HTML
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.FromText(System.String)">
+            <summary>
+            Build a document from plain text
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Load the source: a local evidence file when present, otherwise the URL
+            </summary>
+            <param name="url">Source URL</param>
+            <param name="localPath">Local evidence file (optional)</param>
+            <param name="client">HTTP client for the source URL</param>
+            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension
+            (e.g. <c>.xlsx</c>). A reader returns the text sections of the document.</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSourceMatch">
+            <summary>
+            Verification state of one lex entry against its source
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.Found">
+            <summary>All numbers of the entry are found in the source</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.Partial">
+            <summary>Some numbers are found, others are not</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.NotFound">
+            <summary>None of the numbers is found</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.Unreadable">
+            <summary>The source cannot be read (blocked, script-only page, PDF)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.NoNumbers">
+            <summary>The entry holds no numbers to look for</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSourceResult">
+            <summary>
+            Result for one entry
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Key">
+            <summary>Key of the lex entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Url">
+            <summary>Source URL of the lex entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Match">
+            <summary>Verification state</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.NumbersTotal">
+            <summary>Numbers of the entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.NumbersFound">
+            <summary>Numbers found in the source</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Missing">
+            <summary>Numbers missing in the source</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Location">
+            <summary>Proposed source location (sections that hold the numbers)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceResult.Reason">
+            <summary>Reason of an unreadable source</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSourceVerifier">
+            <summary>
+            Looks up the numbers of lex entries in their source documents
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceVerifier.ContentNumbers(System.String)">
+            <summary>
+            Numbers of an entry content (scalars, object properties, array items); 0 and 1 carry no information
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceVerifier.Contains(System.Collections.Generic.HashSet{System.Decimal},System.Decimal)">
+            <summary>
+            A number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceVerifier.Verify(PayrollEngine.Lex.LexValue,PayrollEngine.Lex.LexSourceDocument)">
+            <summary>
+            Verify one entry against a source document
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexUrlStatus">
+            <summary>
+            Result of requesting one source URL
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexUrlStatus.Ok">
+            <summary>The page answers (2xx or redirect to an answering page)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexUrlStatus.Blocked">
+            <summary>The host blocks scripted requests (401, 403, 429) or fails temporarily (5xx, timeout): not verifiable</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexUrlStatus.Dead">
+            <summary>The page does not exist (404, 410) or the host is unknown</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexUrlChecker">
+            <summary>
+            Requests the source URLs of lex manifests
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.#ctor">
+            <summary>
+            Create a URL checker
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.#ctor(System.Net.Http.HttpMessageHandler)">
+            <param name="handler">Optional message handler (tests)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.Check(System.String)">
+            <summary>
+            Check the URL (cached per run)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.Urls(PayrollEngine.Lex.LexManifest)">
+            <summary>
+            All distinct http(s) URLs of the manifest: sources, entries and files
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.Apply(PayrollEngine.Lex.LexManifest,PayrollEngine.Lex.LexCheckResult)">
+            <summary>
+            Request all URLs of the manifest and record the result
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.Dispose">
+            <inheritdoc />
+        </member>
+        <member name="T:PayrollEngine.Lex.LexValidator">
+            <summary>
+            Validates a <see cref="T:PayrollEngine.Lex.LexManifest"/> for structural correctness
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexValidator.Validate(PayrollEngine.Lex.LexManifest,System.String)">
+            <summary>
+            Validates the manifest. Returns a list of error messages (empty = valid).
+            </summary>
+            <param name="manifest">Manifest to validate</param>
+            <param name="manifestDirectory">Directory containing lex.json (used to resolve relative ContentFile paths)</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexValue">
+            <summary>
+            Compliance value entry in lex.json.
+            Exactly one of <see cref="P:PayrollEngine.Lex.LexValue.Content"/> or <see cref="P:PayrollEngine.Lex.LexValue.ContentFile"/> must be set.
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.Key">
+            <summary>
+            Unique value identifier within the manifest
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.Content">
+            <summary>
+            Inline value — scalar, JSON object, or JSON array (mutually exclusive with ContentFile)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.ContentFile">
+            <summary>
+            Relative path to a source file to copy into the .lex folder (mutually exclusive with Content)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.DocumentRef">
+            <summary>
+            Reference to a local evidence document in the files[] array (e.g. "ahv-beitraege-2026.pdf").
+            The referenced file must be declared in the manifest's files[] array.
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.Unit">
+            <summary>
+            Unit of measure (EUR, %, CHF, months, ...)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.SourceUrl">
+            <summary>
+            URL where this specific value can be found
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.SourceLocation">
+            <summary>
+            Precise location within the source document (free text)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.LegalReference">
+            <summary>
+            Legal norm reference (e.g. Income Tax Act §12(1))
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.Description">
+            <summary>
+            Human-readable description
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.HasInlineContent">
+            <summary>
+            Returns true if this value uses an inline content string
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexValue.HasContentFile">
+            <summary>
+            Returns true if this value references an external file
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexVerifier">
+            <summary>
+            Verifies a snapshot against its manifest and the files in the .lex folder
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexVerifier.Verify(PayrollEngine.Lex.LexManifest,PayrollEngine.Lex.LexSnapshot,System.String)">
+            <summary>
+            Verify the snapshot. Returns the list of differences (empty = snapshot is intact and current).
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="snapshot">Snapshot (snapshot.json)</param>
+            <param name="lexDirectory">Directory containing lex.json and snapshot.json</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexVerifier.ComputeSourceHash(PayrollEngine.Lex.LexManifest,System.String,System.Collections.Generic.List{System.String})">
+            <summary>
+            Recompute the source hash. Returns null when a file needed for the hash is missing (reported in errors).
+            Evidence copies in the .lex folder are the reference; an original outside .lex that differs from its copy is reported.
+            </summary>
+        </member>
+    </members>
+</doc>
