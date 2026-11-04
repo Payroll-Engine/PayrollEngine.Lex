@@ -38,13 +38,16 @@ public sealed class LexSnapshotWriter
     /// <param name="dryRun">When true, reports without writing anything</param>
     /// <param name="writeFile">Optional callback with the file name and the dry-run flag, invoked for every
     /// file downloaded from its source URL, in dry-run mode as well</param>
+    /// <param name="keepLocalFiles">When true, a file with a source URL whose copy already exists in the
+    /// manifest directory is taken from the copy and not downloaded again</param>
     /// <returns>Written snapshot (for reporting)</returns>
     public async Task<LexSnapshot> WriteAsync(
         LexManifest manifest,
         string manifestDirectory,
         string targetDirectory,
         bool dryRun,
-        Action<string, bool> writeFile = null)
+        Action<string, bool> writeFile = null,
+        bool keepLocalFiles = false)
     {
         var snapshotFiles = new List<LexSnapshotFile>();
         var hashInput = new StringBuilder();
@@ -118,6 +121,16 @@ public sealed class LexSnapshotWriter
                 }
 
                 AddFileToSnapshot(snapshotFiles, hashInput, sourcePath, localName, file.Description);
+            }
+            else if (!string.IsNullOrWhiteSpace(file.SourceUrl) && keepLocalFiles &&
+                     File.Exists(Path.Combine(manifestDirectory, localName)))
+            {
+                var localPath = Path.Combine(manifestDirectory, localName);
+                if (!dryRun && !string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(localPath, targetPath, overwrite: true);
+                }
+                AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
             }
             else if (!string.IsNullOrWhiteSpace(file.SourceUrl))
             {
