@@ -4,6 +4,95 @@
         <name>PayrollEngine.Lex</name>
     </assembly>
     <members>
+        <member name="T:PayrollEngine.Lex.ApplyChangeKind">
+            <summary>
+            Kind of a regulation change
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Changed">
+            <summary>Existing value replaced</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Added">
+            <summary>New lookup value</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ApplyChange">
+            <summary>
+            Regulation value written from a lex entry
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.EntryKey">
+            <summary>Lex entry key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.File">
+            <summary>Regulation file name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.Target">
+            <summary>Regulation target: Lookup.Key with optional /property path</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.Kind">
+            <summary>Kind of change</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.Detail">
+            <summary>Difference before the change</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ApplyResult">
+            <summary>
+            Result of applying a lex manifest to its data regulation satellite
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.LexPath">
+            <summary>Full path of lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Satellite">
+            <summary>Name of the data regulation satellite folder</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Changes">
+            <summary>Changes of the regulation values</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Skipped">
+            <summary>Lex entries that could not be applied, with reason</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Unchanged">
+            <summary>Regulation values equal to the lex content</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.WrittenFiles">
+            <summary>Regulation files written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Note">
+            <summary>Information without changes (e.g. no lookups in the regulation JSON)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.Error">
+            <summary>Error that prevented the apply action</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.Applier">
+            <summary>
+            Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
+            Only differing values are replaced in place; descriptions and the formatting of the file are kept.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Apply(PayrollEngine.Lex.Manifest,System.String,System.Boolean)">
+            <summary>
+            Apply one manifest
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="lexPath">Full path of lex.json</param>
+            <param name="dryRun">Report the changes without writing</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Locate(System.Byte[],System.Int32,System.Int32,System.String)">
+            <summary>
+            Locate a property path inside a JSON object token
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.TokenText(System.Text.Json.JsonElement,System.Boolean,System.String,System.String@)">
+            <summary>
+            JSON text of the new value token, in the form of the existing token
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Reindent(System.String,System.String,System.String)">
+            <summary>
+            Continuation lines of a multi-line value are indented like the line of the token
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.AttestResult">
             <summary>
             Result of writing a manual verification record or a review
@@ -142,6 +231,9 @@
         <member name="F:PayrollEngine.Lex.Checker.ReferenceEntryPrefix">
             <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Checker.IsReferenceEntry(System.String)">
+            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean)">
             <summary>
             Check one satellite
@@ -161,14 +253,19 @@
             Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Checker.CompareContent(PayrollEngine.Lex.Entry,System.String)">
+            <summary>
+            Content to compare: inline content, or the text of a JSON content file (null without comparable content)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.Difference(System.Nullable{System.Text.Json.JsonElement},System.String,System.String)">
+            <summary>
+            Difference between a regulation value (structured or scalar) and the lex content, null if equal
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Checker.ScalarEquals(System.String,System.String)">
             <summary>
             Numbers are compared numerically, text ignoring case
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.Splits(System.String)">
-            <summary>
-            Candidate (lookup key, remaining property path) splits of a lex key, longest key first
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.CheckReport">
@@ -274,6 +371,64 @@
         <member name="P:PayrollEngine.Lex.Entry.HasContentFile">
             <summary>
             Returns true if this value references an external file
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryTargetKind">
+            <summary>
+            Kind of the regulation target of a lex entry
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.None">
+            <summary>No regulation lookup</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.Values">
+            <summary>Existing lookup values (with optional property path)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.Lookup">
+            <summary>Whole lookup, entry backed by a content file</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.NewValue">
+            <summary>Lookup exists, the value is missing</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryTarget">
+            <summary>
+            Regulation target of a lex entry
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationIndex">
+            <summary>
+            Lookup values by lex key: Lookup.Key, Alias.Key and the bare value key
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryMapping">
+            <summary>
+            Maps lex entries to regulation lookup values, shared by the check and the apply of a manifest
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EntryMapping.EditionTag(PayrollEngine.Lex.Manifest)">
+            <summary>
+            Year tag of the manifest (year of validFrom): a content file key may end with it (Lookup.Key.Year)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EntryMapping.Resolve(PayrollEngine.Lex.Entry,PayrollEngine.Lex.RegulationIndex,System.String)">
+            <summary>
+            Resolve the regulation target of a lex entry
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EntryMapping.Content(PayrollEngine.Lex.Entry,System.String,System.String@)">
+            <summary>
+            Content of a lex entry: inline content or the text of a JSON content file
+            </summary>
+            <returns>Content or null with the reason</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.EntryMapping.IsStructured(System.String)">
+            <summary>
+            Content is a JSON object or array
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EntryMapping.Splits(System.String)">
+            <summary>
+            Candidate (lookup key, remaining property path) splits of a lex key, longest key first
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.EntryRules">
@@ -687,6 +842,54 @@
             Write the document (UTF-8 without BOM)
             </summary>
             <param name="path">Target path</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationFile">
+            <summary>
+            Regulation JSON file with its content (without byte order mark)
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationLookup">
+            <summary>
+            Lookup of a regulation file
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.HasValues">
+            <summary>Lookup has a values array</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.InsertOffset">
+            <summary>Offset behind the last value object, or behind the opening bracket of an empty values array</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.ValuesOffset">
+            <summary>Offset of the values property name (indentation of new values)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.LastValueOffset">
+            <summary>Offset of the last value object</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationValue">
+            <summary>
+            Lookup value of a regulation file with the location of its value token
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Token">
+            <summary>Value token (value or valueObject), null without value</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationData">
+            <summary>
+            Lookup values of the Regulation folder of a satellite
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.LookupNames">
+            <summary>Lookup names including the names without satellite namespace</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationReader">
+            <summary>
+            Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
+            <summary>
+            Read all regulation files (*.json) of the Regulation folder below the satellite directory
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Schema">
             <summary>

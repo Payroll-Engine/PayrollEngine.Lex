@@ -158,23 +158,17 @@ public static class Checker
     /// <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
     private const string ReferenceEntryPrefix = "OfficialCalculator.";
 
-    private static readonly JsonDocumentOptions JsonOptions = new()
+    /// <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
+    internal static bool IsReferenceEntry(string key) =>
+        key.StartsWith(ReferenceEntryPrefix, StringComparison.Ordinal);
+
+    internal static readonly JsonDocumentOptions JsonOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
 
     private static readonly JsonSerializerOptions SnapshotOptions = new() { PropertyNameCaseInsensitive = true };
-
-    private sealed class RegulationValue
-    {
-        internal string Lookup { get; init; }
-        internal string LookupAlias { get; set; }
-        internal string Key { get; init; }
-        internal string Scalar { get; init; }
-        internal JsonElement? Object { get; init; }
-        internal bool Covered { get; set; }
-    }
 
     /// <summary>
     /// Check one satellite
@@ -204,22 +198,25 @@ public static class Checker
         CheckVerification(manifest, result);
 
         // regulation values
-        var values = new List<RegulationValue>();
-        var lookupNames = new HashSet<string>(StringComparer.Ordinal);
+        RegulationData regulation;
         try
         {
-            ReadRegulation(satelliteDirectory, result, values, lookupNames);
+            regulation = RegulationReader.Read(satelliteDirectory);
         }
         catch (Exception exception)
         {
             result.Error = "Regulation JSON could not be read: " + exception.Message;
             return result;
         }
+        var values = regulation.Values;
+        result.Regulation = regulation.Name;
+        result.RegulationValidFrom = regulation.ValidFrom;
+        result.RegulationLookups = regulation.LookupCount;
         result.RegulationValues = values.Count;
 
         CheckTraceability(manifest, result);
         CheckValidFrom(result);
-        CheckCoverage(manifest, result, values, lookupNames);
+        CheckCoverage(manifest, lexDirectory, result, regulation);
         CheckEvidence(manifest, lexDirectory, result);
         foreach (var exclusion in manifest.Exclusions)
         {
@@ -234,111 +231,6 @@ public static class Checker
             result.OrphanSamples.Clear();
         }
         return result;
-    }
-
-    private static void ReadRegulation(string satelliteDirectory, CheckResult result,
-        List<RegulationValue> values, HashSet<string> lookupNames)
-    {
-        var regulationDirectory = Path.Combine(satelliteDirectory, "Regulation");
-        if (!Directory.Exists(regulationDirectory))
-        {
-            return;
-        }
-
-        string satelliteNamespace = null;
-        foreach (var file in Directory.GetFiles(regulationDirectory, "*.json").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
-        {
-            using var document = JsonDocument.Parse(ReadBytes(file), JsonOptions);
-            if (!document.RootElement.TryGetProperty("tenants", out var tenants) ||
-                tenants.ValueKind != JsonValueKind.Array)
-            {
-                continue;
-            }
-            foreach (var tenant in tenants.EnumerateArray())
-            {
-                if (!tenant.TryGetProperty("regulations", out var regulations) ||
-                    regulations.ValueKind != JsonValueKind.Array)
-                {
-                    continue;
-                }
-                foreach (var regulation in regulations.EnumerateArray())
-                {
-                    result.Regulation ??= GetString(regulation, "name");
-                    result.RegulationValidFrom ??= GetString(regulation, "validFrom");
-                    var ns = GetString(regulation, "namespace");
-                    if (!string.IsNullOrEmpty(ns))
-                    {
-                        satelliteNamespace ??= ns;
-                    }
-                    if (!regulation.TryGetProperty("lookups", out var lookups) ||
-                        lookups.ValueKind != JsonValueKind.Array)
-                    {
-                        continue;
-                    }
-                    foreach (var lookup in lookups.EnumerateArray())
-                    {
-                        var name = GetString(lookup, "name");
-                        if (name == null)
-                        {
-                            continue;
-                        }
-                        lookupNames.Add(name);
-                        result.RegulationLookups++;
-                        if (!lookup.TryGetProperty("values", out var lookupValues) ||
-                            lookupValues.ValueKind != JsonValueKind.Array)
-                        {
-                            continue;
-                        }
-                        foreach (var value in lookupValues.EnumerateArray())
-                        {
-                            var key = GetString(value, "key");
-                            if (key == null && value.TryGetProperty("rangeValue", out var rangeValue))
-                            {
-                                key = rangeValue.ToString();
-                            }
-                            JsonElement? valueObject = null;
-                            string scalar = null;
-                            if (value.TryGetProperty("valueObject", out var vo) && vo.ValueKind != JsonValueKind.Null)
-                            {
-                                valueObject = vo.Clone();
-                            }
-                            else if (value.TryGetProperty("value", out var sv))
-                            {
-                                scalar = sv.ValueKind == JsonValueKind.String ? sv.GetString() : sv.ToString();
-                            }
-                            values.Add(new RegulationValue
-                            {
-                                Lookup = name,
-                                Key = key ?? string.Empty,
-                                Scalar = scalar,
-                                Object = valueObject
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        // the lookup files of one satellite may omit the namespace that another file of the same satellite declares
-        if (!string.IsNullOrEmpty(satelliteNamespace))
-        {
-            var prefix = satelliteNamespace + ".";
-            foreach (var value in values)
-            {
-                if (value.Lookup.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    value.LookupAlias = value.Lookup[prefix.Length..];
-                    lookupNames.Add(value.LookupAlias);
-                }
-            }
-            foreach (var name in lookupNames.ToList())
-            {
-                if (name.StartsWith(prefix, StringComparison.Ordinal))
-                {
-                    lookupNames.Add(name[prefix.Length..]);
-                }
-            }
-        }
     }
 
     private static void CheckTraceability(Manifest manifest, CheckResult result)
@@ -412,20 +304,11 @@ public static class Checker
 
     private static string Left10(string value) => value.Length >= 10 ? value[..10] : value;
 
-    private static void CheckCoverage(Manifest manifest, CheckResult result,
-        List<RegulationValue> values, HashSet<string> lookupNames)
+    private static void CheckCoverage(Manifest manifest, string lexDirectory, CheckResult result, RegulationData regulation)
     {
-        var byFullKey = new Dictionary<string, List<RegulationValue>>(StringComparer.Ordinal);
-        var byShortKey = new Dictionary<string, List<RegulationValue>>(StringComparer.Ordinal);
-        foreach (var value in values)
-        {
-            Add(byFullKey, value.Lookup + "." + value.Key, value);
-            if (value.LookupAlias != null)
-            {
-                Add(byFullKey, value.LookupAlias + "." + value.Key, value);
-            }
-            Add(byShortKey, value.Key, value);
-        }
+        var values = regulation.Values;
+        var index = new RegulationIndex(regulation);
+        var editionTag = EntryMapping.EditionTag(manifest);
 
         var coverageExclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindCoverage).ToList();
         var orphanExclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindOrphan).ToList();
@@ -437,54 +320,45 @@ public static class Checker
             {
                 continue;
             }
-            var matched = false;
-            foreach (var (baseKey, remainder) in Splits(entry.Key))
+            var target = EntryMapping.Resolve(entry, index, editionTag);
+            if (target.Kind == EntryTargetKind.Values)
             {
-                if (byFullKey.TryGetValue(baseKey, out var list) || byShortKey.TryGetValue(baseKey, out list))
+                var content = CompareContent(entry, lexDirectory);
+                foreach (var value in target.Values)
                 {
-                    matched = true;
-                    foreach (var value in list)
+                    value.Covered = true;
+                    if (content != null)
                     {
-                        value.Covered = true;
-                        if (entry.HasInlineContent)
-                        {
-                            Compare(result, entry, value, remainder);
-                        }
+                        Compare(result, entry.Key, content, value, target.Remainder);
                     }
-                    break;
                 }
-            }
-            if (matched)
-            {
                 continue;
             }
             // lookup-level coverage is reserved for entries backed by a content file (e.g. a whole table)
-            foreach (var (baseKey, _) in Splits(entry.Key))
+            if (target.Kind == EntryTargetKind.Lookup)
             {
-                if (entry.HasContentFile && lookupNames.Contains(baseKey))
+                coveredLookups.Add(target.BaseKey);
+                var content = CompareContent(entry, lexDirectory);
+                if (content != null && target.Lookup.Values.Count == 1)
                 {
-                    matched = true;
-                    coveredLookups.Add(baseKey);
-                    break;
+                    Compare(result, entry.Key, content, target.Lookup.Values[0], string.Empty);
                 }
+                continue;
             }
-            if (!matched && entry.Key.StartsWith(ReferenceEntryPrefix, StringComparison.Ordinal))
+            if (IsReferenceEntry(entry.Key))
             {
                 // reference entry (link to an official calculator), not a regulation value
                 continue;
             }
-            if (!matched)
+            var orphanExclusion = orphanExclusions.FirstOrDefault(x => x.Matches(entry.Key));
+            if (orphanExclusion != null)
             {
-                var orphanExclusion = orphanExclusions.FirstOrDefault(x => x.Matches(entry.Key));
-                if (orphanExclusion != null)
-                {
-                    usedExclusions.Add(orphanExclusion);
-                    result.ExcludedOrphans++;
-                    continue;
-                }
-                result.Orphans++;
-                AddSample(result.OrphanSamples, entry.Key);
+                usedExclusions.Add(orphanExclusion);
+                result.ExcludedOrphans++;
+                continue;
             }
+            result.Orphans++;
+            AddSample(result.OrphanSamples, entry.Key);
         }
 
         foreach (var value in values)
@@ -683,7 +557,26 @@ public static class Checker
 
     // value comparison -------------------------------------------------------
 
-    private static void Compare(CheckResult result, Entry entry, RegulationValue value, string remainder)
+    /// <summary>
+    /// Content to compare: inline content, or the text of a JSON content file (null without comparable content)
+    /// </summary>
+    private static string CompareContent(Entry entry, string lexDirectory)
+    {
+        if (!entry.HasContentFile)
+        {
+            return entry.Content;
+        }
+        try
+        {
+            return EntryMapping.Content(entry, lexDirectory, out _);
+        }
+        catch (IOException)
+        {
+            return null;
+        }
+    }
+
+    private static void Compare(CheckResult result, string entryKey, string content, RegulationValue value, string remainder)
     {
         JsonElement? target = null;
         string scalar = null;
@@ -697,7 +590,7 @@ public static class Checker
             if (value.Object == null)
             {
                 result.UnresolvedSplit++;
-                AddSample(result.OrphanSamples, $"{entry.Key}: path '{remainder}' but the regulation value is a scalar");
+                AddSample(result.OrphanSamples, $"{entryKey}: path '{remainder}' but the regulation value is a scalar");
                 return;
             }
             var current = value.Object.Value;
@@ -718,7 +611,7 @@ public static class Checker
                 if (next == null)
                 {
                     result.UnresolvedSplit++;
-                    AddSample(result.OrphanSamples, $"{entry.Key}: property '{part}' not found in the regulation value");
+                    AddSample(result.OrphanSamples, $"{entryKey}: property '{part}' not found in the regulation value");
                     return;
                 }
                 current = next.Value;
@@ -733,37 +626,39 @@ public static class Checker
             }
         }
 
-        string difference;
-        if (target != null)
-        {
-            result.Compared++;
-            try
-            {
-                using var lexJson = JsonDocument.Parse(entry.Content, JsonOptions);
-                difference = DeepDifference(target.Value, lexJson.RootElement, string.Empty);
-            }
-            catch (JsonException)
-            {
-                difference = "lex content is not JSON but the regulation value is structured";
-            }
-        }
-        else if (scalar != null)
-        {
-            result.Compared++;
-            difference = ScalarEquals(scalar, entry.Content)
-                ? null
-                : $"regulation '{Shorten(scalar)}' vs lex '{Shorten(entry.Content)}'";
-        }
-        else
+        if (target == null && scalar == null)
         {
             return;
         }
-
+        result.Compared++;
+        var difference = Difference(target, scalar, content);
         if (difference != null)
         {
             result.Drift++;
-            AddSample(result.DriftSamples, entry.Key + ": " + difference);
+            AddSample(result.DriftSamples, entryKey + ": " + difference);
         }
+    }
+
+    /// <summary>
+    /// Difference between a regulation value (structured or scalar) and the lex content, null if equal
+    /// </summary>
+    internal static string Difference(JsonElement? structured, string scalar, string content)
+    {
+        if (structured != null)
+        {
+            try
+            {
+                using var lexJson = JsonDocument.Parse(content, JsonOptions);
+                return DeepDifference(structured.Value, lexJson.RootElement, string.Empty);
+            }
+            catch (JsonException)
+            {
+                return "lex content is not JSON but the regulation value is structured";
+            }
+        }
+        return ScalarEquals(scalar, content)
+            ? null
+            : $"regulation '{Shorten(scalar)}' vs lex '{Shorten(content)}'";
     }
 
     private static string DeepDifference(JsonElement regulation, JsonElement lex, string path)
@@ -839,29 +734,6 @@ public static class Checker
 
     // helpers ----------------------------------------------------------------
 
-    /// <summary>
-    /// Candidate (lookup key, remaining property path) splits of a lex key, longest key first
-    /// </summary>
-    internal static IEnumerable<(string BaseKey, string Remainder)> Splits(string key)
-    {
-        yield return (key, string.Empty);
-        var index = key.LastIndexOf('.');
-        while (index > 0)
-        {
-            yield return (key[..index], key[(index + 1)..]);
-            index = key.LastIndexOf('.', index - 1);
-        }
-    }
-
-    private static void Add(Dictionary<string, List<RegulationValue>> map, string key, RegulationValue value)
-    {
-        if (!map.TryGetValue(key, out var list))
-        {
-            map[key] = list = [];
-        }
-        list.Add(value);
-    }
-
     private static void AddSample(List<string> samples, string text)
     {
         if (samples.Count < MaxSamples)
@@ -870,33 +742,6 @@ public static class Checker
         }
     }
 
-    private static string Shorten(string text) =>
+    internal static string Shorten(string text) =>
         text is { Length: > 60 } ? text[..60] + "..." : text;
-
-    private static string GetString(JsonElement element, string name)
-    {
-        if (element.ValueKind != JsonValueKind.Object)
-        {
-            return null;
-        }
-        foreach (var property in element.EnumerateObject())
-        {
-            if (string.Equals(property.Name, name, StringComparison.OrdinalIgnoreCase))
-            {
-                return property.Value.ValueKind switch
-                {
-                    JsonValueKind.String => property.Value.GetString(),
-                    JsonValueKind.Null => null,
-                    _ => property.Value.ToString()
-                };
-            }
-        }
-        return null;
-    }
-
-    private static byte[] ReadBytes(string path)
-    {
-        var bytes = File.ReadAllBytes(path);
-        return bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF ? bytes[3..] : bytes;
-    }
 }
