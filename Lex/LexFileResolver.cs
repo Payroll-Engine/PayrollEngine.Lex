@@ -52,6 +52,34 @@ public static class LexFileResolver
     }
 
     /// <summary>
+    /// Resolve the lex.json files in all repository folders below a root folder
+    /// </summary>
+    /// <param name="root">Root folder containing the repository folders; without root the current folder is used</param>
+    /// <param name="repoMask">Mask of the repository folder names below the root, default *</param>
+    /// <param name="fileMask">File name or mask relative to each repository folder, default lex.json</param>
+    /// <param name="recursive">Search all subdirectories of each repository folder</param>
+    public static List<string> Resolve(string root, string repoMask, string fileMask, bool recursive)
+    {
+        if (string.IsNullOrWhiteSpace(root))
+        {
+            return Resolve(fileMask, recursive);
+        }
+        if (!Directory.Exists(root))
+        {
+            return [];
+        }
+        fileMask ??= "lex.json";
+        var repositories = Directory.GetDirectories(root, string.IsNullOrWhiteSpace(repoMask) ? "*" : repoMask);
+        System.Array.Sort(repositories, System.StringComparer.OrdinalIgnoreCase);
+        var result = new List<string>();
+        foreach (var repository in repositories)
+        {
+            result.AddRange(Resolve(Path.Combine(repository, fileMask), recursive));
+        }
+        return result;
+    }
+
+    /// <summary>
     /// Test if the file lies in a bin or obj folder below the search root
     /// </summary>
     private static bool IsBuildOutput(string fullPath, string searchRoot)

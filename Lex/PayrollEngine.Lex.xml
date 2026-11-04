@@ -66,6 +66,27 @@
         <member name="P:PayrollEngine.Lex.LexCheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.VerifiedAuto">
+            <summary>Lex entries with an automatic verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.VerifiedManual">
+            <summary>Lex entries with a manual verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.Unverified">
+            <summary>Lex entries without a valid verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.UnverifiedSamples">
+            <summary>Samples of lex entries without verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.RequireVerification">
+            <summary>An entry without verification record is a finding only in the mode Required</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.MissingReview">
+            <summary>Manual verifications of a four-eyes source without second review (reviewedBy, reviewedOn)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.MissingReviewSamples">
+            <summary>Samples of manual verifications without second review</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LexCheckResult.FileProblems">
             <summary>Problems of the evidence files</summary>
         </member>
@@ -98,13 +119,19 @@
         <member name="F:PayrollEngine.Lex.LexChecker.ReferenceEntryPrefix">
             <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.LexChecker.Check(PayrollEngine.Lex.LexManifest,System.String,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.LexChecker.Check(PayrollEngine.Lex.LexManifest,System.String,System.Boolean,System.Boolean)">
             <summary>
             Check one satellite
             </summary>
             <param name="manifest">Manifest (lex.json)</param>
             <param name="lexPath">Full path of lex.json</param>
             <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
+            <param name="requireVerification">Treat an entry without verification record as a finding</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexChecker.CheckVerificationEvidence(PayrollEngine.Lex.LexManifest,System.String,PayrollEngine.Lex.LexCheckResult)">
+            <summary>
+            The evidence of a verification record must be frozen in the snapshot
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.LexChecker.GitList(System.String,System.Boolean)">
             <summary>
@@ -132,6 +159,11 @@
             </summary>
             <param name="results">Check results</param>
             <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexCheckReport.SatelliteLabel(PayrollEngine.Lex.LexCheckResult,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            Satellite name, prefixed with the parent folder when several results share the name (e.g. a check over a root folder)
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.LexExclusion">
             <summary>
@@ -207,6 +239,15 @@
             </summary>
             <param name="fileMask">File name or mask, default lex.json</param>
             <param name="recursive">Search all subdirectories, otherwise the top directory only</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexFileResolver.Resolve(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Resolve the lex.json files in all repository folders below a root folder
+            </summary>
+            <param name="root">Root folder containing the repository folders; without root the current folder is used</param>
+            <param name="repoMask">Mask of the repository folder names below the root, default *</param>
+            <param name="fileMask">File name or mask relative to each repository folder, default lex.json</param>
+            <param name="recursive">Search all subdirectories of each repository folder</param>
         </member>
         <member name="M:PayrollEngine.Lex.LexFileResolver.IsBuildOutput(System.String,System.String)">
             <summary>

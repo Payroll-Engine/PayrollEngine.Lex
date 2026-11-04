@@ -33,14 +33,16 @@ public static class LexCheckReport
         var csv = new StringBuilder();
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrl;MissingSourceLocation;" +
-                       "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources");
+                       "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
+                       "VerifiedAuto;VerifiedManual;Unverified;MissingReview");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
                 r.Satellite, r.LexPath, r.HasSnapshot, r.RegulationLookups, r.RegulationValues, r.LexEntries,
                 r.CoveredDirect, r.CoveredByLookup, r.Uncovered, r.Orphans, r.UnresolvedSplit, r.Compared, r.Drift,
                 r.MissingSourceUrl, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
-                r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count));
+                r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
+                r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview));
         }
         return csv.ToString();
     }
@@ -68,6 +70,10 @@ public static class LexCheckReport
         text.AppendLine($"| Compared values | {results.Sum(r => (long)r.Compared)} |");
         text.AppendLine($"| Differences (candidates) | {results.Sum(r => (long)r.Drift)} |");
         text.AppendLine($"| Entries without sourceLocation | {results.Sum(r => (long)r.MissingSourceLocation)} |");
+        text.AppendLine($"| Entries verified automatically | {results.Sum(r => (long)r.VerifiedAuto)} |");
+        text.AppendLine($"| Entries verified manually | {results.Sum(r => (long)r.VerifiedManual)} |");
+        text.AppendLine($"| Entries without verification | {results.Sum(r => (long)r.Unverified)} |");
+        text.AppendLine($"| Manual verifications without second review | {results.Sum(r => (long)r.MissingReview)} |");
         if (results.Any(r => r.UrlsChecked))
         {
             text.AppendLine($"| Source URLs not found | {results.Sum(r => (long)r.DeadUrls.Count)} |");
@@ -106,10 +112,28 @@ public static class LexCheckReport
             {
                 text.AppendLine($"- Missing fields: sourceUrl {r.MissingSourceUrl}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");
             }
+            if (r.RequireVerification && r.Unverified > 0)
+                text.AppendLine($"- Without verification ({r.Unverified}): {Join(r.UnverifiedSamples, r.Unverified)}");
+            if (r.MissingReview > 0)
+                text.AppendLine($"- Manual verification without second review ({r.MissingReview}): {Join(r.MissingReviewSamples, r.MissingReview)}");
             if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
             if (!r.ValidFromMatch) text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
             if (r.Note != null) text.AppendLine($"- Note: {r.Note}");
         }
+        text.AppendLine();
+        text.AppendLine("## Verification");
+        text.AppendLine();
+        text.AppendLine("| Satellite | Entries | Auto | Manual | Without | Without second review |");
+        text.AppendLine("|:---|---:|---:|---:|---:|---:|");
+        var duplicates = results.GroupBy(r => r.Satellite, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Count() > 1)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var r in results)
+        {
+            text.AppendLine($"| {SatelliteLabel(r, duplicates)} | {r.LexEntries} | {r.VerifiedAuto} | {r.VerifiedManual} | {r.Unverified} | {r.MissingReview} |");
+        }
+
         var excluded = results.Where(r => r.ExclusionNotes.Count > 0).ToList();
         if (excluded.Count > 0)
         {
@@ -124,6 +148,20 @@ public static class LexCheckReport
             }
         }
         return text.ToString();
+    }
+
+    /// <summary>
+    /// Satellite name, prefixed with the parent folder when several results share the name (e.g. a check over a root folder)
+    /// </summary>
+    private static string SatelliteLabel(LexCheckResult result, HashSet<string> duplicates)
+    {
+        if (!duplicates.Contains(result.Satellite ?? string.Empty) || string.IsNullOrEmpty(result.LexPath))
+        {
+            return result.Satellite;
+        }
+        var satelliteDirectory = Path.GetDirectoryName(Path.GetDirectoryName(result.LexPath));
+        var parent = Path.GetFileName(Path.GetDirectoryName(satelliteDirectory));
+        return string.IsNullOrEmpty(parent) ? result.Satellite : $"{parent}/{result.Satellite}";
     }
 
     private static string Join(IReadOnlyCollection<string> samples, int total) =>

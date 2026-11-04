@@ -94,6 +94,28 @@ public sealed class LexCheckResult
     /// <summary>Lex entries without legalReference</summary>
     public int MissingLegalReference { get; internal set; }
 
+    // verification
+    /// <summary>Lex entries with an automatic verification record</summary>
+    public int VerifiedAuto { get; internal set; }
+
+    /// <summary>Lex entries with a manual verification record</summary>
+    public int VerifiedManual { get; internal set; }
+
+    /// <summary>Lex entries without a valid verification record</summary>
+    public int Unverified { get; internal set; }
+
+    /// <summary>Samples of lex entries without verification record</summary>
+    public List<string> UnverifiedSamples { get; } = [];
+
+    /// <summary>An entry without verification record is a finding only in the mode Required</summary>
+    public bool RequireVerification { get; internal set; }
+
+    /// <summary>Manual verifications of a four-eyes source without second review (reviewedBy, reviewedOn)</summary>
+    public int MissingReview { get; internal set; }
+
+    /// <summary>Samples of manual verifications without second review</summary>
+    public List<string> MissingReviewSamples { get; } = [];
+
     // evidence
     /// <summary>Problems of the evidence files</summary>
     public List<string> FileProblems { get; } = [];
@@ -122,7 +144,7 @@ public sealed class LexCheckResult
         Error != null || ValidationErrors.Count > 0 || !HasSnapshot || Uncovered > 0 || Orphans > 0 ||
         UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrl > 0 || (RequireLocation && MissingSourceLocation > 0) ||
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
-        !ValidFromMatch || Note != null;
+        (RequireVerification && Unverified > 0) || MissingReview > 0 || !ValidFromMatch || Note != null;
 }
 
 /// <summary>
@@ -142,6 +164,8 @@ public static class LexChecker
         AllowTrailingCommas = true
     };
 
+    private static readonly JsonSerializerOptions SnapshotOptions = new() { PropertyNameCaseInsensitive = true };
+
     private sealed class RegulationValue
     {
         internal string Lookup { get; init; }
@@ -158,7 +182,9 @@ public static class LexChecker
     /// <param name="manifest">Manifest (lex.json)</param>
     /// <param name="lexPath">Full path of lex.json</param>
     /// <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
-    public static LexCheckResult Check(LexManifest manifest, string lexPath, bool requireLocation = false)
+    /// <param name="requireVerification">Treat an entry without verification record as a finding</param>
+    public static LexCheckResult Check(LexManifest manifest, string lexPath, bool requireLocation = false,
+        bool requireVerification = false)
     {
         var lexDirectory = Path.GetDirectoryName(lexPath)!;
         var satelliteDirectory = Directory.GetParent(lexDirectory)?.FullName ?? lexDirectory;
@@ -167,6 +193,7 @@ public static class LexChecker
             LexPath = lexPath,
             Satellite = Path.GetFileName(satelliteDirectory),
             RequireLocation = requireLocation,
+            RequireVerification = requireVerification,
             LexEntries = manifest.Values.Count,
             LexValidFrom = manifest.ValidFrom,
             HasSnapshot = File.Exists(Path.Combine(lexDirectory, "snapshot.json"))
@@ -174,6 +201,7 @@ public static class LexChecker
 
         // manifest structure (required fields, duplicates, content/contentFile, files)
         result.ValidationErrors.AddRange(LexValidator.Validate(manifest, lexDirectory));
+        CheckVerification(manifest, result);
 
         // regulation values
         var values = new List<RegulationValue>();
@@ -338,6 +366,37 @@ public static class LexChecker
         foreach (var exclusion in exclusions.Where(x => !used.Contains(x)))
         {
             result.ValidationErrors.Add($"Exclusion (sourceLocation) '{exclusion.Pattern}' matches no entry without sourceLocation: remove it");
+        }
+    }
+
+    private static void CheckVerification(LexManifest manifest, LexCheckResult result)
+    {
+        var fourEyesUrls = manifest.Sources
+            .Where(x => x.IsFourEyes && !string.IsNullOrWhiteSpace(x.Url))
+            .Select(x => x.Url)
+            .ToHashSet(StringComparer.Ordinal);
+        foreach (var value in manifest.Values)
+        {
+            var verification = value.Verification;
+            switch (verification?.Mode)
+            {
+                case LexVerification.ModeAuto:
+                    result.VerifiedAuto++;
+                    break;
+                case LexVerification.ModeManual:
+                    result.VerifiedManual++;
+                    if (value.SourceUrl != null && fourEyesUrls.Contains(value.SourceUrl) &&
+                        (string.IsNullOrWhiteSpace(verification.ReviewedBy) || string.IsNullOrWhiteSpace(verification.ReviewedOn)))
+                    {
+                        result.MissingReview++;
+                        AddSample(result.MissingReviewSamples, value.Key);
+                    }
+                    break;
+                default:
+                    result.Unverified++;
+                    AddSample(result.UnverifiedSamples, value.Key);
+                    break;
+            }
         }
     }
 
@@ -512,6 +571,8 @@ public static class LexChecker
             }
         }
 
+        CheckVerificationEvidence(manifest, lexDirectory, result);
+
         // git state of the evidence: untracked or ignored files are not part of the compliance record
         paths.Add(Path.Combine(lexDirectory, "lex.json"));
         if (result.HasSnapshot)
@@ -535,6 +596,42 @@ public static class LexChecker
         var distinct = result.FileProblems.Distinct(StringComparer.Ordinal).Take(MaxSamples).ToList();
         result.FileProblems.Clear();
         result.FileProblems.AddRange(distinct);
+    }
+
+    /// <summary>
+    /// The evidence of a verification record must be frozen in the snapshot
+    /// </summary>
+    private static void CheckVerificationEvidence(LexManifest manifest, string lexDirectory, LexCheckResult result)
+    {
+        var evidences = manifest.Values
+            .Select(x => x.Verification?.Evidence)
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
+        if (evidences.Count == 0 || !result.HasSnapshot)
+        {
+            return;
+        }
+
+        LexSnapshot snapshot;
+        try
+        {
+            snapshot = JsonSerializer.Deserialize<LexSnapshot>(
+                File.ReadAllText(Path.Combine(lexDirectory, "snapshot.json")), SnapshotOptions);
+        }
+        catch (Exception exception)
+        {
+            result.FileProblems.Add("snapshot.json could not be read: " + exception.Message);
+            return;
+        }
+        var frozen = (snapshot?.Files ?? [])
+            .Select(x => x.FileName)
+            .Where(x => x != null)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        foreach (var evidence in evidences.Where(x => !frozen.Contains(x)))
+        {
+            result.FileProblems.Add($"verification evidence not in the snapshot: {evidence}");
+        }
     }
 
     /// <summary>
