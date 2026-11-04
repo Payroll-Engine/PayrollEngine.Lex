@@ -139,6 +139,11 @@ public static class Applier
             {
                 continue;
             }
+            if (entry.Open)
+            {
+                result.Skipped.Add($"{entry.Key}: open entry, verify first");
+                continue;
+            }
             var target = EntryMapping.Resolve(entry, index, editionTag);
             if (target.Kind == EntryTargetKind.None)
             {

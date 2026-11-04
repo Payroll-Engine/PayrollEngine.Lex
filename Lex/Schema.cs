@@ -224,6 +224,10 @@ public static class Schema
                 },
                 "verification": {
                   "$ref": "#/$defs/verification"
+                },
+                "open": {
+                  "type": "boolean",
+                  "description": "Open entry: value taken from the previous cycle by LexRollover, needs a new verification. A new verification record removes the flag."
                 }
               }
             },

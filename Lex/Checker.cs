@@ -110,6 +110,12 @@ public sealed class CheckResult
     /// <summary>An entry without verification record is a finding only in the mode Required</summary>
     public bool RequireVerification { get; internal set; }
 
+    /// <summary>Open lex entries (previous cycle value without new verification), always a finding</summary>
+    public int Open { get; internal set; }
+
+    /// <summary>Samples of open lex entries</summary>
+    public List<string> OpenSamples { get; } = [];
+
     /// <summary>Manual verifications of a four-eyes source without second review (reviewedBy, reviewedOn)</summary>
     public int MissingReview { get; internal set; }
 
@@ -144,7 +150,7 @@ public sealed class CheckResult
         Error != null || ValidationErrors.Count > 0 || !HasSnapshot || Uncovered > 0 || Orphans > 0 ||
         UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrl > 0 || (RequireLocation && MissingSourceLocation > 0) ||
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
-        (RequireVerification && Unverified > 0) || MissingReview > 0 || !ValidFromMatch || Note != null;
+        (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null;
 }
 
 /// <summary>
@@ -269,6 +275,12 @@ public static class Checker
             .ToHashSet(StringComparer.Ordinal);
         foreach (var value in manifest.Values)
         {
+            if (value.Open)
+            {
+                result.Open++;
+                AddSample(result.OpenSamples, value.Key);
+                continue;
+            }
             var verification = value.Verification;
             switch (verification?.Mode)
             {

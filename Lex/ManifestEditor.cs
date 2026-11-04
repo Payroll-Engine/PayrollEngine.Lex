@@ -100,6 +100,7 @@ public sealed class ManifestEditor
             }
         }
         entry["verification"] = JsonSerializer.SerializeToNode(verification, NodeOptions);
+        entry.Remove("open");
         Changes++;
         return true;
     }
@@ -233,6 +234,7 @@ public sealed class ManifestEditor
             }
         }
         entry["verification"] = JsonSerializer.SerializeToNode(verification, NodeOptions);
+        entry.Remove("open");
         Changes++;
         return AttestResult.Written;
     }
@@ -272,6 +274,70 @@ public sealed class ManifestEditor
         verification["reviewedOn"] = reviewedOn;
         Changes++;
         return AttestResult.Written;
+    }
+
+    /// <summary>
+    /// Set the validFrom date of the manifest
+    /// </summary>
+    /// <param name="validFrom">Date in yyyy-MM-dd format</param>
+    internal void SetValidFrom(string validFrom)
+    {
+        if (root is JsonObject header && header["validFrom"]?.GetValue<string>() != validFrom)
+        {
+            header["validFrom"] = validFrom;
+            Changes++;
+        }
+    }
+
+    /// <summary>
+    /// Mark all entries as open: the verification record is removed
+    /// </summary>
+    /// <returns>Number of open entries</returns>
+    internal int OpenEntries()
+    {
+        var count = 0;
+        foreach (var entry in Values())
+        {
+            entry.Remove("verification");
+            entry["open"] = true;
+            count++;
+        }
+        Changes += count;
+        return count;
+    }
+
+    /// <summary>
+    /// Rename the content files of the entries and move the edition suffix of their keys to the new tag
+    /// </summary>
+    /// <param name="renameFile">Returns the new contentFile path, the same path when unchanged</param>
+    /// <param name="oldTag">Previous edition tag (year)</param>
+    /// <param name="newTag">New edition tag (year)</param>
+    /// <returns>Number of renamed keys</returns>
+    internal int RollContentFiles(Func<string, string> renameFile, string oldTag, string newTag)
+    {
+        var keys = 0;
+        foreach (var entry in Values())
+        {
+            var contentFile = entry["contentFile"]?.GetValue<string>();
+            if (string.IsNullOrEmpty(contentFile))
+            {
+                continue;
+            }
+            var renamed = renameFile(contentFile);
+            if (!string.Equals(renamed, contentFile, StringComparison.Ordinal))
+            {
+                entry["contentFile"] = renamed;
+                Changes++;
+            }
+            var key = entry["key"]?.GetValue<string>();
+            if (key != null && key.EndsWith("." + oldTag, StringComparison.Ordinal))
+            {
+                entry["key"] = key[..^oldTag.Length] + newTag;
+                Changes++;
+                keys++;
+            }
+        }
+        return keys;
     }
 
     /// <summary>

@@ -164,6 +164,10 @@ public static class Verifier
             {
                 input.Append(value.Verification.HashInput());
             }
+            if (value.Open)
+            {
+                input.Append(Entry.OpenHashInput);
+            }
         }
 
         foreach (var file in manifest.Files)

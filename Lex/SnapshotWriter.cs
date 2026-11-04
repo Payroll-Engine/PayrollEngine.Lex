@@ -102,13 +102,18 @@ public sealed class SnapshotWriter
                     SourceLocation = value.SourceLocation,
                     LegalReference = value.LegalReference,
                     Description = value.Description,
-                    Verification = value.Verification
+                    Verification = value.Verification,
+                    Open = value.Open
                 });
             }
 
             if (value.Verification != null)
             {
                 hashInput.Append(value.Verification.HashInput());
+            }
+            if (value.Open)
+            {
+                hashInput.Append(Entry.OpenHashInput);
             }
         }
 

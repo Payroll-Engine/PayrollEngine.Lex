@@ -61,6 +61,18 @@ public sealed class Entry
     public Verification Verification { get; init; }
 
     /// <summary>
+    /// Open entry: the value is taken from the previous cycle (LexRollover) and needs a new verification.
+    /// A new verification record removes the flag.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingDefault)]
+    public bool Open { get; init; }
+
+    /// <summary>
+    /// Canonical text of the open flag, part of the snapshot source hash
+    /// </summary>
+    internal const string OpenHashInput = "open";
+
+    /// <summary>
     /// Returns true if this value uses an inline content string
     /// </summary>
     [JsonIgnore]

@@ -174,8 +174,8 @@ public class CheckerVerificationTests
         var csv = CheckReport.BuildCsv(results);
 
         Assert.Contains("| Entries without verification | 1 |", markdown);
-        Assert.Contains("| Data.Test.2026 | 3 | 1 | 1 | 1 | 0 |", markdown);
-        Assert.EndsWith(";VerifiedAuto;VerifiedManual;Unverified;MissingReview", csv.Split('\n')[0].TrimEnd('\r'));
-        Assert.EndsWith(";1;1;1;0", csv.Split('\n')[1].TrimEnd('\r'));
+        Assert.Contains("| Data.Test.2026 | 3 | 1 | 1 | 1 | 0 | 0 |", markdown);
+        Assert.EndsWith(";VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open", csv.Split('\n')[0].TrimEnd('\r'));
+        Assert.EndsWith(";1;1;1;0;0", csv.Split('\n')[1].TrimEnd('\r'));
     }
 }

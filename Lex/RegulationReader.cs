@@ -72,6 +72,24 @@ internal sealed class RegulationData
 
     /// <summary>Lookup names including the names without satellite namespace</summary>
     internal HashSet<string> LookupNames { get; } = new(StringComparer.Ordinal);
+
+    /// <summary>validFrom tokens of all regulations</summary>
+    internal List<RegulationToken> ValidFromTokens { get; } = [];
+}
+
+/// <summary>
+/// Location of a string token in a regulation file
+/// </summary>
+internal sealed class RegulationToken
+{
+    internal RegulationFile File { get; init; }
+    internal string Value { get; init; }
+
+    /// <summary>Offset of the opening quote</summary>
+    internal int Offset { get; init; }
+
+    /// <summary>Length including the quotes</summary>
+    internal int Length { get; init; }
 }
 
 /// <summary>
@@ -228,7 +246,19 @@ internal static class RegulationReader
             }
             else if (Is(name, "validFrom"))
             {
+                var offset = (int)reader.TokenStartIndex;
+                var isString = reader.TokenType == JsonTokenType.String;
                 validFrom = Text(ref reader);
+                if (isString)
+                {
+                    context.Data.ValidFromTokens.Add(new RegulationToken
+                    {
+                        File = context.File,
+                        Value = validFrom,
+                        Offset = offset,
+                        Length = (int)reader.BytesConsumed - offset
+                    });
+                }
             }
             else if (Is(name, "namespace"))
             {

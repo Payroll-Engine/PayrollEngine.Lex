@@ -137,6 +137,10 @@ public static class Validator
             if (value.Verification != null && !string.IsNullOrWhiteSpace(value.Key))
             {
                 ValidateVerification(errors, value.Key, value.Verification, declaredFileNames);
+                if (value.Open)
+                {
+                    errors.Add($"Value '{value.Key}': an open entry must not have a verification record");
+                }
             }
         }
 

@@ -193,6 +193,12 @@
         <member name="P:PayrollEngine.Lex.CheckResult.RequireVerification">
             <summary>An entry without verification record is a finding only in the mode Required</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Open">
+            <summary>Open lex entries (previous cycle value without new verification), always a finding</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.OpenSamples">
+            <summary>Samples of open lex entries</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingReview">
             <summary>Manual verifications of a four-eyes source without second review (reviewedBy, reviewedOn)</summary>
         </member>
@@ -361,6 +367,17 @@
         <member name="P:PayrollEngine.Lex.Entry.Verification">
             <summary>
             Verification record (optional; LexCheck reports values without verification)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Entry.Open">
+            <summary>
+            Open entry: the value is taken from the previous cycle (LexRollover) and needs a new verification.
+            A new verification record removes the flag.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Entry.OpenHashInput">
+            <summary>
+            Canonical text of the open flag, part of the snapshot source hash
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.HasInlineContent">
@@ -832,6 +849,27 @@
             <param name="reviewedOn">Review date (yyyy-MM-dd)</param>
             <param name="overwrite">Replace an existing review</param>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetValidFrom(System.String)">
+            <summary>
+            Set the validFrom date of the manifest
+            </summary>
+            <param name="validFrom">Date in yyyy-MM-dd format</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.OpenEntries">
+            <summary>
+            Mark all entries as open: the verification record is removed
+            </summary>
+            <returns>Number of open entries</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RollContentFiles(System.Func{System.String,System.String},System.String,System.String)">
+            <summary>
+            Rename the content files of the entries and move the edition suffix of their keys to the new tag
+            </summary>
+            <param name="renameFile">Returns the new contentFile path, the same path when unchanged</param>
+            <param name="oldTag">Previous edition tag (year)</param>
+            <param name="newTag">New edition tag (year)</param>
+            <returns>Number of renamed keys</returns>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.ToJson">
             <summary>
             The document as indented JSON
@@ -881,6 +919,20 @@
         <member name="P:PayrollEngine.Lex.RegulationData.LookupNames">
             <summary>Lookup names including the names without satellite namespace</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.ValidFromTokens">
+            <summary>validFrom tokens of all regulations</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationToken">
+            <summary>
+            Location of a string token in a regulation file
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationToken.Offset">
+            <summary>Offset of the opening quote</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationToken.Length">
+            <summary>Length including the quotes</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationReader">
             <summary>
             Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
@@ -889,6 +941,83 @@
         <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
             <summary>
             Read all regulation files (*.json) of the Regulation folder below the satellite directory
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.YearMention">
+            <summary>
+            Line of a rolled file that still mentions the previous year
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.File">
+            <summary>File path relative to the new satellite</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.Line">
+            <summary>Line number (1-based)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.Text">
+            <summary>Line text (trimmed, shortened)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RolloverResult">
+            <summary>
+            Result of a rollover of one data regulation satellite
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.SourceDirectory">
+            <summary>Directory of the previous cycle</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.TargetDirectory">
+            <summary>Directory of the new cycle</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.PreviousValidFrom">
+            <summary>validFrom of the previous cycle (lex.json)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.ValidFrom">
+            <summary>validFrom of the new cycle (cycle start)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.Files">
+            <summary>Files of the new satellite, relative paths</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.Renamed">
+            <summary>Renamed files and folders (previous name -> new name)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.Changed">
+            <summary>Changed files with the kind of change</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.OpenEntries">
+            <summary>Lex entries marked as open</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.YearMentions">
+            <summary>Lines that still mention the previous year: review them</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.Notes">
+            <summary>Information for the follow-up work</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverResult.Error">
+            <summary>Error that prevented the rollover, nothing written</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.Rollover">
+            <summary>
+            Prepares the satellite of the next cycle: the folder is copied with the year tag of the cycle start,
+            validFrom and the year-based version are set and all lex entries are marked as open.
+            Values, descriptions and lookup keys are not changed.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.Run(System.String,System.DateTime,System.Boolean)">
+            <summary>
+            Roll a satellite to the cycle starting at the given date
+            </summary>
+            <param name="satelliteDirectory">Satellite directory of the previous cycle (contains .lex/lex.json)</param>
+            <param name="cycleStart">Start of the new cycle, the new validFrom</param>
+            <param name="dryRun">Report without writing</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.RenameSegment(System.String,System.String,System.String)">
+            <summary>
+            Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">
+            <summary>
+            Replace the date part of the validFrom tokens, the time part is kept
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Schema">

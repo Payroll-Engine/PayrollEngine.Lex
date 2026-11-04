@@ -34,7 +34,7 @@ public static class CheckReport
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrl;MissingSourceLocation;" +
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
-                       "VerifiedAuto;VerifiedManual;Unverified;MissingReview");
+                       "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -42,7 +42,7 @@ public static class CheckReport
                 r.CoveredDirect, r.CoveredByLookup, r.Uncovered, r.Orphans, r.UnresolvedSplit, r.Compared, r.Drift,
                 r.MissingSourceUrl, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
-                r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview));
+                r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open));
         }
         return csv.ToString();
     }
@@ -74,6 +74,7 @@ public static class CheckReport
         text.AppendLine($"| Entries verified manually | {results.Sum(r => (long)r.VerifiedManual)} |");
         text.AppendLine($"| Entries without verification | {results.Sum(r => (long)r.Unverified)} |");
         text.AppendLine($"| Manual verifications without second review | {results.Sum(r => (long)r.MissingReview)} |");
+        text.AppendLine($"| Open entries (previous cycle, verify again) | {results.Sum(r => (long)r.Open)} |");
         if (results.Any(r => r.UrlsChecked))
         {
             text.AppendLine($"| Source URLs not found | {results.Sum(r => (long)r.DeadUrls.Count)} |");
@@ -114,6 +115,8 @@ public static class CheckReport
             }
             if (r.RequireVerification && r.Unverified > 0)
                 text.AppendLine($"- Without verification ({r.Unverified}): {Join(r.UnverifiedSamples, r.Unverified)}");
+            if (r.Open > 0)
+                text.AppendLine($"- Open entries, verify again ({r.Open}): {Join(r.OpenSamples, r.Open)}");
             if (r.MissingReview > 0)
                 text.AppendLine($"- Manual verification without second review ({r.MissingReview}): {Join(r.MissingReviewSamples, r.MissingReview)}");
             if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
@@ -123,15 +126,15 @@ public static class CheckReport
         text.AppendLine();
         text.AppendLine("## Verification");
         text.AppendLine();
-        text.AppendLine("| Satellite | Entries | Auto | Manual | Without | Without second review |");
-        text.AppendLine("|:---|---:|---:|---:|---:|---:|");
+        text.AppendLine("| Satellite | Entries | Auto | Manual | Without | Open | Without second review |");
+        text.AppendLine("|:---|---:|---:|---:|---:|---:|---:|");
         var duplicates = results.GroupBy(r => r.Satellite, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
             .ToHashSet(StringComparer.OrdinalIgnoreCase);
         foreach (var r in results)
         {
-            text.AppendLine($"| {SatelliteLabel(r, duplicates)} | {r.LexEntries} | {r.VerifiedAuto} | {r.VerifiedManual} | {r.Unverified} | {r.MissingReview} |");
+            text.AppendLine($"| {SatelliteLabel(r, duplicates)} | {r.LexEntries} | {r.VerifiedAuto} | {r.VerifiedManual} | {r.Unverified} | {r.Open} | {r.MissingReview} |");
         }
 
         var excluded = results.Where(r => r.ExclusionNotes.Count > 0).ToList();
