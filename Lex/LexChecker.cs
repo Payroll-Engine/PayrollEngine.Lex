@@ -76,6 +76,12 @@ public sealed class LexCheckResult
     public List<string> DeadUrls { get; } = [];
     internal int BlockedUrls { get; set; }
 
+    /// <summary>Source URLs whose normalized text differs from the snapshot: check the values</summary>
+    public List<string> ChangedSources { get; } = [];
+    internal int SourcesCompared { get; set; }
+    internal int SourcesNotComparable { get; set; }
+    internal int SourcesWithoutBaseline { get; set; }
+
     /// <summary>A missing sourceLocation is a finding only in the mode Required</summary>
     public bool RequireLocation { get; internal set; }
 
@@ -115,7 +121,8 @@ public sealed class LexCheckResult
     public bool HasFindings =>
         Error != null || ValidationErrors.Count > 0 || !HasSnapshot || Uncovered > 0 || Orphans > 0 ||
         UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrl > 0 || (RequireLocation && MissingSourceLocation > 0) ||
-        MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || !ValidFromMatch || Note != null;
+        MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
+        !ValidFromMatch || Note != null;
 }
 
 /// <summary>

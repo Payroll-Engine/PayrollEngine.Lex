@@ -1,9 +1,11 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -29,24 +31,40 @@ internal enum LexUrlStatus
 /// </summary>
 public sealed class LexUrlChecker : IDisposable
 {
+    private static readonly JsonSerializerOptions SnapshotOptions = new() { PropertyNameCaseInsensitive = true };
+
     private readonly HttpClient client;
     private readonly SemaphoreSlim gate = new(6);
     private readonly ConcurrentDictionary<string, Task<LexUrlStatus>> cache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<string, Task<LexSourceDocument>> documents = new(StringComparer.Ordinal);
+    private readonly IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers;
 
     /// <summary>
     /// Create a URL checker
     /// </summary>
     public LexUrlChecker() :
-        this(null)
+        this(null, null)
+    {
+    }
+
+    /// <summary>
+    /// Create a URL checker with readers for source formats without a built-in reader
+    /// </summary>
+    /// <param name="readers">Readers by lower-case file extension (e.g. <c>.xlsx</c>), used to compare live sources</param>
+    public LexUrlChecker(IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers) :
+        this(null, readers)
     {
     }
 
     /// <param name="handler">Optional message handler (tests)</param>
-    internal LexUrlChecker(HttpMessageHandler handler)
+    /// <param name="readers">Optional readers by file extension</param>
+    internal LexUrlChecker(HttpMessageHandler handler,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
     {
+        this.readers = readers;
         client = handler != null ? new HttpClient(handler) : new HttpClient();
         client.Timeout = TimeSpan.FromSeconds(25);
-        client.DefaultRequestHeaders.UserAgent.ParseAdd("Mozilla/5.0 (compatible; PayrollEngine-LexCheck)");
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(LexSourceDocument.UserAgent);
     }
 
     /// <summary>
@@ -68,17 +86,21 @@ public sealed class LexUrlChecker : IDisposable
             .Distinct(StringComparer.Ordinal);
 
     /// <summary>
-    /// Request all URLs of the manifest and record the result
+    /// Request all URLs of the manifest and record the result. Sources with a text hash in the snapshot
+    /// next to lex.json are compared with their live text: a changed text is a finding,
+    /// a source that cannot be read is not comparable (note).
     /// </summary>
     public async Task Apply(LexManifest manifest, LexCheckResult result)
     {
         var urls = Urls(manifest).ToList();
         var states = await Task.WhenAll(urls.Select(async url => (url, status: await Check(url))));
+        var dead = new HashSet<string>(StringComparer.Ordinal);
         foreach (var (url, status) in states)
         {
             if (status == LexUrlStatus.Dead)
             {
                 result.DeadUrls.Add(url);
+                dead.Add(url);
             }
             else if (status == LexUrlStatus.Blocked)
             {
@@ -86,6 +108,79 @@ public sealed class LexUrlChecker : IDisposable
             }
         }
         result.UrlsChecked = true;
+        await CompareLiveSources(manifest, result, dead);
+    }
+
+    private async Task CompareLiveSources(LexManifest manifest, LexCheckResult result, HashSet<string> dead)
+    {
+        var baseline = ReadBaseline(result.LexPath);
+        var live = LexLiveSource.Urls(manifest).Where(url => !dead.Contains(url)).ToList();
+        result.SourcesWithoutBaseline += live.Count(url => !baseline.ContainsKey(url));
+        var compared = await Task.WhenAll(live.Where(baseline.ContainsKey).Select(async url =>
+        {
+            var document = await documents.GetOrAdd(url, LoadDocumentAsync);
+            var changed = document.IsReadable &&
+                          !string.Equals(document.TextHash(), baseline[url], StringComparison.Ordinal);
+            return (url, readable: document.IsReadable, changed);
+        }));
+        foreach (var (url, readable, changed) in compared)
+        {
+            // blocked or unreadable: no change finding, the host proves nothing
+            if (!readable)
+            {
+                result.SourcesNotComparable++;
+                continue;
+            }
+            result.SourcesCompared++;
+            if (changed)
+            {
+                result.ChangedSources.Add(url);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Text hashes of the snapshot next to lex.json, by URL
+    /// </summary>
+    private static Dictionary<string, string> ReadBaseline(string lexPath)
+    {
+        var baseline = new Dictionary<string, string>(StringComparer.Ordinal);
+        var snapshotPath = string.IsNullOrWhiteSpace(lexPath)
+            ? null
+            : Path.Combine(Path.GetDirectoryName(lexPath) ?? string.Empty, "snapshot.json");
+        if (snapshotPath == null || !File.Exists(snapshotPath))
+        {
+            return baseline;
+        }
+        try
+        {
+            var snapshot = JsonSerializer.Deserialize<LexSnapshot>(File.ReadAllText(snapshotPath), SnapshotOptions);
+            foreach (var source in snapshot?.LiveSources ?? [])
+            {
+                if (!string.IsNullOrWhiteSpace(source.Url) && source.TextHash != null)
+                {
+                    baseline[source.Url] = source.TextHash;
+                }
+            }
+        }
+        catch (JsonException)
+        {
+            // an unreadable snapshot is reported by LexVerify
+        }
+        return baseline;
+    }
+
+    private async Task<LexSourceDocument> LoadDocumentAsync(string url)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            return await LexSourceDocument.LoadLive(url, client, readers);
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     private async Task<LexUrlStatus> RequestAsync(string url)

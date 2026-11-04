@@ -33,14 +33,14 @@ public static class LexCheckReport
         var csv = new StringBuilder();
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrl;MissingSourceLocation;" +
-                       "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings");
+                       "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
                 r.Satellite, r.LexPath, r.HasSnapshot, r.RegulationLookups, r.RegulationValues, r.LexEntries,
                 r.CoveredDirect, r.CoveredByLookup, r.Uncovered, r.Orphans, r.UnresolvedSplit, r.Compared, r.Drift,
                 r.MissingSourceUrl, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
-                r.FileProblems.Count, r.ValidFromMatch, r.HasFindings));
+                r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count));
         }
         return csv.ToString();
     }
@@ -72,6 +72,10 @@ public static class LexCheckReport
         {
             text.AppendLine($"| Source URLs not found | {results.Sum(r => (long)r.DeadUrls.Count)} |");
             text.AppendLine($"| Source URLs of blocking hosts (not verifiable) | {results.Sum(r => (long)r.BlockedUrls)} |");
+            text.AppendLine($"| Sources compared with the snapshot | {results.Sum(r => (long)r.SourcesCompared)} |");
+            text.AppendLine($"| Sources changed (check values) | {results.Sum(r => (long)r.ChangedSources.Count)} |");
+            text.AppendLine($"| Sources not comparable (blocked or unreadable) | {results.Sum(r => (long)r.SourcesNotComparable)} |");
+            text.AppendLine($"| Sources without text hash in the snapshot | {results.Sum(r => (long)r.SourcesWithoutBaseline)} |");
         }
         text.AppendLine($"| Excluded (documented): without lex entry | {results.Sum(r => (long)r.ExcludedCoverage)} |");
         text.AppendLine($"| Excluded (documented): without sourceLocation | {results.Sum(r => (long)r.ExcludedSourceLocation)} |");
@@ -97,6 +101,7 @@ public static class LexCheckReport
             if (r.Orphans > 0 || r.UnresolvedSplit > 0) text.AppendLine($"  - orphans / unresolved ({r.Orphans} + {r.UnresolvedSplit}): {Join(r.OrphanSamples, r.Orphans + r.UnresolvedSplit)}");
             if (r.Drift > 0) text.AppendLine($"- Differences ({r.Drift} of {r.Compared} compared): {Join(r.DriftSamples, r.Drift)}");
             foreach (var url in r.DeadUrls) text.AppendLine($"- Source URL not found: {url}");
+            foreach (var url in r.ChangedSources) text.AppendLine($"- Source changed, check value: {url}");
             if (r.MissingSourceUrl + (r.RequireLocation ? r.MissingSourceLocation : 0) + r.MissingLegalReference > 0)
             {
                 text.AppendLine($"- Missing fields: sourceUrl {r.MissingSourceUrl}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");

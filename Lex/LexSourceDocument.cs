@@ -23,7 +23,10 @@ internal enum LexSourceState
     Unreadable,
 
     /// <summary>The format cannot be read (e.g. PDF)</summary>
-    Unsupported
+    Unsupported,
+
+    /// <summary>No local evidence file exists</summary>
+    Missing
 }
 
 /// <summary>
@@ -81,27 +84,119 @@ public sealed class LexSourceDocument
     /// <summary>
     /// Build a document from HTML
     /// </summary>
-    internal static LexSourceDocument FromHtml(string html)
-    {
-        html = Regex.Replace(html, @"<(script|style|noscript)\b.*?</\1>", " ", RegexOptions.Singleline | RegexOptions.IgnoreCase);
-        var sections = new List<(string, string)>();
-        var heading = "(start of page)";
-        var position = 0;
-        foreach (Match match in Regex.Matches(html, @"<h([1-4])\b[^>]*>(.*?)</h\1>", RegexOptions.Singleline | RegexOptions.IgnoreCase))
-        {
-            AddSection(sections, heading, html[position..match.Index]);
-            heading = CleanText(match.Groups[2].Value);
-            position = match.Index + match.Length;
-        }
-        AddSection(sections, heading, html[position..]);
-        return Create(sections);
-    }
+    internal static LexSourceDocument FromHtml(string html) =>
+        Create(LexHtmlReader.Read(html));
 
     /// <summary>
     /// Build a document from plain text
     /// </summary>
     internal static LexSourceDocument FromText(string text) =>
-        Create([("(text)", CleanText(text))]);
+        Create([("(text)", LexHtmlReader.CleanLines(text))]);
+
+    /// <summary>
+    /// User agent of all lex source requests: snapshot and check must request a source the same way
+    /// </summary>
+    internal const string UserAgent = "Mozilla/5.0 (compatible; PayrollEngine-Lex)";
+
+    /// <summary>
+    /// HTTP client for source requests
+    /// </summary>
+    /// <param name="timeout">Request timeout (default: 60 seconds)</param>
+    public static HttpClient CreateHttpClient(TimeSpan? timeout = null)
+    {
+        var client = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(60) };
+        client.DefaultRequestHeaders.UserAgent.ParseAdd(UserAgent);
+        return client;
+    }
+
+    /// <summary>
+    /// True if text could be extracted
+    /// </summary>
+    public bool IsReadable => State == LexSourceState.Readable;
+
+    /// <summary>
+    /// Load the local evidence file of an entry; a missing file gives a document without evidence
+    /// </summary>
+    /// <param name="localPath">Local evidence file, null when the entry has none</param>
+    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    public static Task<LexSourceDocument> LoadLocal(string localPath,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
+    {
+        if (string.IsNullOrWhiteSpace(localPath) || !File.Exists(localPath))
+        {
+            return Task.FromResult(new LexSourceDocument { State = LexSourceState.Missing, Reason = "no local evidence" });
+        }
+        return Load(null, localPath, null, readers);
+    }
+
+    /// <summary>
+    /// Load the live source from its URL
+    /// </summary>
+    /// <param name="url">Source URL</param>
+    /// <param name="client">HTTP client</param>
+    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    public static Task<LexSourceDocument> LoadLive(string url, HttpClient client,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null) =>
+        Load(url, null, client, readers);
+
+    /// <summary>
+    /// Text used for change detection: the lines of all sections that hold a number (values), without date and
+    /// time stamps and without whitespace (markup changes move spaces around inline elements), sorted, because
+    /// pages may serve their blocks in a varying order. Lines without a number (menus, navigation) are ignored.
+    /// A table row is one line, so a changed value still changes the text.
+    /// </summary>
+    internal string NormalizedText()
+    {
+        var lines = new List<string>();
+        foreach (var (heading, body) in Sections)
+        {
+            AddNormalizedLine(lines, heading);
+            foreach (var line in body.Split('\n'))
+            {
+                AddNormalizedLine(lines, line);
+            }
+        }
+        lines.Sort(StringComparer.Ordinal);
+        return string.Join('\n', lines);
+    }
+
+    private static void AddNormalizedLine(List<string> lines, string line)
+    {
+        foreach (var pattern in DatePatterns)
+        {
+            line = pattern.Replace(line, " ");
+        }
+        line = Whitespace.Replace(line, string.Empty);
+        if (line.Any(char.IsAsciiDigit))
+        {
+            lines.Add(line);
+        }
+    }
+
+    /// <summary>
+    /// Hash of the normalized text (sha256:...), null when the document is not readable
+    /// </summary>
+    internal string TextHash() =>
+        IsReadable ? "sha256:" + LexHash.StringHash(NormalizedText()) : null;
+
+    private static readonly Regex Whitespace = new(@"\s+", RegexOptions.Compiled);
+
+    private const string MonthNames =
+        "Jan(?:uary)?|Feb(?:ruary)?|Mar(?:ch)?|Apr(?:il)?|May|June?|July?|Aug(?:ust)?|Sep(?:t(?:ember)?)?|Oct(?:ober)?|Nov(?:ember)?|Dec(?:ember)?";
+
+    private static readonly Regex[] DatePatterns =
+    [
+        // ISO date with optional time
+        new(@"\b\d{4}-\d{2}-\d{2}(?:[T ]\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:?\d{2})?)?\b", RegexOptions.Compiled),
+        // numeric dates: 03.11.2026, 3/11/2026, 03-11-26
+        new(@"\b\d{1,2}[./-]\d{1,2}[./-](?:\d{4}|\d{2})\b", RegexOptions.Compiled),
+        // 3 November 2026, 3rd Nov. 2026
+        new($@"\b\d{{1,2}}(?:st|nd|rd|th)?\.?\s+(?:{MonthNames})\.?,?\s+\d{{4}}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // November 3, 2026
+        new($@"\b(?:{MonthNames})\.?\s+\d{{1,2}}(?:st|nd|rd|th)?,?\s+\d{{4}}\b", RegexOptions.Compiled | RegexOptions.IgnoreCase),
+        // times: 14:05, 2:05:10 pm
+        new(@"\b\d{1,2}:\d{2}(?::\d{2})?(?:\s*[ap]\.?m\.?)?(?![\w:])", RegexOptions.Compiled | RegexOptions.IgnoreCase)
+    ];
 
     /// <summary>
     /// Load the source: a local evidence file when present, otherwise the URL
@@ -163,16 +258,4 @@ public sealed class LexSourceDocument
             ? new LexSourceDocument { State = LexSourceState.Unreadable, Reason = "no readable text (script-only page?)" }
             : new LexSourceDocument { State = LexSourceState.Readable, Sections = sections };
     }
-
-    private static void AddSection(List<(string, string)> sections, string heading, string html)
-    {
-        var text = CleanText(html);
-        if (text.Length > 0)
-        {
-            sections.Add((heading, text));
-        }
-    }
-
-    private static string CleanText(string html) =>
-        Regex.Replace(WebUtility.HtmlDecode(Regex.Replace(html, "<[^>]+>", " ")), @"\s+", " ").Trim();
 }

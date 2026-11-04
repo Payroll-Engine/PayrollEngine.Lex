@@ -56,4 +56,10 @@ public sealed class LexSnapshot
     /// All files in the .lex folder — includes both explicit files[] and values with contentFile
     /// </summary>
     public List<LexSnapshotFile> Files { get; init; }
+
+    /// <summary>
+    /// Live state of the source URLs (sources and entries) at snapshot time; not part of the source hash.
+    /// Compared by LexCheck with source URL checks to detect changed sources.
+    /// </summary>
+    public List<LexLiveSource> LiveSources { get; init; }
 }

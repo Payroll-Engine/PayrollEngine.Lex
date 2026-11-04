@@ -7,6 +7,7 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace PayrollEngine.Lex;
@@ -29,6 +30,8 @@ public sealed class LexSnapshotWriter
 
     private static readonly HttpClient HttpClient = new();
 
+    private const int MaxParallelLiveSources = 6;
+
     /// <summary>
     /// Creates the snapshot: downloads/copies files and writes snapshot.json
     /// </summary>
@@ -40,6 +43,8 @@ public sealed class LexSnapshotWriter
     /// file downloaded from its source URL, in dry-run mode as well</param>
     /// <param name="keepLocalFiles">When true, a file with a source URL whose copy already exists in the
     /// manifest directory is taken from the copy and not downloaded again</param>
+    /// <param name="loadLiveSource">Optional loader of a live source URL (e.g. <see cref="LexSourceDocument.LoadLive"/>);
+    /// when set, the snapshot records the text hash of every source URL. Not called in dry-run mode.</param>
     /// <returns>Written snapshot (for reporting)</returns>
     public async Task<LexSnapshot> WriteAsync(
         LexManifest manifest,
@@ -47,7 +52,8 @@ public sealed class LexSnapshotWriter
         string targetDirectory,
         bool dryRun,
         Action<string, bool> writeFile = null,
-        bool keepLocalFiles = false)
+        bool keepLocalFiles = false,
+        Func<string, Task<LexSourceDocument>> loadLiveSource = null)
     {
         var snapshotFiles = new List<LexSnapshotFile>();
         var hashInput = new StringBuilder();
@@ -178,6 +184,9 @@ public sealed class LexSnapshotWriter
         }
 
         var sourceHash = "sha256:" + ComputeStringHash(hashInput.ToString());
+        var liveSources = !dryRun && loadLiveSource != null
+            ? await LoadLiveSources(LexLiveSource.Urls(manifest), loadLiveSource)
+            : null;
 
         var snapshot = new LexSnapshot
         {
@@ -190,7 +199,8 @@ public sealed class LexSnapshotWriter
             SourceHash = sourceHash,
             Sources = manifest.Sources,
             Values = resolvedValues,
-            Files = snapshotFiles
+            Files = snapshotFiles,
+            LiveSources = liveSources
         };
 
         if (!dryRun)
@@ -201,6 +211,36 @@ public sealed class LexSnapshotWriter
         }
 
         return snapshot;
+    }
+
+    private static async Task<List<LexLiveSource>> LoadLiveSources(List<string> urls,
+        Func<string, Task<LexSourceDocument>> loadLiveSource)
+    {
+        using var gate = new SemaphoreSlim(MaxParallelLiveSources);
+        var tasks = new List<Task<LexLiveSource>>(urls.Count);
+        foreach (var url in urls)
+        {
+            tasks.Add(LoadLiveSource(url, loadLiveSource, gate));
+        }
+        return [.. await Task.WhenAll(tasks)];
+    }
+
+    private static async Task<LexLiveSource> LoadLiveSource(string url,
+        Func<string, Task<LexSourceDocument>> loadLiveSource, SemaphoreSlim gate)
+    {
+        await gate.WaitAsync();
+        try
+        {
+            return LexLiveSource.From(url, await loadLiveSource(url));
+        }
+        catch (Exception exception)
+        {
+            return new LexLiveSource { Url = url, Reason = exception.Message };
+        }
+        finally
+        {
+            gate.Release();
+        }
     }
 
     private static void AddFileToSnapshot(

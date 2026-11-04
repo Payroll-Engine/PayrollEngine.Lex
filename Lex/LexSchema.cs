@@ -197,7 +197,7 @@ public static class LexSchema
                 },
                 "documentRef": {
                   "type": "string",
-                  "description": "Reference to a local evidence document declared in the files[] array (e.g. 'ahv-beitraege-2026.pdf'). The referenced fileName must exist in files[]."
+                  "description": "Reference to a local evidence document declared in the files[] array (e.g. 'tax-rates-2026.pdf'). The referenced fileName must exist in files[]."
                 },
                 "unit": {
                   "type": "string",

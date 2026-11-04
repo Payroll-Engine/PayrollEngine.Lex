@@ -24,7 +24,10 @@ public enum LexSourceMatch
     Unreadable,
 
     /// <summary>The entry holds no numbers to look for</summary>
-    NoNumbers
+    NoNumbers,
+
+    /// <summary>The entry has no local evidence file (local verification)</summary>
+    NoEvidence
 }
 
 /// <summary>
@@ -64,6 +67,25 @@ public static class LexSourceVerifier
 {
     private const int MaxNumbers = 40;
     private const int MaxSections = 3;
+
+    /// <summary>
+    /// Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
+    /// </summary>
+    public static string Method { get; } =
+        $"LexVerifySource {typeof(LexSourceVerifier).Assembly.GetName().Version?.ToString(3) ?? "1.0"}";
+
+    /// <summary>
+    /// Automatic verification record for an entry whose numbers were all found
+    /// </summary>
+    /// <param name="verifiedOn">Verification date</param>
+    /// <param name="evidence">Local evidence file name (declared in files[]), null for a live verification</param>
+    public static LexVerification AutoVerification(DateOnly verifiedOn, string evidence) => new()
+    {
+        Mode = LexVerification.ModeAuto,
+        VerifiedOn = verifiedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+        Method = Method,
+        Evidence = evidence
+    };
 
     /// <summary>
     /// Numbers of an entry content (scalars, object properties, array items); 0 and 1 carry no information
@@ -142,7 +164,8 @@ public static class LexSourceVerifier
         {
             return new LexSourceResult
             {
-                Key = entry.Key, Url = entry.SourceUrl, Match = LexSourceMatch.Unreadable, Reason = document.Reason
+                Key = entry.Key, Url = entry.SourceUrl, Reason = document.Reason,
+                Match = document.State == LexSourceState.Missing ? LexSourceMatch.NoEvidence : LexSourceMatch.Unreadable
             };
         }
         var numbers = ContentNumbers(entry.Content);

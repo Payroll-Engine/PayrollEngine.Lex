@@ -57,6 +57,9 @@
         <member name="P:PayrollEngine.Lex.LexCheckResult.DeadUrls">
             <summary>Source URLs that do not exist</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.LexCheckResult.ChangedSources">
+            <summary>Source URLs whose normalized text differs from the snapshot: check the values</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LexCheckResult.RequireLocation">
             <summary>A missing sourceLocation is a finding only in the mode Required</summary>
         </member>
@@ -231,6 +234,62 @@
             Resolve a path relative to a base directory
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.LexHtmlReader">
+            <summary>
+            Tolerant HTML tokenizer: extracts the text of a page as sections (headings h1-h4).
+            Script, style and comment blocks are dropped, block elements become line breaks and
+            table cells are separated by tabs, so that the numbers of one table row stay on one line.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexHtmlReader.StartHeading">
+            <summary>Heading of the text before the first heading</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHtmlReader.Read(System.String)">
+            <summary>
+            Read the sections of an HTML page
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHtmlReader.CleanLines(System.String)">
+            <summary>
+            Normalize extracted text: decoded entities, one space between words, tabs between cells, one line per block
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexHtmlReader.TagEnd(System.String,System.Int32)">
+            <summary>
+            Position of the closing '&gt;' of a tag, quoted attribute values may contain '&gt;'
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexLiveSource">
+            <summary>
+            Live state of a source URL in the snapshot: hash of the normalized text, used to detect source changes
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexLiveSource.Url">
+            <summary>
+            Source URL
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexLiveSource.TextHash">
+            <summary>
+            Hash of the normalized text (sha256:...); null when the source could not be read
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexLiveSource.Reason">
+            <summary>
+            Reason why the source could not be read (e.g. HTTP 403, PDF)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexLiveSource.Urls(PayrollEngine.Lex.LexManifest)">
+            <summary>
+            Distinct http(s) URLs of the manifest sources and entries, in manifest order
+            </summary>
+            <param name="manifest">Manifest</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexLiveSource.From(System.String,PayrollEngine.Lex.LexSourceDocument)">
+            <summary>
+            Live state of a loaded source document
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LexManifest">
             <summary>
             Deserialized lex.json manifest — source of truth for compliance value provenance
@@ -280,6 +339,50 @@
             <summary>
             Documented exclusions from the coverage and sourceLocation checks
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexManifestEditor">
+            <summary>
+            Edits entries of a lex.json document in place: unknown properties and the property order are preserved
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestEditor.Changes">
+            <summary>
+            Number of changes since loading
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexManifestEditor.Parse(System.String)">
+            <summary>
+            Parse a lex.json document
+            </summary>
+            <param name="json">lex.json text</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexManifestEditor.SetSourceLocation(System.String,System.String)">
+            <summary>
+            Set the source location of an entry without one
+            </summary>
+            <param name="key">Entry key</param>
+            <param name="location">Source location</param>
+            <returns>True if the location was written</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexManifestEditor.SetAutoVerification(System.String,PayrollEngine.Lex.LexVerification)">
+            <summary>
+            Set the automatic verification record of an entry. A manual verification is never replaced;
+            an automatic one only when method or evidence change, so that a repeated run leaves the snapshot valid.
+            </summary>
+            <param name="key">Entry key</param>
+            <param name="verification">Automatic verification record</param>
+            <returns>True if the record was written</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexManifestEditor.ToJson">
+            <summary>
+            The document as indented JSON
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexManifestEditor.SaveAsync(System.String)">
+            <summary>
+            Write the document (UTF-8 without BOM)
+            </summary>
+            <param name="path">Target path</param>
         </member>
         <member name="T:PayrollEngine.Lex.LexSchema">
             <summary>
@@ -346,6 +449,12 @@
             All files in the .lex folder — includes both explicit files[] and values with contentFile
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.LexSnapshot.LiveSources">
+            <summary>
+            Live state of the source URLs (sources and entries) at snapshot time; not part of the source hash.
+            Compared by LexCheck with source URL checks to detect changed sources.
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LexSnapshotFile">
             <summary>
             File entry in snapshot.json — enriched with computed metadata
@@ -387,7 +496,7 @@
             Downloads files from sourceUrl when no local sourcePath is provided.
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.LexSnapshotWriter.WriteAsync(PayrollEngine.Lex.LexManifest,System.String,System.String,System.Boolean,System.Action{System.String,System.Boolean},System.Boolean)">
+        <member name="M:PayrollEngine.Lex.LexSnapshotWriter.WriteAsync(PayrollEngine.Lex.LexManifest,System.String,System.String,System.Boolean,System.Action{System.String,System.Boolean},System.Boolean,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.LexSourceDocument}})">
             <summary>
             Creates the snapshot: downloads/copies files and writes snapshot.json
             </summary>
@@ -399,6 +508,8 @@
             file downloaded from its source URL, in dry-run mode as well</param>
             <param name="keepLocalFiles">When true, a file with a source URL whose copy already exists in the
             manifest directory is taken from the copy and not downloaded again</param>
+            <param name="loadLiveSource">Optional loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.LexSourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>);
+            when set, the snapshot records the text hash of every source URL. Not called in dry-run mode.</param>
             <returns>Written snapshot (for reporting)</returns>
         </member>
         <member name="T:PayrollEngine.Lex.LexSource">
@@ -456,6 +567,9 @@
         <member name="F:PayrollEngine.Lex.LexSourceState.Unsupported">
             <summary>The format cannot be read (e.g. PDF)</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.LexSourceState.Missing">
+            <summary>No local evidence file exists</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LexSourceDocument">
             <summary>
             Text of a source document, split into sections (HTML headings, spreadsheet sheets)
@@ -474,6 +588,50 @@
         <member name="M:PayrollEngine.Lex.LexSourceDocument.FromText(System.String)">
             <summary>
             Build a document from plain text
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceDocument.UserAgent">
+            <summary>
+            User agent of all lex source requests: snapshot and check must request a source the same way
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.CreateHttpClient(System.Nullable{System.TimeSpan})">
+            <summary>
+            HTTP client for source requests
+            </summary>
+            <param name="timeout">Request timeout (default: 60 seconds)</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceDocument.IsReadable">
+            <summary>
+            True if text could be extracted
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.LoadLocal(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Load the local evidence file of an entry; a missing file gives a document without evidence
+            </summary>
+            <param name="localPath">Local evidence file, null when the entry has none</param>
+            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Load the live source from its URL
+            </summary>
+            <param name="url">Source URL</param>
+            <param name="client">HTTP client</param>
+            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.NormalizedText">
+            <summary>
+            Text used for change detection: the lines of all sections that hold a number (values), without date and
+            time stamps and without whitespace (markup changes move spaces around inline elements), sorted, because
+            pages may serve their blocks in a varying order. Lines without a number (menus, navigation) are ignored.
+            A table row is one line, so a changed value still changes the text.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceDocument.TextHash">
+            <summary>
+            Hash of the normalized text (sha256:...), null when the document is not readable
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.LexSourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
@@ -505,6 +663,9 @@
         </member>
         <member name="F:PayrollEngine.Lex.LexSourceMatch.NoNumbers">
             <summary>The entry holds no numbers to look for</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSourceMatch.NoEvidence">
+            <summary>The entry has no local evidence file (local verification)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.LexSourceResult">
             <summary>
@@ -539,6 +700,18 @@
             <summary>
             Looks up the numbers of lex entries in their source documents
             </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSourceVerifier.Method">
+            <summary>
+            Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexSourceVerifier.AutoVerification(System.DateOnly,System.String)">
+            <summary>
+            Automatic verification record for an entry whose numbers were all found
+            </summary>
+            <param name="verifiedOn">Verification date</param>
+            <param name="evidence">Local evidence file name (declared in files[]), null for a live verification</param>
         </member>
         <member name="M:PayrollEngine.Lex.LexSourceVerifier.ContentNumbers(System.String)">
             <summary>
@@ -579,8 +752,15 @@
             Create a URL checker
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.LexUrlChecker.#ctor(System.Net.Http.HttpMessageHandler)">
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Create a URL checker with readers for source formats without a built-in reader
+            </summary>
+            <param name="readers">Readers by lower-case file extension (e.g. <c>.xlsx</c>), used to compare live sources</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.#ctor(System.Net.Http.HttpMessageHandler,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <param name="handler">Optional message handler (tests)</param>
+            <param name="readers">Optional readers by file extension</param>
         </member>
         <member name="M:PayrollEngine.Lex.LexUrlChecker.Check(System.String)">
             <summary>
@@ -594,7 +774,14 @@
         </member>
         <member name="M:PayrollEngine.Lex.LexUrlChecker.Apply(PayrollEngine.Lex.LexManifest,PayrollEngine.Lex.LexCheckResult)">
             <summary>
-            Request all URLs of the manifest and record the result
+            Request all URLs of the manifest and record the result. Sources with a text hash in the snapshot
+            next to lex.json are compared with their live text: a changed text is a finding,
+            a source that cannot be read is not comparable (note).
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexUrlChecker.ReadBaseline(System.String)">
+            <summary>
+            Text hashes of the snapshot next to lex.json, by URL
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.LexUrlChecker.Dispose">
@@ -635,7 +822,7 @@
         </member>
         <member name="P:PayrollEngine.Lex.LexValue.DocumentRef">
             <summary>
-            Reference to a local evidence document in the files[] array (e.g. "ahv-beitraege-2026.pdf").
+            Reference to a local evidence document in the files[] array (e.g. "tax-rates-2026.pdf").
             The referenced file must be declared in the manifest's files[] array.
             </summary>
         </member>

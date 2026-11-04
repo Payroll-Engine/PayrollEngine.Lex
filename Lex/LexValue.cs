@@ -25,7 +25,7 @@ public sealed class LexValue
     public string ContentFile { get; init; }
 
     /// <summary>
-    /// Reference to a local evidence document in the files[] array (e.g. "ahv-beitraege-2026.pdf").
+    /// Reference to a local evidence document in the files[] array (e.g. "tax-rates-2026.pdf").
     /// The referenced file must be declared in the manifest's files[] array.
     /// </summary>
     public string DocumentRef { get; init; }
