@@ -125,7 +125,7 @@ public static class LexSourceVerifier
     }
 
     /// <summary>
-    /// A number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
+    /// Number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
     /// </summary>
     private static bool Contains(HashSet<decimal> available, decimal number)
     {

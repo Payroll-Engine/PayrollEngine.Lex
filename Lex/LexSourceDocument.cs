@@ -140,6 +140,7 @@ public sealed class LexSourceDocument
                 {
                     return new LexSourceDocument { State = LexSourceState.Unsupported, Reason = "PDF" };
                 }
+                // ReSharper disable once StringLiteralTypo
                 if (type.Contains("spreadsheetml", StringComparison.OrdinalIgnoreCase)) extension = ".xlsx";
             }
             if (readers != null && readers.TryGetValue(extension, out var reader))

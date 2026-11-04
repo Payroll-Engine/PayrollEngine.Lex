@@ -53,6 +53,7 @@ public static class LexVerifier
             {
                 errors.Add($"Value '{value.Key}': content differs from the snapshot");
             }
+            VerifyVerification(errors, value, snapValue, snapshot);
         }
         foreach (var key in snapshotValues.Keys.Where(k => !manifestKeys.Contains(k)))
         {
@@ -94,6 +95,29 @@ public static class LexVerifier
         return errors;
     }
 
+    private static void VerifyVerification(List<string> errors, LexValue value, LexValue snapValue, LexSnapshot snapshot)
+    {
+        var verification = value.Verification;
+        if (verification == null)
+        {
+            if (snapValue.Verification != null)
+            {
+                errors.Add($"Value '{value.Key}': verification is in the snapshot but not in lex.json");
+            }
+            return;
+        }
+        if (!verification.SameAs(snapValue.Verification))
+        {
+            errors.Add($"Value '{value.Key}': verification differs from the snapshot");
+        }
+        // the evidence file itself is checked with the snapshot files (presence and hash)
+        if (!string.IsNullOrWhiteSpace(verification.Evidence) &&
+            !(snapshot.Files ?? []).Any(f => string.Equals(f.ContentFile ?? f.FileName, verification.Evidence, StringComparison.OrdinalIgnoreCase)))
+        {
+            errors.Add($"Value '{value.Key}': verification evidence '{verification.Evidence}' is not in the snapshot");
+        }
+    }
+
     private static void Compare(List<string> errors, string field, string manifestValue, string snapshotValue)
     {
         if (!string.Equals(manifestValue, snapshotValue, StringComparison.Ordinal))
@@ -116,23 +140,30 @@ public static class LexVerifier
             if (value.HasInlineContent)
             {
                 input.Append(value.Content);
-                continue;
             }
-            if (!value.HasContentFile)
+            else if (value.HasContentFile)
+            {
+                var original = LexHash.ResolvePath(lexDirectory, value.ContentFile);
+                var local = Path.Combine(lexDirectory, Path.GetFileName(original));
+                if (!File.Exists(local))
+                {
+                    errors.Add($"Value '{value.Key}': content file copy missing in the .lex folder: {Path.GetFileName(original)}");
+                    complete = false;
+                    continue;
+                }
+                var localHash = LexHash.FileHash(local);
+                input.Append(localHash);
+                CheckOriginal(errors, $"Value '{value.Key}'", original, local, localHash);
+            }
+            else
             {
                 continue;
             }
-            var original = LexHash.ResolvePath(lexDirectory, value.ContentFile);
-            var local = Path.Combine(lexDirectory, Path.GetFileName(original));
-            if (!File.Exists(local))
+
+            if (value.Verification != null)
             {
-                errors.Add($"Value '{value.Key}': content file copy missing in the .lex folder: {Path.GetFileName(original)}");
-                complete = false;
-                continue;
+                input.Append(value.Verification.HashInput());
             }
-            var localHash = LexHash.FileHash(local);
-            input.Append(localHash);
-            CheckOriginal(errors, $"Value '{value.Key}'", original, local, localHash);
         }
 
         foreach (var file in manifest.Files)

@@ -1,3 +1,6 @@
+using System;
+using System.Text.Json.Serialization;
+
 namespace PayrollEngine.Lex;
 
 /// <summary>
@@ -5,6 +8,16 @@ namespace PayrollEngine.Lex;
 /// </summary>
 public sealed class LexSource
 {
+    /// <summary>
+    /// Review by the author only (default)
+    /// </summary>
+    public const string ReviewSingleAuthor = "SingleAuthor";
+
+    /// <summary>
+    /// Manual verifications require the confirmation of a second person
+    /// </summary>
+    public const string ReviewFourEyes = "FourEyes";
+
     /// <summary>
     /// URL to the source document or page
     /// </summary>
@@ -20,4 +33,16 @@ public sealed class LexSource
     /// </summary>
     // ReSharper disable once UnusedMember.Global
     public string LegalBasis { get; init; }
+
+    /// <summary>
+    /// Review rule for the values of this source: SingleAuthor (default) or FourEyes.
+    /// A value belongs to the source whose url equals the value's sourceUrl.
+    /// </summary>
+    public string Review { get; init; }
+
+    /// <summary>
+    /// True if manual verifications of this source require a second confirmation
+    /// </summary>
+    [JsonIgnore]
+    public bool IsFourEyes => string.Equals(Review, ReviewFourEyes, StringComparison.Ordinal);
 }

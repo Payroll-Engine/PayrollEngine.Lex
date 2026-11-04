@@ -121,6 +121,25 @@ public static class LexValidator
             }
         }
 
+        // source review
+        foreach (var source in manifest.Sources)
+        {
+            if (source.Review != null && source.Review != LexSource.ReviewSingleAuthor &&
+                source.Review != LexSource.ReviewFourEyes)
+            {
+                errors.Add($"Source '{source.Url}': review must be '{LexSource.ReviewSingleAuthor}' or '{LexSource.ReviewFourEyes}'");
+            }
+        }
+
+        // verification
+        foreach (var value in manifest.Values)
+        {
+            if (value.Verification != null && !string.IsNullOrWhiteSpace(value.Key))
+            {
+                ValidateVerification(errors, value.Key, value.Verification, declaredFileNames);
+            }
+        }
+
         // files
         var seenFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var file in manifest.Files)
@@ -155,6 +174,73 @@ public static class LexValidator
         }
 
         return errors;
+    }
+
+    private static void ValidateVerification(List<string> errors, string key, LexVerification verification,
+        HashSet<string> declaredFileNames)
+    {
+        var subject = $"Value '{key}': verification";
+        var manual = verification.Mode == LexVerification.ModeManual;
+        if (!manual && verification.Mode != LexVerification.ModeAuto)
+        {
+            errors.Add($"{subject} mode must be '{LexVerification.ModeAuto}' or '{LexVerification.ModeManual}'");
+        }
+
+        ValidateDate(errors, subject, "verifiedOn", verification.VerifiedOn, required: true);
+
+        if (manual)
+        {
+            if (string.IsNullOrWhiteSpace(verification.VerifiedBy))
+            {
+                errors.Add($"{subject} missing required field: verifiedBy");
+            }
+            if (string.IsNullOrWhiteSpace(verification.Evidence))
+            {
+                errors.Add($"{subject} missing required field: evidence");
+            }
+            if (verification.Method != null)
+            {
+                errors.Add($"{subject} method is only allowed in mode '{LexVerification.ModeAuto}'");
+            }
+        }
+        else if (verification.Mode == LexVerification.ModeAuto)
+        {
+            if (string.IsNullOrWhiteSpace(verification.Method))
+            {
+                errors.Add($"{subject} missing required field: method");
+            }
+            if (verification.VerifiedBy != null)
+            {
+                errors.Add($"{subject} verifiedBy is only allowed in mode '{LexVerification.ModeManual}'");
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(verification.Evidence) && !declaredFileNames.Contains(verification.Evidence))
+        {
+            errors.Add($"{subject} evidence '{verification.Evidence}' not found in files[] array");
+        }
+
+        if ((verification.ReviewedBy == null) != (verification.ReviewedOn == null))
+        {
+            errors.Add($"{subject} reviewedBy and reviewedOn must be set together");
+        }
+        ValidateDate(errors, subject, "reviewedOn", verification.ReviewedOn, required: false);
+    }
+
+    private static void ValidateDate(List<string> errors, string subject, string field, string value, bool required)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            if (required)
+            {
+                errors.Add($"{subject} missing required field: {field}");
+            }
+            return;
+        }
+        if (!DateOnly.TryParseExact(value, "yyyy-MM-dd", out _))
+        {
+            errors.Add($"{subject} invalid {field} format '{value}' — expected YYYY-MM-DD");
+        }
     }
 
     private static string ResolvePath(string baseDirectory, string relativePath)

@@ -92,8 +92,14 @@ public sealed class LexSnapshotWriter
                     SourceUrl = value.SourceUrl,
                     SourceLocation = value.SourceLocation,
                     LegalReference = value.LegalReference,
-                    Description = value.Description
+                    Description = value.Description,
+                    Verification = value.Verification
                 });
+            }
+
+            if (value.Verification != null)
+            {
+                hashInput.Append(value.Verification.HashInput());
             }
         }
 

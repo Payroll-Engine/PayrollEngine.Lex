@@ -404,6 +404,16 @@
             Document-level source reference in lex.json
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.LexSource.ReviewSingleAuthor">
+            <summary>
+            Review by the author only (default)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSource.ReviewFourEyes">
+            <summary>
+            Manual verifications require the confirmation of a second person
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LexSource.Url">
             <summary>
             URL to the source document or page
@@ -417,6 +427,17 @@
         <member name="P:PayrollEngine.Lex.LexSource.LegalBasis">
             <summary>
             Legal basis (e.g. Income Tax Act §12)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSource.Review">
+            <summary>
+            Review rule for the values of this source: SingleAuthor (default) or FourEyes.
+            A value belongs to the source whose url equals the value's sourceUrl.
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexSource.IsFourEyes">
+            <summary>
+            True if manual verifications of this source require a second confirmation
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.LexSourceState">
@@ -524,7 +545,7 @@
         </member>
         <member name="M:PayrollEngine.Lex.LexSourceVerifier.Contains(System.Collections.Generic.HashSet{System.Decimal},System.Decimal)">
             <summary>
-            A number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
+            Number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.LexSourceVerifier.Verify(PayrollEngine.Lex.LexValue,PayrollEngine.Lex.LexSourceDocument)">
@@ -641,6 +662,11 @@
             Human-readable description
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.LexValue.Verification">
+            <summary>
+            Verification record (optional; LexCheck reports values without verification)
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LexValue.HasInlineContent">
             <summary>
             Returns true if this value uses an inline content string
@@ -649,6 +675,66 @@
         <member name="P:PayrollEngine.Lex.LexValue.HasContentFile">
             <summary>
             Returns true if this value references an external file
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexVerification">
+            <summary>
+            Verification record of a lex value: how, when and by whom the value was checked against its source
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexVerification.ModeAuto">
+            <summary>
+            Automatic verification by a tool
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexVerification.ModeManual">
+            <summary>
+            Manual verification by a person
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.Mode">
+            <summary>
+            Verification mode: auto or manual
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.VerifiedOn">
+            <summary>
+            Verification date in YYYY-MM-DD format
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.VerifiedBy">
+            <summary>
+            Person who verified the value (manual mode only)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.Evidence">
+            <summary>
+            Evidence document declared in the files[] array (mandatory in manual mode)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.Method">
+            <summary>
+            Tool and version that verified the value (auto mode only, e.g. LexVerifySource 1.0)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.ReviewedBy">
+            <summary>
+            Second person who confirmed a manual verification (sources with four-eyes review)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexVerification.ReviewedOn">
+            <summary>
+            Review date in YYYY-MM-DD format (sources with four-eyes review)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexVerification.HashInput">
+            <summary>
+            Canonical text of the record, part of the snapshot source hash
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LexVerification.SameAs(PayrollEngine.Lex.LexVerification)">
+            <summary>
+            Field-wise equality (ordinal)
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.LexVerifier">

@@ -111,8 +111,72 @@ public static class LexSchema
                   "type": "string",
                   "description": "Legal basis (e.g. Income Tax Act §12, Act 123/2025 Art. 4)",
                   "examples": ["Income Tax Act §12", "Act 123/2025 Art. 4", "Employment Act s.38"]
+                },
+                "review": {
+                  "type": "string",
+                  "enum": ["SingleAuthor", "FourEyes"],
+                  "default": "SingleAuthor",
+                  "description": "Review rule for the values of this source (values whose sourceUrl equals the source url). FourEyes: manual verifications require reviewedBy and reviewedOn."
                 }
               }
+            },
+            "verification": {
+              "type": "object",
+              "required": ["mode", "verifiedOn"],
+              "additionalProperties": false,
+              "properties": {
+                "mode": {
+                  "type": "string",
+                  "enum": ["auto", "manual"],
+                  "description": "auto: verified by a tool against the source. manual: verified by a person with an evidence document."
+                },
+                "verifiedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Verification date in YYYY-MM-DD format",
+                  "examples": ["2026-01-15"]
+                },
+                "verifiedBy": {
+                  "type": "string",
+                  "description": "Person who verified the value (manual mode only)",
+                  "examples": ["Jane Doe"]
+                },
+                "evidence": {
+                  "type": "string",
+                  "description": "Evidence document declared in the files[] array (mandatory in manual mode)",
+                  "examples": ["tax-rates-2026.pdf"]
+                },
+                "method": {
+                  "type": "string",
+                  "description": "Tool and version that verified the value (auto mode only)",
+                  "examples": ["LexVerifySource 1.2"]
+                },
+                "reviewedBy": {
+                  "type": "string",
+                  "description": "Second person who confirmed a manual verification (sources with review FourEyes)",
+                  "examples": ["John Doe"]
+                },
+                "reviewedOn": {
+                  "type": "string",
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "description": "Review date in YYYY-MM-DD format (sources with review FourEyes)",
+                  "examples": ["2026-01-16"]
+                }
+              },
+              "dependentRequired": {
+                "reviewedBy": ["reviewedOn"],
+                "reviewedOn": ["reviewedBy"]
+              },
+              "allOf": [
+                {
+                  "if": { "properties": { "mode": { "const": "manual" } } },
+                  "then": { "required": ["verifiedBy", "evidence"], "not": { "required": ["method"] } }
+                },
+                {
+                  "if": { "properties": { "mode": { "const": "auto" } } },
+                  "then": { "required": ["method"], "not": { "required": ["verifiedBy"] } }
+                }
+              ]
             },
             "value": {
               "type": "object",
@@ -157,6 +221,9 @@ public static class LexSchema
                 "description": {
                   "type": "string",
                   "description": "Human-readable description of this value"
+                },
+                "verification": {
+                  "$ref": "#/$defs/verification"
                 }
               }
             },

@@ -5,6 +5,7 @@ namespace PayrollEngine.Lex.Tests;
 /// </summary>
 internal sealed class TestSatellite : IDisposable
 {
+    // ReSharper disable once StringLiteralTypo
     internal string Root { get; } = Path.Combine(Path.GetTempPath(), "lextest-" + Guid.NewGuid().ToString("N"), "Data.Test.2026");
     internal string LexDirectory => Path.Combine(Root, ".lex");
     internal string LexPath => Path.Combine(LexDirectory, "lex.json");

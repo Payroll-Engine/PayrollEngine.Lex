@@ -56,6 +56,11 @@ public sealed class LexValue
     public string Description { get; init; }
 
     /// <summary>
+    /// Verification record (optional; LexCheck reports values without verification)
+    /// </summary>
+    public LexVerification Verification { get; init; }
+
+    /// <summary>
     /// Returns true if this value uses an inline content string
     /// </summary>
     [JsonIgnore]
