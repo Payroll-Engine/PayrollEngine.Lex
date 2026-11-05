@@ -29,7 +29,7 @@ internal enum SourceState
 }
 
 /// <summary>
-/// Text of a source document, split into sections (HTML headings, spreadsheet sheets)
+/// Text of a source document, split into sections (HTML headings, spreadsheet sheets, PDF pages)
 /// </summary>
 public sealed class SourceDocument
 {
@@ -204,7 +204,8 @@ public sealed class SourceDocument
     {
         [".xls"] = SpreadsheetReader.Read,
         [".xlsx"] = SpreadsheetReader.Read,
-        [".xlsb"] = SpreadsheetReader.Read
+        [".xlsb"] = SpreadsheetReader.Read,
+        [".pdf"] = PdfReader.Read
     };
 
     private static Func<Stream, List<(string Heading, string Text)>> PassedReader(string extension,
@@ -215,8 +216,9 @@ public sealed class SourceDocument
     /// Load the source: a local evidence file when present, otherwise the URL
     /// </summary>
     /// <remarks>The format is detected from the content, not from the file extension or media type.
-    /// Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
-    /// <c>.xlsb</c>, one section per sheet). Other binary content is unsupported.</remarks>
+    /// Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>), spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
+    /// <c>.xlsb</c>, one section per sheet) and PDF (text layer, one section per page).
+    /// Other binary content is unsupported.</remarks>
     /// <param name="url">Source URL</param>
     /// <param name="localPath">Local evidence file (optional)</param>
     /// <param name="client">HTTP client for the source URL</param>

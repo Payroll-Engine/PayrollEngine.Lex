@@ -918,6 +918,29 @@
             </summary>
             <param name="path">Target path</param>
         </member>
+        <member name="T:PayrollEngine.Lex.PdfReader">
+            <summary>
+            Reads the text layer of a PDF, one section per page (heading <c>Page N</c>) and the values
+            of the form fields (heading <c>Form fields</c>). Scanned pages without text layer are not recognized (no OCR).
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PdfReader.MaxMegabytes">
+            <summary>Maximum file size in megabytes</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PdfReader.MaxPages">
+            <summary>Maximum number of pages</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PdfReader.FormFieldsHeading">
+            <summary>Heading of the form field section</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.PdfReader.Read(System.IO.Stream)">
+            <summary>
+            Text of a PDF: page text in content order with one line per text line, form field values one per line.
+            A document that requires a user password, exceeds a limit or holds no text throws an
+            <see cref="T:System.IO.InvalidDataException"/>.
+            </summary>
+            <param name="stream">The PDF stream (seekable)</param>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationFile">
             <summary>
             Regulation JSON file with its content (without byte order mark)
@@ -1252,7 +1275,7 @@
         </member>
         <member name="T:PayrollEngine.Lex.SourceDocument">
             <summary>
-            Text of a source document, split into sections (HTML headings, spreadsheet sheets)
+            Text of a source document, split into sections (HTML headings, spreadsheet sheets, PDF pages)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.Numbers(System.String)">
@@ -1324,8 +1347,9 @@
             Load the source: a local evidence file when present, otherwise the URL
             </summary>
             <remarks>The format is detected from the content, not from the file extension or media type.
-            Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
-            <c>.xlsb</c>, one section per sheet). Other binary content is unsupported.</remarks>
+            Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>), spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
+            <c>.xlsb</c>, one section per sheet) and PDF (text layer, one section per page).
+            Other binary content is unsupported.</remarks>
             <param name="url">Source URL</param>
             <param name="localPath">Local evidence file (optional)</param>
             <param name="client">HTTP client for the source URL</param>
