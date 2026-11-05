@@ -122,13 +122,15 @@ await editor.SaveAsync(lexPath);
 
 ### Source Documents
 
-`SourceDocument` reads HTML and text sources. Readers for further formats are passed by file extension;
-a reader returns the text sections of the document:
+`SourceDocument` reads HTML, text (`.txt`, `.csv`) and spreadsheet sources (`.xls`, `.xlsx`, `.xlsb`;
+one section per sheet, numbers in invariant format). Spreadsheets served by a live source are also detected by
+their content type. Readers for further formats are passed by file extension; a passed reader replaces the built-in
+reader of the same extension. A reader returns the text sections of the document:
 
 ```csharp
 var readers = new Dictionary<string, Func<Stream, List<(string Heading, string Text)>>>
 {
-    [".xlsx"] = MySpreadsheetReader.Read
+    [".ods"] = MyOpenDocumentReader.Read
 };
 var document = await SourceDocument.Load(entry.SourceUrl, localPath, httpClient, readers);
 var match = SourceVerifier.Verify(entry, document);

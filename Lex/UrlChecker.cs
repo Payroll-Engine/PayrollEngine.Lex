@@ -48,9 +48,10 @@ public sealed class UrlChecker : IDisposable
     }
 
     /// <summary>
-    /// Create a URL checker with readers for source formats without a built-in reader
+    /// Create a URL checker with additional source readers
     /// </summary>
-    /// <param name="readers">Readers by lower-case file extension (e.g. <c>.xlsx</c>), used to compare live sources</param>
+    /// <param name="readers">Additional readers by lower-case file extension (see <see cref="SourceDocument.Load"/>),
+    /// used to compare live sources</param>
     public UrlChecker(IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers) :
         this(null, readers)
     {

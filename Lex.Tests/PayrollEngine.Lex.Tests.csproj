@@ -21,7 +21,18 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!-- creates xlsx test documents -->
+		<PackageReference Include="ClosedXML" Version="0.105.1" />
+	</ItemGroup>
+
+	<ItemGroup>
 		<ProjectReference Include="..\Lex\PayrollEngine.Lex.csproj" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<None Update="Resources\Rates.xls">
+			<CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+		</None>
 	</ItemGroup>
 
 </Project>

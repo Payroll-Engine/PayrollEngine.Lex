@@ -17,6 +17,10 @@
 		<InternalsVisibleTo Include="PayrollEngine.Lex.Tests" />
 	</ItemGroup>
 
+	<ItemGroup>
+		<PackageReference Include="ExcelDataReader" Version="3.9.0" />
+	</ItemGroup>
+
 	<!-- include xml documention files to the nuget package -->
 	<ItemGroup>
 		<None Include="$(OutputDir)*.xml" Pack="true">

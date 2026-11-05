@@ -1254,7 +1254,7 @@
             Load the local evidence file of an entry; a missing file gives a document without evidence
             </summary>
             <param name="localPath">Local evidence file, null when the entry has none</param>
-            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+            <param name="readers">Additional readers by lower-case file extension (see <see cref="M:PayrollEngine.Lex.SourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>)</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <summary>
@@ -1262,7 +1262,7 @@
             </summary>
             <param name="url">Source URL</param>
             <param name="client">HTTP client</param>
-            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+            <param name="readers">Additional readers by lower-case file extension (see <see cref="M:PayrollEngine.Lex.SourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>)</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.NormalizedText">
             <summary>
@@ -1277,15 +1277,32 @@
             Hash of the normalized text (sha256:...), null when the document is not readable
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceDocument.BuiltInReaders">
+            <summary>
+            Built-in readers by lower-case file extension
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceDocument.MediaTypeExtensions">
+            <summary>
+            File extension of a live source by media type fragment, used when the URL has no matching extension
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceDocument.GetReader(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Reader of a file extension: a passed reader, otherwise a built-in reader
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <summary>
             Load the source: a local evidence file when present, otherwise the URL
             </summary>
+            <remarks>Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets
+            (<c>.xls</c>, <c>.xlsx</c>, <c>.xlsb</c>, one section per sheet).</remarks>
             <param name="url">Source URL</param>
             <param name="localPath">Local evidence file (optional)</param>
             <param name="client">HTTP client for the source URL</param>
-            <param name="readers">Readers for formats without a built-in reader, by lower-case file extension
-            (e.g. <c>.xlsx</c>). A reader returns the text sections of the document.</param>
+            <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>); a passed reader
+            replaces the built-in reader of the same extension. A reader returns the text sections of the document.</param>
         </member>
         <member name="T:PayrollEngine.Lex.SourceMatch">
             <summary>
@@ -1371,6 +1388,21 @@
             Verify one entry against a source document
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.SpreadsheetReader">
+            <summary>
+            Reads the text of a spreadsheet (xls, xlsx, xlsb), one section per sheet
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SpreadsheetReader.MaxRows">
+            <summary>Maximum number of rows read per sheet, counted from the first row with a value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SpreadsheetReader.Read(System.IO.Stream)">
+            <summary>
+            Text of a spreadsheet: section heading is the sheet name, one line per row,
+            numbers in invariant format, dates as serial number
+            </summary>
+            <param name="stream">The spreadsheet stream (the format is detected from the content)</param>
+        </member>
         <member name="T:PayrollEngine.Lex.UrlStatus">
             <summary>
             Result of requesting one source URL
@@ -1397,9 +1429,10 @@
         </member>
         <member name="M:PayrollEngine.Lex.UrlChecker.#ctor(System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <summary>
-            Create a URL checker with readers for source formats without a built-in reader
+            Create a URL checker with additional source readers
             </summary>
-            <param name="readers">Readers by lower-case file extension (e.g. <c>.xlsx</c>), used to compare live sources</param>
+            <param name="readers">Additional readers by lower-case file extension (see <see cref="M:PayrollEngine.Lex.SourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>),
+            used to compare live sources</param>
         </member>
         <member name="M:PayrollEngine.Lex.UrlChecker.#ctor(System.Net.Http.HttpMessageHandler,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <param name="handler">Optional message handler (tests)</param>

@@ -118,7 +118,7 @@ public sealed class SourceDocument
     /// Load the local evidence file of an entry; a missing file gives a document without evidence
     /// </summary>
     /// <param name="localPath">Local evidence file, null when the entry has none</param>
-    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    /// <param name="readers">Additional readers by lower-case file extension (see <see cref="Load"/>)</param>
     public static Task<SourceDocument> LoadLocal(string localPath,
         IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
     {
@@ -134,7 +134,7 @@ public sealed class SourceDocument
     /// </summary>
     /// <param name="url">Source URL</param>
     /// <param name="client">HTTP client</param>
-    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension</param>
+    /// <param name="readers">Additional readers by lower-case file extension (see <see cref="Load"/>)</param>
     public static Task<SourceDocument> LoadLive(string url, HttpClient client,
         IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null) =>
         Load(url, null, client, readers);
@@ -199,13 +199,48 @@ public sealed class SourceDocument
     ];
 
     /// <summary>
+    /// Built-in readers by lower-case file extension
+    /// </summary>
+    private static readonly Dictionary<string, Func<Stream, List<(string Heading, string Text)>>> BuiltInReaders = new()
+    {
+        [".xls"] = SpreadsheetReader.Read,
+        [".xlsx"] = SpreadsheetReader.Read,
+        [".xlsb"] = SpreadsheetReader.Read
+    };
+
+    /// <summary>
+    /// File extension of a live source by media type fragment, used when the URL has no matching extension
+    /// </summary>
+    private static readonly (string MediaType, string Extension)[] MediaTypeExtensions =
+    [
+        // ReSharper disable once StringLiteralTypo
+        ("spreadsheetml", ".xlsx"),
+        ("ms-excel", ".xls")
+    ];
+
+    /// <summary>
+    /// Reader of a file extension: a passed reader, otherwise a built-in reader
+    /// </summary>
+    private static Func<Stream, List<(string Heading, string Text)>> GetReader(string extension,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers)
+    {
+        if (readers != null && readers.TryGetValue(extension, out var reader))
+        {
+            return reader;
+        }
+        return BuiltInReaders.GetValueOrDefault(extension);
+    }
+
+    /// <summary>
     /// Load the source: a local evidence file when present, otherwise the URL
     /// </summary>
+    /// <remarks>Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets
+    /// (<c>.xls</c>, <c>.xlsx</c>, <c>.xlsb</c>, one section per sheet).</remarks>
     /// <param name="url">Source URL</param>
     /// <param name="localPath">Local evidence file (optional)</param>
     /// <param name="client">HTTP client for the source URL</param>
-    /// <param name="readers">Readers for formats without a built-in reader, by lower-case file extension
-    /// (e.g. <c>.xlsx</c>). A reader returns the text sections of the document.</param>
+    /// <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>); a passed reader
+    /// replaces the built-in reader of the same extension. A reader returns the text sections of the document.</param>
     public static async Task<SourceDocument> Load(string url, string localPath, HttpClient client,
         IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
     {
@@ -235,10 +270,17 @@ public sealed class SourceDocument
                 {
                     return new SourceDocument { State = SourceState.Unsupported, Reason = "PDF" };
                 }
-                // ReSharper disable once StringLiteralTypo
-                if (type.Contains("spreadsheetml", StringComparison.OrdinalIgnoreCase)) extension = ".xlsx";
+                foreach (var (mediaType, mediaExtension) in MediaTypeExtensions)
+                {
+                    if (type.Contains(mediaType, StringComparison.OrdinalIgnoreCase))
+                    {
+                        extension = mediaExtension;
+                        break;
+                    }
+                }
             }
-            if (readers != null && readers.TryGetValue(extension, out var reader))
+            var reader = GetReader(extension, readers);
+            if (reader != null)
             {
                 return new SourceDocument { State = SourceState.Readable, Sections = reader(new MemoryStream(bytes)) };
             }
