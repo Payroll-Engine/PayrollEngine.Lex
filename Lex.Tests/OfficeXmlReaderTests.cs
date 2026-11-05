@@ -193,7 +193,7 @@ public class OfficeXmlReaderTests
         var result = SourceVerifier.Verify(
             new Entry { Key = "Rates.A", Content = "0.085", Unit = "rate", SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(1, result.NumbersFound);
-        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceMatch.Found, result.Match);
     }
 
     [Theory]

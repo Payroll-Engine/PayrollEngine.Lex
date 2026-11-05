@@ -1546,14 +1546,20 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.Contains(System.Decimal,System.Boolean)">
             <summary>
-            Test if the text holds a number: as numeral, in words or, for a rate below 1, as percentage (0.085 as 8.5%)
+            Test if the text holds a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
             </summary>
             <param name="number">Entry number</param>
-            <param name="rate">The entry unit is a rate</param>
+            <param name="percent">A value below 1 may be written as percentage</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.IsWordOnly(System.Decimal,System.Boolean)">
             <summary>
             Test if the text holds a number in words only, not as numeral or percentage
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.WrittenDigits(System.Decimal,System.Boolean)">
+            <summary>
+            Fewest digits of the number as written in the text (numeral or percentage), null when the text
+            holds no numeral of it
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.Scan(System.String)">
@@ -1570,8 +1576,9 @@
             <summary>All numbers of the entry are found in the source</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
-            <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is short
-            (two significant digits at most), occurs in many sections or is found in words only.
+            <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
+            with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
+            or is found in words only.
             Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
@@ -1651,7 +1658,11 @@
             </summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.WeakDigits">
-            <summary>A single number with this many significant digits or less is weak evidence</summary>
+            <summary>A single number written with this many digits or less is weak evidence (22%, 1.5, 50)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.FrequentDigits">
+            <summary>A single number written with this many digits or less that occurs in more than
+            <see cref="F:PayrollEngine.Lex.SourceVerifier.WeakSections"/> sections is weak evidence</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.WeakSections">
             <summary>A single number that occurs in more sections is weak evidence</summary>
@@ -1685,15 +1696,11 @@
             Open upper bound of a range, written as nines only (999999, 99999999.99): not a value of the source
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.SignificantDigits(System.Decimal)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.AllowsPercent(System.String)">
             <summary>
-            Significant digits of a number: 0.5, 22 and 340 have two at most, 7.25 has three
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.IsRateUnit(System.String)">
-            <summary>
-            The unit names a rate (<c>%</c>, <c>percent</c>, <c>rate</c> or <c>fraction</c>, also within a combined
-            unit like <c>USD / rate</c>): a value below 1 is also looked up as percentage
+            A value below 1 may be looked up as percentage (0.085 as 8.5%, the source writes a percent sign):
+            always, except for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code
+            (<c>USD</c>, <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.IsToolLocation(System.String)">

@@ -43,10 +43,11 @@ source it is reported by the checker (a finding in the release mode).
 
 ## Evidence Quality
 
-`SourceVerifier.Verify` returns a `SourceMatch`. A single number is rated `Ambiguous` instead of `Found` when it has
-at most two significant digits, occurs in more than three sections, or is found in words only (`$1 million`,
-`one and one-half`, `2.5 lakh`). A rate below 1 is also looked up as percentage when the unit names a rate (`%`,
-`percent`, `rate`, `fraction`) and the source writes a percent sign after the number. A `sourceQuote` anchors the
+`SourceVerifier.Verify` returns a `SourceMatch`. A single number is rated `Ambiguous` instead of `Found` when the
+source writes it with at most two digits (`22%`, `1.5`), writes it with at most three digits in more than three
+sections, or holds it in words only (`$1 million`, `one and one-half`, `2.5 lakh`). A value below 1 is also looked
+up as percentage when the source writes a percent sign after the number, except for units that are no rate
+(`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the
 entry: the numbers must be in the section of the quote (`Found`), otherwise in the quote itself; a quote missing in
 the source gives `QuoteNotFound`. Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). `SourceVerifier.VerifyManifest` checks

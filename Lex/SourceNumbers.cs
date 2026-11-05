@@ -21,28 +21,45 @@ internal sealed class SourceNumbers
     /// <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
     internal HashSet<decimal> Words { get; } = [];
 
+    // fewest digits of a numeral as written in the text, without separators: 4,300 has 4, 1.2% has 2
+    private readonly Dictionary<decimal, int> numeralDigits = [];
+    private readonly Dictionary<decimal, int> percentDigits = [];
+
     /// <summary>
     /// Numerals and numbers in words
     /// </summary>
     internal HashSet<decimal> All() => [.. Numerals, .. Words];
 
     /// <summary>
-    /// Test if the text holds a number: as numeral, in words or, for a rate below 1, as percentage (0.085 as 8.5%)
+    /// Test if the text holds a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
     /// </summary>
     /// <param name="number">Entry number</param>
-    /// <param name="rate">The entry unit is a rate</param>
-    internal bool Contains(decimal number, bool rate) =>
-        IsNumeral(number, rate) || Words.Contains(Math.Round(number, 6));
+    /// <param name="percent">A value below 1 may be written as percentage</param>
+    internal bool Contains(decimal number, bool percent) =>
+        WrittenDigits(number, percent) != null || Words.Contains(Math.Round(number, 6));
 
     /// <summary>
     /// Test if the text holds a number in words only, not as numeral or percentage
     /// </summary>
-    internal bool IsWordOnly(decimal number, bool rate) =>
-        !IsNumeral(number, rate) && Words.Contains(Math.Round(number, 6));
+    internal bool IsWordOnly(decimal number, bool percent) =>
+        WrittenDigits(number, percent) == null && Words.Contains(Math.Round(number, 6));
 
-    private bool IsNumeral(decimal number, bool rate) =>
-        Numerals.Contains(Math.Round(number, 6)) ||
-        (rate && number < 1m && Percents.Contains(Math.Round(number * 100m, 6)));
+    /// <summary>
+    /// Fewest digits of the number as written in the text (numeral or percentage), null when the text
+    /// holds no numeral of it
+    /// </summary>
+    internal int? WrittenDigits(decimal number, bool percent)
+    {
+        int? digits = numeralDigits.TryGetValue(Math.Round(number, 6), out var numeral) ? numeral : null;
+        if (percent && number < 1m && percentDigits.TryGetValue(Math.Round(number * 100m, 6), out var written))
+        {
+            digits = Math.Min(digits ?? written, written);
+        }
+        return digits;
+    }
+
+    private static void AddDigits(Dictionary<decimal, int> digits, decimal value, int count) =>
+        digits[value] = digits.TryGetValue(value, out var existing) ? Math.Min(existing, count) : count;
 
     /// <summary>
     /// Scan a text
@@ -57,12 +74,15 @@ internal sealed class SourceNumbers
         foreach (Match match in NumberToken.Matches(text))
         {
             var percent = PercentSign.IsMatch(text, match.Index + match.Length);
+            var digits = match.Value.Count(char.IsDigit);
             foreach (var value in Interpretations(match))
             {
                 numbers.Numerals.Add(value);
+                AddDigits(numbers.numeralDigits, value, digits);
                 if (percent)
                 {
                     numbers.Percents.Add(value);
+                    AddDigits(numbers.percentDigits, value, digits);
                 }
             }
         }

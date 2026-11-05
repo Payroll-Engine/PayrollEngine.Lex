@@ -18,8 +18,9 @@ public enum SourceMatch
     /// <summary>All numbers of the entry are found in the source</summary>
     Found,
 
-    /// <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is short
-    /// (two significant digits at most), occurs in many sections or is found in words only.
+    /// <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
+    /// with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
+    /// or is found in words only.
     /// Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
     Ambiguous,
 
@@ -104,8 +105,12 @@ public static class SourceVerifier
     private const int MaxNumbers = 40;
     private const int MaxSections = 3;
 
-    /// <summary>A single number with this many significant digits or less is weak evidence</summary>
+    /// <summary>A single number written with this many digits or less is weak evidence (22%, 1.5, 50)</summary>
     private const int WeakDigits = 2;
+
+    /// <summary>A single number written with this many digits or less that occurs in more than
+    /// <see cref="WeakSections"/> sections is weak evidence</summary>
+    private const int FrequentDigits = 3;
 
     /// <summary>A single number that occurs in more sections is weak evidence</summary>
     private const int WeakSections = 3;
@@ -229,23 +234,27 @@ public static class SourceVerifier
         return fraction.All(c => c == '9') || fraction.All(c => c == '0');
     }
 
-    /// <summary>
-    /// Significant digits of a number: 0.5, 22 and 340 have two at most, 7.25 has three
-    /// </summary>
-    internal static int SignificantDigits(decimal value) =>
-        Math.Abs(value).ToString(CultureInfo.InvariantCulture).Replace(".", string.Empty).Trim('0').Length;
+    private static readonly string[] NonRateTokens = ["factor", "hour", "hours", "day", "days"];
 
-    private static readonly string[] RateTokens = ["%", "percent", "rate", "fraction"];
+    private static readonly Regex UnitToken = new("%|[A-Za-z]+", RegexOptions.Compiled);
 
-    private static readonly Regex UnitToken = new("%|[a-z]+", RegexOptions.Compiled);
+    private static readonly Regex CurrencyCode = new("^[A-Z]{3}$", RegexOptions.Compiled);
 
     /// <summary>
-    /// The unit names a rate (<c>%</c>, <c>percent</c>, <c>rate</c> or <c>fraction</c>, also within a combined
-    /// unit like <c>USD / rate</c>): a value below 1 is also looked up as percentage
+    /// A value below 1 may be looked up as percentage (0.085 as 8.5%, the source writes a percent sign):
+    /// always, except for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code
+    /// (<c>USD</c>, <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it
     /// </summary>
-    internal static bool IsRateUnit(string unit) =>
-        !string.IsNullOrWhiteSpace(unit) &&
-        UnitToken.Matches(unit.ToLowerInvariant()).Any(x => RateTokens.Contains(x.Value));
+    internal static bool AllowsPercent(string unit)
+    {
+        if (string.IsNullOrWhiteSpace(unit))
+        {
+            return true;
+        }
+        var tokens = UnitToken.Matches(unit).Select(x => x.Value).ToList();
+        return tokens.Count == 0 || !tokens.All(t =>
+            CurrencyCode.IsMatch(t) || NonRateTokens.Contains(t, StringComparer.OrdinalIgnoreCase));
+    }
 
     // a location written by LexVerifySource: Section "…" or Sections "…", "…", optionally with a source prefix
     private static readonly Regex ToolLocation = new(
@@ -294,7 +303,7 @@ public static class SourceVerifier
 
         var allNumbers = ContentNumbers(content ?? entry.Content);
         var numbers = Sample(allNumbers);
-        var rate = IsRateUnit(entry.Unit);
+        var percent = AllowsPercent(entry.Unit);
         var quote = string.IsNullOrWhiteSpace(entry.SourceQuote) ? null : entry.SourceQuote;
         var sections = readable
             .SelectMany(s => s.Document.Sections.Select(x => new Section(s.Url, s.Document.Name, x.Heading, x.Text)))
@@ -322,7 +331,7 @@ public static class SourceVerifier
             }
             var quoteNumbers = SourceNumbers.Scan(quote);
             var best = quoted
-                .Select(s => (Section: s, Found: numbers.Where(n => s.Numbers.Contains(n, rate) || quoteNumbers.Contains(n, rate)).ToList()))
+                .Select(s => (Section: s, Found: numbers.Where(n => s.Numbers.Contains(n, percent) || quoteNumbers.Contains(n, percent)).ToList()))
                 .OrderByDescending(x => x.Found.Count)
                 .First();
             var quoteMatch = Classify(best.Found.Count, numbers.Count);
@@ -334,14 +343,14 @@ public static class SourceVerifier
         {
             return Result(SourceMatch.NoNumbers);
         }
-        var found = numbers.Where(n => sections.Any(s => s.Numbers.Contains(n, rate))).ToList();
+        var found = numbers.Where(n => sections.Any(s => s.Numbers.Contains(n, percent))).ToList();
         var match = Classify(found.Count, numbers.Count);
         if (match != SourceMatch.Found)
         {
             return Result(match, found);
         }
 
-        var weak = Weakness(numbers, sections, rate);
+        var weak = Weakness(numbers, sections, percent);
         if (weak != null)
         {
             return Result(SourceMatch.Ambiguous, found, ambiguity: weak);
@@ -353,7 +362,7 @@ public static class SourceVerifier
         while (remaining.Count > 0 && cover.Count <= MaxSections)
         {
             var best = sections
-                .Select(s => (Section: s, Hits: remaining.Where(n => s.Numbers.Contains(n, rate)).ToList()))
+                .Select(s => (Section: s, Hits: remaining.Where(n => s.Numbers.Contains(n, percent)).ToList()))
                 .OrderByDescending(x => x.Hits.Count).First();
             if (best.Hits.Count == 0) break;
             cover.Add(best.Section);
@@ -369,23 +378,24 @@ public static class SourceVerifier
     /// <summary>
     /// Weak evidence of a single number, null for an entry with several numbers or a distinctive number
     /// </summary>
-    private static string Weakness(List<decimal> numbers, List<Section> sections, bool rate)
+    private static string Weakness(List<decimal> numbers, List<Section> sections, bool percent)
     {
         if (numbers.Count != 1)
         {
             return null;
         }
         var number = numbers[0];
-        var hits = sections.Where(s => s.Numbers.Contains(number, rate)).ToList();
-        if (hits.All(s => s.Numbers.IsWordOnly(number, rate)))
+        var hits = sections.Where(s => s.Numbers.Contains(number, percent)).ToList();
+        if (hits.All(s => s.Numbers.IsWordOnly(number, percent)))
         {
             return "number in words";
         }
-        if (SignificantDigits(number) <= WeakDigits)
+        var digits = hits.Select(s => s.Numbers.WrittenDigits(number, percent)).Where(x => x != null).Min();
+        if (digits <= WeakDigits)
         {
             return "short number";
         }
-        return hits.Count > WeakSections ? $"number in {hits.Count} sections" : null;
+        return digits <= FrequentDigits && hits.Count > WeakSections ? $"number in {hits.Count} sections" : null;
     }
 
     private static string Location(int sourceCount, List<Section> cover)

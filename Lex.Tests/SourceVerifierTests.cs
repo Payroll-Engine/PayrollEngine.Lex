@@ -64,66 +64,100 @@ public class SourceVerifierTests
         new() { State = SourceState.Readable, Sections = texts.Select((x, i) => ($"Page {i + 1}", x)).ToList() };
 
     [Theory]
+    [InlineData(null, true)]
+    [InlineData("", true)]
+    [InlineData("mixed", true)]
     [InlineData("%", true)]
+    [InlineData("rate", true)]
     [InlineData("percent", true)]
-    [InlineData("Rate", true)]
-    [InlineData("fraction", true)]
+    [InlineData("coefficient", true)]
     [InlineData("USD / rate", true)]
     [InlineData("% of salary", true)]
-    [InlineData("INR; %", true)]
-    [InlineData(null, false)]
     [InlineData("factor", false)]
-    [InlineData("mixed", false)]
-    [InlineData("coefficient", false)]
+    [InlineData("Factor", false)]
+    [InlineData("USD", false)]
+    [InlineData("EUR", false)]
+    [InlineData("hours", false)]
+    [InlineData("days", false)]
     [InlineData("USD/hour", false)]
-    public void IsRateUnit(string unit, bool expected) =>
-        Assert.Equal(expected, SourceVerifier.IsRateUnit(unit));
+    public void AllowsPercent(string unit, bool expected) =>
+        Assert.Equal(expected, SourceVerifier.AllowsPercent(unit));
 
     [Fact]
     public void FactorUnit_IsNotLookedUpAsPercentage() =>
         Assert.Equal(SourceMatch.NotFound,
             SourceVerifier.Verify(Entry("0.5", "factor"), Sections("The workweek has 50 hours a week.")).Match);
 
+    [Fact]
+    public void CurrencyUnit_IsNotLookedUpAsPercentage() =>
+        Assert.Equal(SourceMatch.NotFound,
+            SourceVerifier.Verify(Entry("0.0425", "USD"), Sections("The employee share is 4.25%.")).Match);
+
     [Theory]
-    [InlineData("The workweek has 50 hours a week.", 0)]
-    [InlineData("The employee share is 4.25 %.", 1)]
-    [InlineData("The employee share is 4.25%.", 1)]
-    [InlineData("The employee share is 4.25 percent.", 1)]
-    [InlineData("The employee share is 4.25 per cent.", 1)]
-    public void RateUnit_PercentageNeedsPercentSign(string text, int found)
-    {
-        var result = SourceVerifier.Verify(Entry("0.0425", "rate"), Sections(text));
-        Assert.Equal(found, result.NumbersFound);
-    }
+    [InlineData("rate")]
+    [InlineData("mixed")]
+    [InlineData(null)]
+    public void WithoutPercentSign_IsNotLookedUpAsPercentage(string unit) =>
+        Assert.Equal(SourceMatch.NotFound,
+            SourceVerifier.Verify(Entry("0.5", unit), Sections("The workweek has 50 hours a week.")).Match);
+
+    [Theory]
+    [InlineData("The employee share is 4.25 %.")]
+    [InlineData("The employee share is 4.25%.")]
+    [InlineData("The employee share is 4.25 percent.")]
+    [InlineData("The employee share is 4.25 per cent.")]
+    public void PercentSign_IsLookedUpAsPercentage(string text) =>
+        Assert.Equal(1, SourceVerifier.Verify(Entry("0.0425", "rate"), Sections(text)).NumbersFound);
 
     [Fact]
-    public void WithoutUnit_RateIsNotLookedUpAsPercentage() =>
-        Assert.Equal(SourceMatch.NotFound,
+    public void WithoutUnit_RateWithPercentSign_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
             SourceVerifier.Verify(Entry("0.0425"), Sections("The employee share is 4.25%.")).Match);
 
-    [Theory]
-    [InlineData(0.5, 1)]
-    [InlineData(1.5, 2)]
-    [InlineData(22, 2)]
-    [InlineData(37, 2)]
-    [InlineData(340, 2)]
-    [InlineData(0.012, 2)]
-    [InlineData(1000000, 1)]
-    [InlineData(7.25, 3)]
-    [InlineData(66150, 4)]
-    public void SignificantDigits(double value, int expected) =>
-        Assert.Equal(expected, SourceVerifier.SignificantDigits((decimal)value));
-
     [Fact]
-    public void ShortSingleNumber_IsAmbiguous()
+    public void MixedUnit_RateTableWithPercentSign_IsFound()
     {
-        var result = SourceVerifier.Verify(Entry("22", "%"), Sections("The optional flat rate is 22%."));
+        var result = SourceVerifier.Verify(
+            Entry("[{\"Over\":0,\"Amount\":0,\"Rate\":0.1},{\"Over\":19300,\"Amount\":1930,\"Rate\":0.12},{\"Over\":44100,\"Amount\":4906,\"Rate\":0.22}]", "mixed"),
+            Sections("$0 to $19,300: 10%; $19,300 to $44,100: $1,930.00 plus 12%; over $44,100: $4,906.00 plus 22%"));
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Equal(result.NumbersTotal, result.NumbersFound);
+    }
+
+    [Theory]
+    [InlineData("22", "%", "The optional flat rate is 22%.")]
+    [InlineData("0.22", "mixed", "The optional flat rate is 22%.")]
+    [InlineData("0.012", "percent", "The credit reduction is 1.2% for the year.")]
+    [InlineData("1.5", "factor", "Overtime at 1.5 the regular rate.")]
+    [InlineData("50", null, "Maximum 50 hours.")]
+    public void ShortSingleNumber_IsAmbiguous(string content, string unit, string text)
+    {
+        var result = SourceVerifier.Verify(Entry(content, unit), Sections(text));
 
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
         Assert.Equal("short number", result.Ambiguity);
         Assert.Null(result.Location);
         Assert.False(result.CanWrite);
     }
+
+    [Theory]
+    [InlineData("4300", "mixed", "Multiply the number of allowances by $4,300.")]
+    [InlineData("340", "mixed", "The monthly transit limit is $340.")]
+    [InlineData("8600", "USD", "Enter $8,600 on line 1g.")]
+    public void SingleNumberWithThreeOrMoreDigits_IsFound(string content, string unit, string text)
+    {
+        var result = SourceVerifier.Verify(Entry(content, unit), Sections(text));
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Equal("Section \"Page 1\"", result.Location);
+    }
+
+    [Fact]
+    public void LongNumberInManySections_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("12900", "mixed"),
+                Sections("Line 1g: $12,900", "Worksheet 1A: 12,900", "Example: subtract $12,900", "Table: 12,900")).Match);
 
     [Fact]
     public void TableWithManyNumbers_IsFound()
@@ -145,6 +179,14 @@ public class SourceVerifierTests
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
         Assert.Equal("number in 4 sections", result.Ambiguity);
     }
+
+    [Theory]
+    [InlineData("Minimum wage 7.25", 7.25, 3)]
+    [InlineData("Limit $4,300 per year", 4300, 4)]
+    [InlineData("Rate 1.2% of wages", 0.012, 2)]
+    [InlineData("Rate 0.012 or 1.2%", 0.012, 2)]
+    public void WrittenDigits_CountsDigitsAsWritten(string text, double value, int expected) =>
+        Assert.Equal(expected, SourceNumbers.Scan(text).WrittenDigits((decimal)value, true));
 
     [Fact]
     public void NumberInFewSections_IsFound() =>
