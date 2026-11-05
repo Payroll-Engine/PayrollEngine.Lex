@@ -25,7 +25,7 @@ internal sealed class TestSatellite : IDisposable
     {
         Key = key,
         Content = content,
-        SourceUrl = "https://example.org/doc",
+        SourceUrls = ["https://example.org/doc"],
         SourceLocation = location,
         LegalReference = "Test Act s. 1"
     };

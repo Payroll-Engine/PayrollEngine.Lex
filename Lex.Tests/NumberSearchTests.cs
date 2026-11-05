@@ -5,7 +5,7 @@ namespace PayrollEngine.Lex.Tests;
 public class NumberSearchTests
 {
     private static SourceResult Verify(string content, string text) =>
-        SourceVerifier.Verify(new Entry { Key = "Test.2026", Content = content, SourceUrl = "https://example.org/doc" },
+        SourceVerifier.Verify(new Entry { Key = "Test.2026", Content = content, SourceUrls = ["https://example.org/doc"] },
             new SourceDocument { State = SourceState.Readable, Sections = [("Page 1", text)] });
 
     [Theory]

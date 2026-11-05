@@ -49,7 +49,7 @@ public class RolloverTests
             {
               "key": "Rates.A",
               "content": "8.5",
-              "sourceUrl": "https://example.org/doc",
+              "sourceUrls": ["https://example.org/doc"],
               "sourceLocation": "p. 1",
               "legalReference": "Test Act s. 1",
               "verification": { "mode": "manual", "verifiedOn": "2026-01-02", "verifiedBy": "Tester", "evidence": "evidence-2026.pdf" }
@@ -57,7 +57,7 @@ public class RolloverTests
             {
               "key": "Table.A.2026",
               "contentFile": "Table.A.2026.json",
-              "sourceUrl": "https://example.org/doc",
+              "sourceUrls": ["https://example.org/doc"],
               "sourceLocation": "p. 2",
               "legalReference": "Test Act s. 2"
             }

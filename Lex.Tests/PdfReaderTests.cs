@@ -13,7 +13,7 @@ public class PdfReaderTests
         PdfReader.Read(new MemoryStream(pdf));
 
     private static SourceResult Verify(SourceDocument document, string content) =>
-        SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrl = "https://example.org/doc" }, document);
+        SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrls = ["https://example.org/doc"] }, document);
 
     private static async Task<SourceDocument> LoadLocal(string fileName, byte[] bytes)
     {

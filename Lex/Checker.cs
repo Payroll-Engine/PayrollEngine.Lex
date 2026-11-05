@@ -63,8 +63,8 @@ public sealed class CheckResult
     public List<string> DriftSamples { get; } = [];
 
     // traceability
-    /// <summary>Lex entries without sourceUrl</summary>
-    public int MissingSourceUrl { get; internal set; }
+    /// <summary>Lex entries without sourceUrls</summary>
+    public int MissingSourceUrls { get; internal set; }
 
     /// <summary>Lex entries without sourceLocation</summary>
     public int MissingSourceLocation { get; internal set; }
@@ -148,7 +148,7 @@ public sealed class CheckResult
     /// </summary>
     public bool HasFindings =>
         Error != null || ValidationErrors.Count > 0 || !HasSnapshot || Uncovered > 0 || Orphans > 0 ||
-        UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrl > 0 || (RequireLocation && MissingSourceLocation > 0) ||
+        UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrls > 0 || (RequireLocation && MissingSourceLocation > 0) ||
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
         (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null;
 }
@@ -245,7 +245,7 @@ public static class Checker
         var used = new HashSet<Exclusion>();
         foreach (var value in manifest.Values)
         {
-            if (string.IsNullOrWhiteSpace(value.SourceUrl)) result.MissingSourceUrl++;
+            if (!value.Urls.Any()) result.MissingSourceUrls++;
             if (string.IsNullOrWhiteSpace(value.SourceLocation))
             {
                 var exclusion = exclusions.FirstOrDefault(x => x.Matches(value.Key));
@@ -289,7 +289,7 @@ public static class Checker
                     break;
                 case Verification.ModeManual:
                     result.VerifiedManual++;
-                    if (value.SourceUrl != null && fourEyesUrls.Contains(value.SourceUrl) &&
+                    if (value.Urls.Any(fourEyesUrls.Contains) &&
                         (string.IsNullOrWhiteSpace(verification.ReviewedBy) || string.IsNullOrWhiteSpace(verification.ReviewedOn)))
                     {
                         result.MissingReview++;

@@ -20,13 +20,13 @@ public enum SourceMatch
     /// <summary>None of the numbers is found</summary>
     NotFound,
 
-    /// <summary>The source cannot be read (blocked, script-only page, PDF)</summary>
+    /// <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
     Unreadable,
 
     /// <summary>The entry holds no numbers to look for</summary>
     NoNumbers,
 
-    /// <summary>The entry has no local evidence file (local verification)</summary>
+    /// <summary>The entry has no local evidence file for any source (local verification)</summary>
     NoEvidence
 }
 
@@ -38,8 +38,8 @@ public sealed class SourceResult
     /// <summary>Key of the lex entry</summary>
     public string Key { get; internal init; }
 
-    /// <summary>Source URL of the lex entry</summary>
-    public string Url { get; internal init; }
+    /// <summary>Source URLs of the lex entry</summary>
+    public List<string> Urls { get; internal init; } = [];
 
     /// <summary>Verification state</summary>
     public SourceMatch Match { get; internal init; }
@@ -56,7 +56,7 @@ public sealed class SourceResult
     /// <summary>Proposed source location (sections that hold the numbers)</summary>
     public string Location { get; internal init; }
 
-    /// <summary>Reason of an unreadable source</summary>
+    /// <summary>Reason of an unreadable source; with several sources, the unreadable ones</summary>
     public string Reason { get; internal init; }
 }
 
@@ -179,25 +179,43 @@ public static class SourceVerifier
     }
 
     /// <summary>
-    /// Verify one entry against a source document
+    /// Verify one entry against the document of its single source
     /// </summary>
-    public static SourceResult Verify(Entry entry, SourceDocument document)
+    public static SourceResult Verify(Entry entry, SourceDocument document) =>
+        Verify(entry, [(entry.Urls.FirstOrDefault(), document)]);
+
+    /// <summary>
+    /// Verify one entry against the documents of its sources: a number is found when any readable
+    /// document holds it
+    /// </summary>
+    /// <param name="entry">Lex entry</param>
+    /// <param name="sources">Source URL and document, in the order of the entry source URLs</param>
+    public static SourceResult Verify(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources)
     {
-        if (document.State != SourceState.Readable)
+        var urls = entry.Urls.ToList();
+        var readable = sources.Where(s => s.Document.State == SourceState.Readable).ToList();
+        var failed = sources.Where(s => s.Document.State != SourceState.Readable).ToList();
+        var reason = sources.Count == 1
+            ? failed.FirstOrDefault().Document?.Reason
+            : failed.Count == 0 ? null
+            : string.Join("; ", failed.Select(s => $"{Label(s.Url)}: {s.Document.Reason}"));
+        if (readable.Count == 0)
         {
             return new SourceResult
             {
-                Key = entry.Key, Url = entry.SourceUrl, Reason = document.Reason,
-                Match = document.State == SourceState.Missing ? SourceMatch.NoEvidence : SourceMatch.Unreadable
+                Key = entry.Key, Urls = urls, Reason = reason,
+                Match = failed.All(s => s.Document.State == SourceState.Missing) ? SourceMatch.NoEvidence : SourceMatch.Unreadable
             };
         }
         var numbers = ContentNumbers(entry.Content);
         if (numbers.Count == 0)
         {
-            return new SourceResult { Key = entry.Key, Url = entry.SourceUrl, Match = SourceMatch.NoNumbers };
+            return new SourceResult { Key = entry.Key, Urls = urls, Match = SourceMatch.NoNumbers };
         }
 
-        var perSection = document.Sections.Select(s => (s.Heading, Numbers: SourceDocument.Numbers(s.Text))).ToList();
+        var perSection = readable
+            .SelectMany(s => s.Document.Sections.Select(x => (s.Url, x.Heading, Numbers: SourceDocument.Numbers(x.Text))))
+            .ToList();
         var all = new HashSet<decimal>(perSection.SelectMany(x => x.Numbers));
         var found = numbers.Where(n => Contains(all, n)).ToList();
         var missing = numbers.Except(found).Select(n => n.ToString(CultureInfo.InvariantCulture)).ToList();
@@ -210,27 +228,41 @@ public static class SourceVerifier
         {
             // greedy cover: the sections that hold most of the numbers
             var remaining = new HashSet<decimal>(found);
-            var headings = new List<string>();
-            while (remaining.Count > 0 && headings.Count <= MaxSections)
+            var cover = new List<(string Url, string Heading)>();
+            while (remaining.Count > 0 && cover.Count <= MaxSections)
             {
                 var best = perSection
-                    .Select(s => (s.Heading, Hits: remaining.Where(n => Contains(s.Numbers, n)).ToList()))
+                    .Select(s => (s.Url, s.Heading, Hits: remaining.Where(n => Contains(s.Numbers, n)).ToList()))
                     .OrderByDescending(x => x.Hits.Count).First();
                 if (best.Hits.Count == 0) break;
-                headings.Add(best.Heading);
+                cover.Add((best.Url, best.Heading));
                 remaining.ExceptWith(best.Hits);
             }
-            if (remaining.Count == 0 && headings.Count <= MaxSections)
+            if (remaining.Count == 0 && cover.Count <= MaxSections)
             {
-                location = headings.Count == 1
-                    ? $"Section \"{headings[0]}\""
-                    : "Sections " + string.Join(", ", headings.Select(h => $"\"{h}\""));
+                location = sources.Count == 1
+                    ? Sections(cover.Select(x => x.Heading).ToList())
+                    : string.Join("; ", cover.GroupBy(x => x.Url)
+                        .Select(g => $"{Label(g.Key)}: {Sections(g.Select(x => x.Heading).ToList())}"));
             }
         }
         return new SourceResult
         {
-            Key = entry.Key, Url = entry.SourceUrl, Match = match, NumbersTotal = numbers.Count,
-            NumbersFound = found.Count, Missing = missing, Location = location
+            Key = entry.Key, Urls = urls, Match = match, NumbersTotal = numbers.Count,
+            NumbersFound = found.Count, Missing = missing, Location = location, Reason = reason
         };
     }
+
+    private static string Sections(List<string> headings) =>
+        headings.Count == 1
+            ? $"Section \"{headings[0]}\""
+            : "Sections " + string.Join(", ", headings.Select(h => $"\"{h}\""));
+
+    /// <summary>
+    /// Short source name: the host of a URL without www, otherwise the text
+    /// </summary>
+    private static string Label(string url) =>
+        Uri.TryCreate(url, UriKind.Absolute, out var uri) && !string.IsNullOrEmpty(uri.Host)
+            ? uri.Host.StartsWith("www.", StringComparison.OrdinalIgnoreCase) ? uri.Host[4..] : uri.Host
+            : url ?? "source";
 }

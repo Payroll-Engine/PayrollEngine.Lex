@@ -24,7 +24,7 @@ public class OpenEntryTests
         {
             Key = value.Key,
             Content = value.Content,
-            SourceUrl = value.SourceUrl,
+            SourceUrls = value.SourceUrls,
             SourceLocation = value.SourceLocation,
             LegalReference = value.LegalReference,
             Open = true
@@ -69,7 +69,7 @@ public class OpenEntryTests
         {
             Key = value.Key,
             Content = value.Content,
-            SourceUrl = value.SourceUrl,
+            SourceUrls = value.SourceUrls,
             SourceLocation = value.SourceLocation,
             LegalReference = value.LegalReference,
             Open = true,

@@ -180,7 +180,7 @@ public static class Verifier
             if (!File.Exists(local))
             {
                 // LexSnapshot skips local-only files that do not exist; declared origins must exist
-                if (!string.IsNullOrWhiteSpace(file.SourcePath) || !string.IsNullOrWhiteSpace(file.SourceUrl))
+                if (!string.IsNullOrWhiteSpace(file.SourcePath) || file.Urls.Any())
                 {
                     errors.Add($"File '{file.FileName}' is declared in lex.json but missing in the .lex folder");
                     complete = false;

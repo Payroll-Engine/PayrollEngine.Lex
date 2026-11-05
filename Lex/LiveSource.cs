@@ -20,7 +20,7 @@ public sealed class LiveSource
     public string TextHash { get; init; }
 
     /// <summary>
-    /// Reason why the source could not be read (e.g. HTTP 403, PDF)
+    /// Reason why the source could not be read (e.g. HTTP 403, no text layer)
     /// </summary>
     public string Reason { get; init; }
 
@@ -30,7 +30,7 @@ public sealed class LiveSource
     /// <param name="manifest">Manifest</param>
     public static List<string> Urls(Manifest manifest) =>
         manifest.Sources.Select(x => x.Url)
-            .Concat(manifest.Values.Select(x => x.SourceUrl))
+            .Concat(manifest.Values.SelectMany(x => x.Urls))
             .Where(IsHttp)
             .Distinct(StringComparer.Ordinal)
             .ToList();

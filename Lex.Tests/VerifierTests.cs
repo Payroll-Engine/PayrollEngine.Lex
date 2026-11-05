@@ -19,7 +19,7 @@ public class VerifierTests
             {
                 Key = "Table.All",
                 ContentFile = "table.json",
-                SourceUrl = "https://example.org/doc",
+                SourceUrls = ["https://example.org/doc"],
                 SourceLocation = "p. 2",
                 LegalReference = "Test Act s. 2"
             }
@@ -101,7 +101,7 @@ public class VerifierTests
         {
             Key = value.Key,
             Content = value.Content,
-            SourceUrl = value.SourceUrl,
+            SourceUrls = value.SourceUrls,
             SourceLocation = value.SourceLocation,
             LegalReference = value.LegalReference,
             Verification = new Verification

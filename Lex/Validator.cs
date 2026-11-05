@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace PayrollEngine.Lex;
 
@@ -167,12 +168,12 @@ public static class Validator
                     errors.Add($"File '{file.FileName}': sourcePath not found: {resolved}");
                 }
             }
-            else if (string.IsNullOrWhiteSpace(file.SourceUrl))
+            else if (!file.Urls.Any())
             {
                 var localPath = Path.Combine(manifestDirectory, file.FileName);
                 if (!File.Exists(localPath))
                 {
-                    errors.Add($"File '{file.FileName}': no sourcePath, no sourceUrl, and file not found in .lex folder: {localPath}");
+                    errors.Add($"File '{file.FileName}': no sourcePath, no sourceUrls, and file not found in .lex folder: {localPath}");
                 }
             }
         }

@@ -1,3 +1,7 @@
+using System.Collections.Generic;
+using System.Linq;
+using System.Text.Json.Serialization;
+
 namespace PayrollEngine.Lex;
 
 /// <summary>
@@ -16,12 +20,18 @@ public sealed class EvidenceFile
     public string SourcePath { get; init; }
 
     /// <summary>
-    /// Source URL — file is downloaded automatically when sourcePath is empty
+    /// Source URLs — when sourcePath is empty, the file is downloaded from the first URL that answers
     /// </summary>
-    public string SourceUrl { get; init; }
+    public List<string> SourceUrls { get; init; }
 
     /// <summary>
     /// Human-readable description
     /// </summary>
     public string Description { get; init; }
+
+    /// <summary>
+    /// The non-empty source URLs, in declaration order
+    /// </summary>
+    [JsonIgnore]
+    public IEnumerable<string> Urls => SourceUrls?.Where(x => !string.IsNullOrWhiteSpace(x)) ?? [];
 }

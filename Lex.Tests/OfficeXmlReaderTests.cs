@@ -177,7 +177,7 @@ public class OfficeXmlReaderTests
 
         var document = await SourceDocument.LoadLocal(path);
 
-        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrl = "https://example.org/doc" }, document);
+        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal($"Section \"{section}\"", result.Location);
     }
@@ -198,7 +198,7 @@ public class OfficeXmlReaderTests
             var document = await SourceDocument.LoadLocal(path);
             Assert.True(document.IsReadable);
             Assert.Equal(SourceMatch.NotFound,
-                SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = number, SourceUrl = "https://example.org/doc" }, document).Match);
+                SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = number, SourceUrls = ["https://example.org/doc"] }, document).Match);
         }
     }
 

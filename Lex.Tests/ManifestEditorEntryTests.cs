@@ -13,7 +13,7 @@ public class ManifestEditorEntryTests
             { "url": "https://example.org/four", "description": "Four", "review": "FourEyes" }
           ],
           "values": [
-            { "key": "Rates.A", "content": "8.5", "sourceUrl": "https://example.org/four" },
+            { "key": "Rates.A", "content": "8.5", "sourceUrls": ["https://example.org/four"] },
             { "key": "Rates.B", "content": "10",
               "verification": { "mode": "manual", "verifiedOn": "2026-01-10", "verifiedBy": "Jane Doe", "evidence": "doc.pdf" } },
             { "key": "Rates.C", "content": "12",
@@ -69,7 +69,7 @@ public class ManifestEditorEntryTests
         var entry = Entry(editor, "Rates.D");
         Assert.Equal("7", entry.GetProperty("content").GetString());
         Assert.Equal("rate", entry.GetProperty("unit").GetString());
-        Assert.Equal(string.Empty, entry.GetProperty("sourceUrl").GetString());
+        Assert.Equal(0, entry.GetProperty("sourceUrls").GetArrayLength());
         Assert.Equal(string.Empty, entry.GetProperty("sourceLocation").GetString());
         Assert.Equal(string.Empty, entry.GetProperty("legalReference").GetString());
         Assert.False(entry.TryGetProperty("documentRef", out _));
@@ -94,9 +94,12 @@ public class ManifestEditorEntryTests
     {
         var editor = ManifestEditor.Parse(Json);
 
-        Assert.True(editor.AddFile(new EvidenceFile { FileName = "rates.html", SourceUrl = "https://example.org/rates" }));
+        Assert.True(editor.AddFile(new EvidenceFile { FileName = "rates.html", SourceUrls = ["https://example.org/rates"] }));
         Assert.False(editor.AddFile(new EvidenceFile { FileName = "RATES.html" }));
-        Assert.Contains("\"sourceUrl\": \"https://example.org/rates\"", editor.ToJson());
+        using var json = JsonDocument.Parse(editor.ToJson());
+        var file = json.RootElement.GetProperty("files").EnumerateArray()
+            .Single(x => x.GetProperty("fileName").GetString() == "rates.html");
+        Assert.Equal("https://example.org/rates", file.GetProperty("sourceUrls")[0].GetString());
         Assert.Equal(1, editor.Changes);
     }
 

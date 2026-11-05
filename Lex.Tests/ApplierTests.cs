@@ -81,7 +81,7 @@ public class ApplierTests
         {
             Key = entry.Key,
             ContentFile = fileName,
-            SourceUrl = entry.SourceUrl,
+            SourceUrls = entry.SourceUrls,
             SourceLocation = entry.SourceLocation,
             LegalReference = entry.LegalReference
         };

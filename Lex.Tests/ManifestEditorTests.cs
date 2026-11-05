@@ -11,7 +11,7 @@ public class ManifestEditorTests
           "authority": "XX",
           "custom": { "keep": true },
           "values": [
-            { "key": "Rates.A", "content": "8.5", "sourceUrl": "https://example.org/doc", "note": "kept" },
+            { "key": "Rates.A", "content": "8.5", "sourceUrls": ["https://example.org/doc"], "note": "kept" },
             { "key": "Rates.B", "content": "10", "sourceLocation": "p. 2",
               "verification": { "mode": "manual", "verifiedOn": "2026-01-10", "verifiedBy": "Jane Doe", "evidence": "doc.pdf" } },
             { "key": "Rates.C", "content": "12",

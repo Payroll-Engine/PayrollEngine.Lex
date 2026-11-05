@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.Linq;
 using System.Text.Json.Serialization;
 // ReSharper disable CommentTypo
 
@@ -36,9 +38,10 @@ public sealed class Entry
     public string Unit { get; init; }
 
     /// <summary>
-    /// URL where this specific value can be found
+    /// URLs where this specific value can be found; a value combined from several authorities
+    /// lists one URL per authority, the first one is the main source
     /// </summary>
-    public string SourceUrl { get; init; }
+    public List<string> SourceUrls { get; init; }
 
     /// <summary>
     /// Precise location within the source document (free text)
@@ -83,4 +86,10 @@ public sealed class Entry
     /// </summary>
     [JsonIgnore]
     public bool HasContentFile => ContentFile != null;
+
+    /// <summary>
+    /// The non-empty source URLs, in declaration order
+    /// </summary>
+    [JsonIgnore]
+    public IEnumerable<string> Urls => SourceUrls?.Where(x => !string.IsNullOrWhiteSpace(x)) ?? [];
 }

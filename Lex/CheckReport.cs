@@ -32,7 +32,7 @@ public static class CheckReport
     {
         var csv = new StringBuilder();
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
-                       "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrl;MissingSourceLocation;" +
+                       "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrls;MissingSourceLocation;" +
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open");
         foreach (var r in results)
@@ -40,7 +40,7 @@ public static class CheckReport
             csv.AppendLine(string.Join(';',
                 r.Satellite, r.LexPath, r.HasSnapshot, r.RegulationLookups, r.RegulationValues, r.LexEntries,
                 r.CoveredDirect, r.CoveredByLookup, r.Uncovered, r.Orphans, r.UnresolvedSplit, r.Compared, r.Drift,
-                r.MissingSourceUrl, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
+                r.MissingSourceUrls, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open));
         }
@@ -109,9 +109,9 @@ public static class CheckReport
             if (r.Drift > 0) text.AppendLine($"- Differences ({r.Drift} of {r.Compared} compared): {Join(r.DriftSamples, r.Drift)}");
             foreach (var url in r.DeadUrls) text.AppendLine($"- Source URL not found: {url}");
             foreach (var url in r.ChangedSources) text.AppendLine($"- Source changed, check value: {url}");
-            if (r.MissingSourceUrl + (r.RequireLocation ? r.MissingSourceLocation : 0) + r.MissingLegalReference > 0)
+            if (r.MissingSourceUrls + (r.RequireLocation ? r.MissingSourceLocation : 0) + r.MissingLegalReference > 0)
             {
-                text.AppendLine($"- Missing fields: sourceUrl {r.MissingSourceUrl}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");
+                text.AppendLine($"- Missing fields: sourceUrls {r.MissingSourceUrls}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");
             }
             if (r.RequireVerification && r.Unverified > 0)
                 text.AppendLine($"- Without verification ({r.Unverified}): {Join(r.UnverifiedSamples, r.Unverified)}");

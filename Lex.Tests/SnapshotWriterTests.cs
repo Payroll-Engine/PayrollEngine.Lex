@@ -12,7 +12,7 @@ public class SnapshotWriterTests
     private static Manifest ManifestWithDownload()
     {
         var manifest = TestSatellite.Manifest(TestSatellite.Value("Rates.A", "7.5"));
-        manifest.Files.Add(new EvidenceFile { FileName = DownloadFile, SourceUrl = UnreachableUrl });
+        manifest.Files.Add(new EvidenceFile { FileName = DownloadFile, SourceUrls = [UnreachableUrl] });
         return manifest;
     }
 

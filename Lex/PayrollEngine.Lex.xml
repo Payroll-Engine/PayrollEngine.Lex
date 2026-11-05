@@ -160,8 +160,8 @@
         <member name="P:PayrollEngine.Lex.CheckResult.DriftSamples">
             <summary>Samples of value differences</summary>
         </member>
-        <member name="P:PayrollEngine.Lex.CheckResult.MissingSourceUrl">
-            <summary>Lex entries without sourceUrl</summary>
+        <member name="P:PayrollEngine.Lex.CheckResult.MissingSourceUrls">
+            <summary>Lex entries without sourceUrls</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingSourceLocation">
             <summary>Lex entries without sourceLocation</summary>
@@ -344,9 +344,10 @@
             Unit of measure (EUR, %, CHF, months, ...)
             </summary>
         </member>
-        <member name="P:PayrollEngine.Lex.Entry.SourceUrl">
+        <member name="P:PayrollEngine.Lex.Entry.SourceUrls">
             <summary>
-            URL where this specific value can be found
+            URLs where this specific value can be found; a value combined from several authorities
+            lists one URL per authority, the first one is the main source
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.SourceLocation">
@@ -388,6 +389,11 @@
         <member name="P:PayrollEngine.Lex.Entry.HasContentFile">
             <summary>
             Returns true if this value references an external file
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Entry.Urls">
+            <summary>
+            The non-empty source URLs, in declaration order
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.EntryTargetKind">
@@ -493,14 +499,19 @@
             Local path to the source file (copied by LexSnapshot)
             </summary>
         </member>
-        <member name="P:PayrollEngine.Lex.EvidenceFile.SourceUrl">
+        <member name="P:PayrollEngine.Lex.EvidenceFile.SourceUrls">
             <summary>
-            Source URL — file is downloaded automatically when sourcePath is empty
+            Source URLs — when sourcePath is empty, the file is downloaded from the first URL that answers
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.EvidenceFile.Description">
             <summary>
             Human-readable description
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EvidenceFile.Urls">
+            <summary>
+            The non-empty source URLs, in declaration order
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Exclusion">
@@ -725,7 +736,7 @@
         </member>
         <member name="P:PayrollEngine.Lex.LiveSource.Reason">
             <summary>
-            Reason why the source could not be read (e.g. HTTP 403, PDF)
+            Reason why the source could not be read (e.g. HTTP 403, no text layer)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.LiveSource.Urls(PayrollEngine.Lex.Manifest)">
@@ -848,15 +859,16 @@
         </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SourceReview(System.String)">
             <summary>
-            Review rule of the source of an entry (sources[].url equals the sourceUrl of the entry)
+            Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
+            FourEyes when any source requires it
             </summary>
             <param name="key">Entry key</param>
             <returns>The review rule, null without source or rule</returns>
         </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.AddValue(PayrollEngine.Lex.Entry)">
             <summary>
-            Append a new entry. The required fields content, sourceUrl, sourceLocation and legalReference
-            are written as empty text when missing, so that LexCheck reports them until they are filled.
+            Append a new entry. The required fields content, sourceUrls, sourceLocation and legalReference
+            are written empty when missing, so that LexCheck reports them until they are filled.
             </summary>
             <param name="value">Entry to add</param>
             <exception cref="T:System.InvalidOperationException">An entry with the key exists</exception>
@@ -1257,7 +1269,7 @@
         <member name="T:PayrollEngine.Lex.SnapshotWriter">
             <summary>
             Generates snapshot.json from a validated <see cref="T:PayrollEngine.Lex.Manifest"/> and copies referenced files.
-            Downloads files from sourceUrl when no local sourcePath is provided.
+            Downloads files from their sourceUrls when no local sourcePath is provided.
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SnapshotWriter.WriteAsync(PayrollEngine.Lex.Manifest,System.String,System.String,System.Boolean,System.Action{System.String,System.Boolean},System.Boolean,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}})">
@@ -1275,6 +1287,11 @@
             <param name="loadLiveSource">Optional loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>);
             when set, the snapshot records the text hash of every source URL. Not called in dry-run mode.</param>
             <returns>Written snapshot (for reporting)</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.DownloadAsync(System.Collections.Generic.List{System.String})">
+            <summary>
+            Download from the first URL that answers; the error of the last URL when none answers
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Source">
             <summary>
@@ -1309,7 +1326,7 @@
         <member name="P:PayrollEngine.Lex.Source.Review">
             <summary>
             Review rule for the values of this source: SingleAuthor (default) or FourEyes.
-            A value belongs to the source whose url equals the value's sourceUrl.
+            A value belongs to every source whose url is listed in the value's sourceUrls.
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Source.IsFourEyes">
@@ -1439,13 +1456,13 @@
             <summary>None of the numbers is found</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Unreadable">
-            <summary>The source cannot be read (blocked, script-only page, PDF)</summary>
+            <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NoNumbers">
             <summary>The entry holds no numbers to look for</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NoEvidence">
-            <summary>The entry has no local evidence file (local verification)</summary>
+            <summary>The entry has no local evidence file for any source (local verification)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceResult">
             <summary>
@@ -1455,8 +1472,8 @@
         <member name="P:PayrollEngine.Lex.SourceResult.Key">
             <summary>Key of the lex entry</summary>
         </member>
-        <member name="P:PayrollEngine.Lex.SourceResult.Url">
-            <summary>Source URL of the lex entry</summary>
+        <member name="P:PayrollEngine.Lex.SourceResult.Urls">
+            <summary>Source URLs of the lex entry</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.Match">
             <summary>Verification state</summary>
@@ -1474,7 +1491,7 @@
             <summary>Proposed source location (sections that hold the numbers)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.Reason">
-            <summary>Reason of an unreadable source</summary>
+            <summary>Reason of an unreadable source; with several sources, the unreadable ones</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceVerifier">
             <summary>
@@ -1511,7 +1528,20 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument)">
             <summary>
-            Verify one entry against a source document
+            Verify one entry against the document of its single source
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}})">
+            <summary>
+            Verify one entry against the documents of its sources: a number is found when any readable
+            document holds it
+            </summary>
+            <param name="entry">Lex entry</param>
+            <param name="sources">Source URL and document, in the order of the entry source URLs</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Label(System.String)">
+            <summary>
+            Short source name: the host of a URL without www, otherwise the text
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.SpreadsheetReader">

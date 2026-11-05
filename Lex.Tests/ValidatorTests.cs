@@ -30,7 +30,7 @@ public class ValidatorTests
         {
             Key = value.Key,
             Content = value.Content,
-            SourceUrl = value.SourceUrl,
+            SourceUrls = value.SourceUrls,
             SourceLocation = value.SourceLocation,
             LegalReference = value.LegalReference,
             Verification = verification

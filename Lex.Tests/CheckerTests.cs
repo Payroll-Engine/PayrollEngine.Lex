@@ -210,8 +210,8 @@ public class CheckerTests
         var a = TestSatellite.Value("Rates.A", "7.5");
         var b = TestSatellite.Value("Rates.B", "10");
         var manifest = TestSatellite.Manifest(
-            new Entry { Key = a.Key, Content = a.Content, SourceUrl = "https://example.org/gone", SourceLocation = "p. 1", LegalReference = "x" },
-            new Entry { Key = b.Key, Content = b.Content, SourceUrl = "https://example.org/blocked", SourceLocation = "p. 1", LegalReference = "x" });
+            new Entry { Key = a.Key, Content = a.Content, SourceUrls = ["https://example.org/gone"], SourceLocation = "p. 1", LegalReference = "x" },
+            new Entry { Key = b.Key, Content = b.Content, SourceUrls = ["https://example.org/blocked"], SourceLocation = "p. 1", LegalReference = "x" });
         var result = Checker.Check(manifest, s.LexPath);
 
         using var checker = new UrlChecker(new FakeHandler(r =>

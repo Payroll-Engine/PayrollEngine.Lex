@@ -138,22 +138,28 @@ public sealed class ManifestEditor
             string.Equals(x["url"]?.GetValue<string>(), url, StringComparison.Ordinal));
 
     /// <summary>
-    /// Review rule of the source of an entry (sources[].url equals the sourceUrl of the entry)
+    /// Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
+    /// FourEyes when any source requires it
     /// </summary>
     /// <param name="key">Entry key</param>
     /// <returns>The review rule, null without source or rule</returns>
     public string SourceReview(string key)
     {
-        var url = Entry(key)?["sourceUrl"]?.GetValue<string>();
-        return url == null
-            ? null
-            : Items("sources").OfType<JsonObject>()
-                .FirstOrDefault(x => x["url"]?.GetValue<string>() == url)?["review"]?.GetValue<string>();
+        var urls = (Entry(key)?["sourceUrls"] as JsonArray)?
+            .Select(x => x?.GetValue<string>())
+            .Where(x => !string.IsNullOrWhiteSpace(x))
+            .ToHashSet(StringComparer.Ordinal) ?? [];
+        var reviews = Items("sources").OfType<JsonObject>()
+            .Where(x => urls.Contains(x["url"]?.GetValue<string>() ?? string.Empty))
+            .Select(x => x["review"]?.GetValue<string>())
+            .Where(x => x != null)
+            .ToList();
+        return reviews.Contains(Source.ReviewFourEyes) ? Source.ReviewFourEyes : reviews.FirstOrDefault();
     }
 
     /// <summary>
-    /// Append a new entry. The required fields content, sourceUrl, sourceLocation and legalReference
-    /// are written as empty text when missing, so that LexCheck reports them until they are filled.
+    /// Append a new entry. The required fields content, sourceUrls, sourceLocation and legalReference
+    /// are written empty when missing, so that LexCheck reports them until they are filled.
     /// </summary>
     /// <param name="value">Entry to add</param>
     /// <exception cref="InvalidOperationException">An entry with the key exists</exception>
@@ -173,7 +179,7 @@ public sealed class ManifestEditor
             ["content"] = value.Content ?? string.Empty
         };
         if (value.Unit != null) entry["unit"] = value.Unit;
-        entry["sourceUrl"] = value.SourceUrl ?? string.Empty;
+        entry["sourceUrls"] = new JsonArray(value.Urls.Select(x => (JsonNode)x).ToArray());
         entry["sourceLocation"] = value.SourceLocation ?? string.Empty;
         entry["legalReference"] = value.LegalReference ?? string.Empty;
         if (value.DocumentRef != null) entry["documentRef"] = value.DocumentRef;

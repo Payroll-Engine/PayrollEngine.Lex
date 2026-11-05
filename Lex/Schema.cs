@@ -116,7 +116,7 @@ public static class Schema
                   "type": "string",
                   "enum": ["SingleAuthor", "FourEyes"],
                   "default": "SingleAuthor",
-                  "description": "Review rule for the values of this source (values whose sourceUrl equals the source url). FourEyes: manual verifications require reviewedBy and reviewedOn."
+                  "description": "Review rule for the values of this source (values whose sourceUrls list the source url). FourEyes: manual verifications require reviewedBy and reviewedOn."
                 }
               }
             },
@@ -204,10 +204,13 @@ public static class Schema
                   "description": "Unit of measure",
                   "examples": ["EUR", "%", "CHF", "SGD", "months", "days"]
                 },
-                "sourceUrl": {
-                  "type": "string",
-                  "format": "uri",
-                  "description": "URL where this specific value can be found"
+                "sourceUrls": {
+                  "type": "array",
+                  "description": "URLs where this specific value can be found. A value combined from several authorities lists one URL per authority; the first one is the main source.",
+                  "items": {
+                    "type": "string",
+                    "format": "uri"
+                  }
                 },
                 "sourceLocation": {
                   "type": "string",
@@ -244,10 +247,13 @@ public static class Schema
                   "type": "string",
                   "description": "Local path to the source file (copied into .lex by LexSnapshot)"
                 },
-                "sourceUrl": {
-                  "type": "string",
-                  "format": "uri",
-                  "description": "Source URL — file is downloaded automatically by LexSnapshot when sourcePath is empty"
+                "sourceUrls": {
+                  "type": "array",
+                  "description": "Source URLs — when sourcePath is empty, LexSnapshot downloads the file from the first URL that answers",
+                  "items": {
+                    "type": "string",
+                    "format": "uri"
+                  }
                 },
                 "description": {
                   "type": "string",

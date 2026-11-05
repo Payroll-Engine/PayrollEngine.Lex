@@ -35,7 +35,7 @@ public class LiveSourceTests
         var manifest = TestSatellite.Manifest(TestSatellite.Value("Rates.A", "8.5"));
         manifest.Values.Add(new Entry
         {
-            Key = "Rates.B", Content = "10", SourceUrl = PageUrl, SourceLocation = "p. 1", LegalReference = "Test Act s. 2"
+            Key = "Rates.B", Content = "10", SourceUrls = [PageUrl], SourceLocation = "p. 1", LegalReference = "Test Act s. 2"
         });
         return manifest;
     }

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Net.Http;
 using System.Reflection;
 using System.Security.Cryptography;
@@ -14,7 +15,7 @@ namespace PayrollEngine.Lex;
 
 /// <summary>
 /// Generates snapshot.json from a validated <see cref="Manifest"/> and copies referenced files.
-/// Downloads files from sourceUrl when no local sourcePath is provided.
+/// Downloads files from their sourceUrls when no local sourcePath is provided.
 /// </summary>
 public sealed class SnapshotWriter
 {
@@ -98,7 +99,7 @@ public sealed class SnapshotWriter
                     ContentFile = localName,
                     DocumentRef = value.DocumentRef,
                     Unit = value.Unit,
-                    SourceUrl = value.SourceUrl,
+                    SourceUrls = value.SourceUrls,
                     SourceLocation = value.SourceLocation,
                     LegalReference = value.LegalReference,
                     Description = value.Description,
@@ -133,7 +134,7 @@ public sealed class SnapshotWriter
 
                 AddFileToSnapshot(snapshotFiles, hashInput, sourcePath, localName, file.Description);
             }
-            else if (!string.IsNullOrWhiteSpace(file.SourceUrl) && keepLocalFiles &&
+            else if (file.Urls.Any() && keepLocalFiles &&
                      File.Exists(Path.Combine(manifestDirectory, localName)))
             {
                 var localPath = Path.Combine(manifestDirectory, localName);
@@ -143,14 +144,14 @@ public sealed class SnapshotWriter
                 }
                 AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
             }
-            else if (!string.IsNullOrWhiteSpace(file.SourceUrl))
+            else if (file.Urls.Any())
             {
                 var localPath = Path.Combine(manifestDirectory, localName);
 
                 writeFile?.Invoke(localName, dryRun);
                 if (!dryRun)
                 {
-                    var bytes = await HttpClient.GetByteArrayAsync(file.SourceUrl);
+                    var bytes = await DownloadAsync(file.Urls.ToList());
                     await File.WriteAllBytesAsync(localPath, bytes);
 
                     if (!string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
@@ -216,6 +217,24 @@ public sealed class SnapshotWriter
         }
 
         return snapshot;
+    }
+
+    /// <summary>
+    /// Download from the first URL that answers; the error of the last URL when none answers
+    /// </summary>
+    private static async Task<byte[]> DownloadAsync(List<string> urls)
+    {
+        for (var i = 0; ; i++)
+        {
+            try
+            {
+                return await HttpClient.GetByteArrayAsync(urls[i]);
+            }
+            catch (HttpRequestException) when (i < urls.Count - 1)
+            {
+                // next URL
+            }
+        }
     }
 
     private static async Task<List<LiveSource>> LoadLiveSources(List<string> urls,

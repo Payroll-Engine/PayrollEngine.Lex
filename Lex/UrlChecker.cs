@@ -79,8 +79,8 @@ public sealed class UrlChecker : IDisposable
     /// </summary>
     internal static IEnumerable<string> Urls(Manifest manifest) =>
         manifest.Sources.Select(x => x.Url)
-            .Concat(manifest.Values.Select(x => x.SourceUrl))
-            .Concat(manifest.Files.Select(x => x.SourceUrl))
+            .Concat(manifest.Values.SelectMany(x => x.Urls))
+            .Concat(manifest.Files.SelectMany(x => x.Urls))
             .Where(x => !string.IsNullOrWhiteSpace(x) &&
                         (x.StartsWith("http://", StringComparison.OrdinalIgnoreCase) ||
                          x.StartsWith("https://", StringComparison.OrdinalIgnoreCase)))

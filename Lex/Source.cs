@@ -36,7 +36,7 @@ public sealed class Source
 
     /// <summary>
     /// Review rule for the values of this source: SingleAuthor (default) or FourEyes.
-    /// A value belongs to the source whose url equals the value's sourceUrl.
+    /// A value belongs to every source whose url is listed in the value's sourceUrls.
     /// </summary>
     public string Review { get; init; }
 

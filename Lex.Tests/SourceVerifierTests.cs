@@ -8,7 +8,7 @@ public class SourceVerifierTests
     {
         Key = "Test.2026",
         Content = content,
-        SourceUrl = "https://example.org/doc"
+        SourceUrls = ["https://example.org/doc"]
     };
 
     private static string Page(string body) =>

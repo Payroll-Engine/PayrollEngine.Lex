@@ -70,7 +70,7 @@ public class SourceDocumentTests
     public async Task LoadLocal_MissingFile_IsNoEvidence()
     {
         var document = await SourceDocument.LoadLocal(null);
-        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "8.5", SourceUrl = "https://example.org/doc" }, document);
+        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "8.5", SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(SourceMatch.NoEvidence, result.Match);
     }
 
@@ -81,7 +81,7 @@ public class SourceDocumentTests
         var path = Path.Combine(s.LexDirectory, "page.html");
         await File.WriteAllTextAsync(path, Page("<p>The rate is 8.5%.</p>"));
         var document = await SourceDocument.LoadLocal(path);
-        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "0.085", SourceUrl = "https://example.org/doc" }, document);
+        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "0.085", SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal("Section \"Rates\"", result.Location);
     }

@@ -29,7 +29,7 @@ public class CheckerVerificationTests
     {
         Key = key,
         Content = content,
-        SourceUrl = "https://example.org/doc",
+        SourceUrls = ["https://example.org/doc"],
         SourceLocation = "p. 1",
         LegalReference = "Test Act s. 1",
         Verification = verification

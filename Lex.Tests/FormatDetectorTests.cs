@@ -129,7 +129,7 @@ public class FormatDetectorTests
         Assert.Equal(SourceState.Unsupported, document.State);
         Assert.Equal(reason, document.Reason);
         Assert.Equal(SourceMatch.Unreadable,
-            SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "60", SourceUrl = "https://example.org/doc" }, document).Match);
+            SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "60", SourceUrls = ["https://example.org/doc"] }, document).Match);
     }
 
     [Fact]
