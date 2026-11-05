@@ -47,6 +47,16 @@ public sealed class SourceDocument
         var values = new HashSet<decimal>();
         foreach (Match match in NumberToken.Matches(text))
         {
+            if (match.Groups["lakh"].Success)
+            {
+                // the grouping is unambiguous: one reading only
+                if (decimal.TryParse(match.Value.Replace(",", string.Empty), NumberStyles.AllowDecimalPoint,
+                        CultureInfo.InvariantCulture, out var lakh))
+                {
+                    values.Add(Math.Round(lakh, 6));
+                }
+                continue;
+            }
             foreach (var value in Interpretations(match.Value))
             {
                 values.Add(Math.Round(value, 6));
@@ -55,8 +65,10 @@ public sealed class SourceDocument
         return values;
     }
 
+    // lakh grouping (1,50,000 and 20,00,000.50): groups of two digits before the last group of three
     private static readonly Regex NumberToken = new(
-        @"\d{1,3}(?:[ \u00a0\u202f.,'’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?", RegexOptions.Compiled);
+        @"(?<lakh>\d{1,2}(?:,\d{2})+,\d{3}(?:\.\d+)?)(?!\d|,\d)|\d{1,3}(?:[ \u00a0\u202f.,'’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?",
+        RegexOptions.Compiled);
 
     private static IEnumerable<decimal> Interpretations(string token)
     {

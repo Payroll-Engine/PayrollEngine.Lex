@@ -1495,7 +1495,13 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ContentNumbers(System.String)">
             <summary>
-            Numbers of an entry content (scalars, object properties, array items); 0 and 1 carry no information
+            Numbers of an entry content (scalars, object properties, array items); 0, 1 and open upper bounds
+            (nines only, see <see cref="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)"/>) carry no information
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)">
+            <summary>
+            Open upper bound of a range, written as nines only (999999, 99999999.99): not a value of the source
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Contains(System.Collections.Generic.HashSet{System.Decimal},System.Decimal)">

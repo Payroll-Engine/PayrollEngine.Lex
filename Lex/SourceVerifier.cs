@@ -88,7 +88,8 @@ public static class SourceVerifier
     };
 
     /// <summary>
-    /// Numbers of an entry content (scalars, object properties, array items); 0 and 1 carry no information
+    /// Numbers of an entry content (scalars, object properties, array items); 0, 1 and open upper bounds
+    /// (nines only, see <see cref="IsPlaceholder"/>) carry no information
     /// </summary>
     internal static List<decimal> ContentNumbers(string content)
     {
@@ -140,10 +141,32 @@ public static class SourceVerifier
     {
         value = Math.Abs(value);
         // ReSharper disable once MergeIntoPattern
-        if (value > 1m || (value > 0m && value < 1m))
+        if ((value > 1m || (value > 0m && value < 1m)) && !IsPlaceholder(value))
         {
             numbers.Add(value);
         }
+    }
+
+    private const int MinPlaceholderDigits = 6;
+
+    /// <summary>
+    /// Open upper bound of a range, written as nines only (999999, 99999999.99): not a value of the source
+    /// </summary>
+    internal static bool IsPlaceholder(decimal value)
+    {
+        var whole = Math.Truncate(value).ToString(CultureInfo.InvariantCulture);
+        if (whole.Length < MinPlaceholderDigits || whole.Any(c => c != '9'))
+        {
+            return false;
+        }
+        var fraction = value.ToString(CultureInfo.InvariantCulture);
+        var point = fraction.IndexOf('.');
+        if (point < 0)
+        {
+            return true;
+        }
+        fraction = fraction[(point + 1)..];
+        return fraction.All(c => c == '9') || fraction.All(c => c == '0');
     }
 
     /// <summary>
