@@ -1343,10 +1343,11 @@
             <summary>Text could be extracted</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceState.Unreadable">
-            <summary>The page could not be requested or holds no text (blocked host, script-only page)</summary>
+            <summary>The source could not be requested or holds no text (blocked host, script-only page,
+            PDF without text layer, encrypted PDF)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceState.Unsupported">
-            <summary>The format cannot be read (e.g. PDF)</summary>
+            <summary>The format has no reader (e.g. a ZIP archive or an unknown binary format)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceState.Missing">
             <summary>No local evidence file exists</summary>

@@ -4,7 +4,7 @@
 > Full documentation at [payrollengine.org](https://payrollengine.org).
 
 Library for the provenance of compliance values in data regulations. A `lex.json` manifest documents where each
-value comes from (source URL, location, legal reference, evidence files); a `snapshot.json` freezes the manifest
+value comes from (source URLs, location, legal reference, evidence files); a `snapshot.json` freezes the manifest
 and its evidence with hashes.
 
 The library provides:
@@ -21,12 +21,22 @@ The library provides:
 - Transfer of the lex values into the lookup values of the regulation (`Applier`)
 - Rollover of a satellite to the next cycle (`Rollover`)
 
-The library depends on the .NET base class library only. It is used by the Lex commands of the
+Besides the .NET base class library, the library uses [PdfPig](https://github.com/UglyToad/PdfPig) (Apache-2.0)
+to read PDF sources and [ExcelDataReader](https://github.com/ExcelDataReader/ExcelDataReader) (MIT) to read
+Excel workbooks (see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). It is used by the Lex commands of the
 [Payroll Console](https://github.com/Payroll-Engine/PayrollEngine.PayrollConsole)
 (`LexFetch`, `LexAdd`, `LexVerifySource`, `LexAttest`, `LexSnapshot`, `LexVerify`, `LexCheck`, `LexApply`,
 `LexRollover`).
 
 ---
+
+## Sources
+
+An entry lists its sources in `sourceUrls`; the first URL is the main source. A value whose numbers are spread over
+several documents (e.g. a rate table and a separate ceiling notice) lists all of them. `SourceVerifier` reads every
+source and counts a number as found when any readable source holds it; an unreadable source is reported, but does
+not hide the numbers found in the others. A file in `files[]` also lists its `sourceUrls`: `SnapshotWriter`
+downloads it from the first URL that answers.
 
 ## Verification and Open Entries
 
@@ -72,7 +82,8 @@ The checks expect the manifest in a `.lex` folder next to the `Regulation` folde
 Data.Tax/
 ├── .lex/
 │   ├── lex.json                  # Manifest
-│   ├── snapshot.json             # Snapshot (created by SnapshotWriter)│   └── *.pdf, *.xlsx, ...        # Evidence files
+│   ├── snapshot.json             # Snapshot (created by SnapshotWriter)
+│   └── *.pdf, *.xlsx, ...        # Evidence files
 └── Regulation/
     └── *.json                    # Regulation with lookups
 ```
@@ -112,7 +123,11 @@ var rollover = Rollover.Run(satelliteDirectory, new DateTime(2027, 1, 1), dryRun
 
 ```csharp
 var editor = ManifestEditor.Parse(await File.ReadAllTextAsync(lexPath));
-editor.AddValue(new Entry { Key = "Rates.Standard", Content = "0.081", SourceUrl = "https://example.org/rates" });
+editor.AddValue(new Entry
+{
+    Key = "Rates.Standard", Content = "0.081",
+    SourceUrls = ["https://example.org/rates", "https://example.org/rates-notice-2026.pdf"]
+});
 editor.SetManualVerification("Rates.Standard", new Verification
 {
     Mode = "manual", VerifiedOn = "2026-11-03", VerifiedBy = "Jane Doe", Evidence = "tax-rates-2026.pdf"
@@ -122,18 +137,32 @@ await editor.SaveAsync(lexPath);
 
 ### Source Documents
 
-`SourceDocument` reads HTML, text (`.txt`, `.csv`) and spreadsheet sources (`.xls`, `.xlsx`, `.xlsb`;
-one section per sheet, numbers in invariant format). Spreadsheets served by a live source are also detected by
-their content type. Readers for further formats are passed by file extension; a passed reader replaces the built-in
-reader of the same extension. A reader returns the text sections of the document:
+`SourceDocument` detects the format from the content, not from the file extension or the media type, and splits
+the text into sections:
+
+| Format | Sections |
+|:--|:--|
+| HTML | One per document heading |
+| Text (`.txt`, `.csv`) | One section |
+| Spreadsheets (`.xls`, `.xlsx`, `.xlsb`, `.ods`) | One per sheet, numbers in invariant format |
+| PDF | One per page (text layer), plus the values of the form fields |
+| Text documents (`.docx`, `.odt`) | One per heading; a table row is one line |
+
+A PDF without text layer (scan) or with a user password is unreadable — there is no OCR. Other binary content is
+unsupported. Readers for further formats are passed by file extension; a passed reader replaces the built-in reader
+of the same format. A reader returns the text sections of the document:
 
 ```csharp
 var readers = new Dictionary<string, Func<Stream, List<(string Heading, string Text)>>>
 {
-    [".ods"] = MyOpenDocumentReader.Read
+    [".rtf"] = MyRtfReader.Read
 };
-var document = await SourceDocument.Load(entry.SourceUrl, localPath, httpClient, readers);
-var match = SourceVerifier.Verify(entry, document);
+var sources = new List<(string Url, SourceDocument Document)>();
+foreach (var url in entry.Urls)
+{
+    sources.Add((url, await SourceDocument.LoadLive(url, httpClient, readers)));
+}
+var match = SourceVerifier.Verify(entry, sources);
 ```
 
 ---
@@ -158,7 +187,8 @@ Environment variable used during build:
 
 ## License
 
-This project is licensed under the [MIT License](LICENSE).
+This project is licensed under the [MIT License](LICENSE). Third-party components and their licenses are listed in
+[THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
 
