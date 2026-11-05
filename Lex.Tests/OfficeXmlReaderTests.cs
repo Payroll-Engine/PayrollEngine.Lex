@@ -162,7 +162,6 @@ public class OfficeXmlReaderTests
     [InlineData("rates.ods", "Limits", "12570.5")]
     [InlineData("rates.odt", "Limits", "66150")]
     [InlineData("rates.docx", "Limits", "66150")]
-    [InlineData("rates", "Rates", "0.085")]
     public async Task LoadLocal_OfficeDocument_IsFound(string fileName, string section, string content)
     {
         var bytes = Path.GetExtension(fileName) switch
@@ -179,7 +178,22 @@ public class OfficeXmlReaderTests
 
         var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal($"Section \"{section}\"", result.Location);
+        Assert.Equal($"{fileName}: Section \"{section}\"", result.Location);
+    }
+
+    [Fact]
+    public async Task LoadLocal_OfficeDocumentWithoutExtension_ReadsRate()
+    {
+        using var s = new TestSatellite();
+        var path = Path.Combine(s.LexDirectory, "rates");
+        await File.WriteAllBytesAsync(path, RatesOds);
+
+        var document = await SourceDocument.LoadLocal(path);
+
+        var result = SourceVerifier.Verify(
+            new Entry { Key = "Rates.A", Content = "0.085", Unit = "rate", SourceUrls = ["https://example.org/doc"] }, document);
+        Assert.Equal(1, result.NumbersFound);
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
     }
 
     [Theory]

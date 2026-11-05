@@ -79,10 +79,11 @@ public class SourceDocumentTests
     {
         using var s = new TestSatellite();
         var path = Path.Combine(s.LexDirectory, "page.html");
-        await File.WriteAllTextAsync(path, Page("<p>The rate is 8.5%.</p>"));
+        await File.WriteAllTextAsync(path, Page("<p>The rate is 8.25%.</p>"));
         var document = await SourceDocument.LoadLocal(path);
-        var result = SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = "0.085", SourceUrls = ["https://example.org/doc"] }, document);
+        var result = SourceVerifier.Verify(
+            new Entry { Key = "Rates.A", Content = "0.0825", Unit = "rate", SourceUrls = ["https://example.org/doc"] }, document);
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Section \"Rates\"", result.Location);
+        Assert.Equal("page.html: Section \"Rates\"", result.Location);
     }
 }

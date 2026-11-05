@@ -46,6 +46,17 @@ public class NumberSearchTests
         }
     }
 
+    [Theory]
+    [InlineData("WH = 263 + [BASE x 0.0475]", 0.0475, 0.047)]
+    [InlineData("Rate 0.01675 of wages", 0.01675, 0.016)]
+    [InlineData("Limit 1,2345", 1.2345, 1.234)]
+    public void Numbers_FourDecimals_AreNotGrouped(string text, double expected, double unexpected)
+    {
+        var numbers = SourceDocument.Numbers(text);
+        Assert.Contains((decimal)expected, numbers);
+        Assert.DoesNotContain((decimal)unexpected, numbers);
+    }
+
     [Fact]
     public void Numbers_List_IsNotOneNumber() =>
         Assert.DoesNotContain(1020300m, SourceDocument.Numbers("Values 10, 20, 300"));
@@ -59,7 +70,7 @@ public class NumberSearchTests
         Assert.Equal(SourceMatch.NotFound, Verify(content, text).Match);
 
     [Theory]
-    [InlineData("2000000", "Cap 20,00,000")]
+    [InlineData("2050000", "Cap 20,50,000")]
     [InlineData("{ \"threshold\": 1200000, \"rebate\": 60000 }", "Rebate up to 60,000 for income up to 12,00,000")]
     public void Verify_LakhNumber_IsFound(string content, string text) =>
         Assert.Equal(SourceMatch.Found, Verify(content, text).Match);
@@ -91,4 +102,52 @@ public class NumberSearchTests
     [Fact]
     public void Verify_OnlyPlaceholder_HasNoNumbers() =>
         Assert.Equal(SourceMatch.NoNumbers, Verify("99999999", "Limit 99999999").Match);
+
+    [Theory]
+    [InlineData("wages that exceed $1 million", 1000000)]
+    [InlineData("a cap of 1.5 million", 1500000)]
+    [InlineData("above 2 billion", 2000000000)]
+    [InlineData("rebate of 2.5 lakh", 250000)]
+    [InlineData("rebate of 3 lakhs", 300000)]
+    // ReSharper disable once StringLiteralTypo
+    [InlineData("turnover of 1 crore", 10000000)]
+    [InlineData("deduction up to 2,50,000", 250000)]
+    [InlineData("at one-half the regular rate", 0.5)]
+    [InlineData("at one half the regular rate", 0.5)]
+    [InlineData("at ½ the regular rate", 0.5)]
+    [InlineData("one and one-half times the regular rate", 1.5)]
+    [InlineData("one and a half times the regular rate", 1.5)]
+    [InlineData("paid at time and a half", 1.5)]
+    [InlineData("paid at time and one-half", 1.5)]
+    [InlineData("paid at 1½ times", 1.5)]
+    [InlineData("Sunday work is double time", 2)]
+    public void Numbers_InWords(string text, double expected) =>
+        Assert.Contains((decimal)expected, SourceDocument.Numbers(text));
+
+    [Theory]
+    [InlineData("a million reasons", 1000000)]
+    [InlineData("billions of records", 1000000000)]
+    [InlineData("one and one-half times the regular rate", 0.5)]
+    [InlineData("1,000 million", 1000000)]
+    public void Numbers_InWords_NoFalseMatch(string text, double unexpected) =>
+        Assert.DoesNotContain((decimal)unexpected, SourceDocument.Numbers(text));
+
+    [Fact]
+    public void Verify_NumberInWords_IsAmbiguous()
+    {
+        var result = Verify("1000000", "37% on supplemental wages that exceed $1 million during the year");
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal("number in words", result.Ambiguity);
+    }
+
+    [Fact]
+    public void Verify_FactorInWords_IsAmbiguous() =>
+        Assert.Equal(SourceMatch.Ambiguous,
+            Verify("1.5", "overtime at a rate not less than one and one-half times the regular rate").Match);
+
+    [Fact]
+    public void Verify_NumberInWordsWithinTable_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            Verify("{ \"threshold\": 1000000, \"rate\": 37, \"limit\": 12345 }", "Limit 12,345; 37 percent above $1 million").Match);
 }

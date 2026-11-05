@@ -58,12 +58,19 @@ public sealed class ManifestEditor
     /// </summary>
     /// <param name="key">Entry key</param>
     /// <param name="location">Source location</param>
+    /// <param name="refresh">Also replace a location written by LexVerifySource (<see cref="SourceVerifier.IsToolLocation"/>);
+    /// a location written by a person is never replaced</param>
     /// <returns>True if the location was written</returns>
-    public bool SetSourceLocation(string key, string location)
+    public bool SetSourceLocation(string key, string location, bool refresh = false)
     {
         var entry = Entry(key);
-        if (entry == null || string.IsNullOrWhiteSpace(location) ||
-            !string.IsNullOrWhiteSpace(entry["sourceLocation"]?.GetValue<string>()))
+        if (entry == null || string.IsNullOrWhiteSpace(location))
+        {
+            return false;
+        }
+        var existing = entry["sourceLocation"]?.GetValue<string>();
+        if (!string.IsNullOrWhiteSpace(existing) &&
+            (!refresh || !SourceVerifier.IsToolLocation(existing) || string.Equals(existing, location, StringComparison.Ordinal)))
         {
             return false;
         }
@@ -181,6 +188,7 @@ public sealed class ManifestEditor
         if (value.Unit != null) entry["unit"] = value.Unit;
         entry["sourceUrls"] = new JsonArray(value.Urls.Select(x => (JsonNode)x).ToArray());
         entry["sourceLocation"] = value.SourceLocation ?? string.Empty;
+        if (value.SourceQuote != null) entry["sourceQuote"] = value.SourceQuote;
         entry["legalReference"] = value.LegalReference ?? string.Empty;
         if (value.DocumentRef != null) entry["documentRef"] = value.DocumentRef;
         if (value.Description != null) entry["description"] = value.Description;

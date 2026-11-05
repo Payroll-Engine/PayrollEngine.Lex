@@ -175,6 +175,20 @@
         <member name="P:PayrollEngine.Lex.CheckResult.RequireLocation">
             <summary>A missing sourceLocation is a finding only in the mode Required</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnspecificLocations">
+            <summary>Lex entries whose sourceLocation is not entry-specific: the same long location on many entries
+            or an overlong location (a finding only in the mode Required)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnspecificLocationSamples">
+            <summary>Samples of lex entries with a location that is not entry-specific</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SecondaryMainSource">
+            <summary>Lex entries whose main source (first source URL) is a secondary source (official: false);
+            a finding only in the release mode</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SecondaryMainSourceSamples">
+            <summary>Samples of lex entries with a secondary main source</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
@@ -204,6 +218,28 @@
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingReviewSamples">
             <summary>Samples of manual verifications without second review</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Release">
+            <summary>Release mode: location and verification required, a secondary main source and an entry
+            that needs a manual verification are findings</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SourcesVerified">
+            <summary>The entries were verified against their local evidence (release mode)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Ambiguous">
+            <summary>Entries without manual verification whose numbers are found with weak evidence only (ambiguous)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.QuoteNotFound">
+            <summary>Entries without manual verification whose sourceQuote is not found in the source</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedAutoVerified">
+            <summary>Entries excluded from automatic verification with an automatic verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ManualVerificationSamples">
+            <summary>Samples of entries that need a manual verification (ambiguous, quote not found, excluded from auto verification)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ManualVerificationRequired">
+            <summary>Entries that need a manual verification</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.FileProblems">
             <summary>Problems of the evidence files</summary>
@@ -240,7 +276,7 @@
         <member name="M:PayrollEngine.Lex.Checker.IsReferenceEntry(System.String)">
             <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)">
             <summary>
             Check one satellite
             </summary>
@@ -248,6 +284,18 @@
             <param name="lexPath">Full path of lex.json</param>
             <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
             <param name="requireVerification">Treat an entry without verification record as a finding</param>
+            <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
+            a secondary main source and an entry excluded from auto verification with an automatic record are findings.
+            The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)"/>.</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Release gate: verify the entries without manual verification against their local evidence
+            (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})"/>); an ambiguous entry and an entry whose quote is not found
+            need a manual verification
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
         </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
             <summary>
@@ -355,6 +403,12 @@
             Precise location within the source document (free text)
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.Entry.SourceQuote">
+            <summary>
+            Verbatim quote from the source that holds the value; LexVerifySource looks up the numbers
+            in the section of the quote
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Entry.LegalReference">
             <summary>
             Legal norm reference (e.g. Income Tax Act §12(1))
@@ -379,6 +433,11 @@
         <member name="F:PayrollEngine.Lex.Entry.OpenHashInput">
             <summary>
             Canonical text of the open flag, part of the snapshot source hash
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Entry.QuoteHashInput">
+            <summary>
+            Canonical text of the source quote, part of the snapshot source hash (null without quote)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.HasInlineContent">
@@ -529,17 +588,22 @@
         <member name="F:PayrollEngine.Lex.Exclusion.KindOrphan">
             <summary>Kind: lex entries without a regulation value (evidence of a rule that is implemented in code or derived values)</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Exclusion.KindAutoVerification">
+            <summary>Kind: lex entries that are verified manually only; LexVerifySource writes no source location and
+            no automatic verification record</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Kind">
             <summary>
             Exclusion kind: <c>coverage</c> (regulation values without lex entry),
-            <c>sourceLocation</c> (lex entries without sourceLocation) or
-            <c>orphan</c> (lex entries without regulation value)
+            <c>sourceLocation</c> (lex entries without sourceLocation),
+            <c>orphan</c> (lex entries without regulation value) or
+            <c>autoVerification</c> (lex entries verified manually only)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Pattern">
             <summary>
             Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
-            SourceLocation: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
+            SourceLocation, orphan and autoVerification: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Reason">
@@ -816,12 +880,14 @@
             </summary>
             <param name="json">lex.json text</param>
         </member>
-        <member name="M:PayrollEngine.Lex.ManifestEditor.SetSourceLocation(System.String,System.String)">
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetSourceLocation(System.String,System.String,System.Boolean)">
             <summary>
             Set the source location of an entry without one
             </summary>
             <param name="key">Entry key</param>
             <param name="location">Source location</param>
+            <param name="refresh">Also replace a location written by LexVerifySource (<see cref="M:PayrollEngine.Lex.SourceVerifier.IsToolLocation(System.String)"/>);
+            a location written by a person is never replaced</param>
             <returns>True if the location was written</returns>
         </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SetAutoVerification(System.String,PayrollEngine.Lex.Verification)">
@@ -1329,9 +1395,20 @@
             A value belongs to every source whose url is listed in the value's sourceUrls.
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.Source.Official">
+            <summary>
+            Official source of the issuing authority (default: true); a secondary source (e.g. a commercial summary)
+            must not be the main source of a value
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Source.IsFourEyes">
             <summary>
             True if manual verifications of this source require a second confirmation
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Source.IsOfficial">
+            <summary>
+            True unless the source is marked as secondary (official: false)
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceState">
@@ -1357,9 +1434,14 @@
             Text of a source document, split into sections (document headings, spreadsheet sheets, PDF pages)
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.SourceDocument.Name">
+            <summary>
+            File name of the local evidence, null for a live source or an in-memory document
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.Numbers(System.String)">
             <summary>
-            Numbers of one section as normalized decimal values (every separator interpretation)
+            Numbers of one section as normalized decimal values (every separator interpretation and numbers in words)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.FromHtml(System.String)">
@@ -1442,6 +1524,43 @@
             reader of the detected format; content without known signature is read as text or HTML unless it is binary
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.SourceNumbers">
+            <summary>
+            Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
+            and numbers in words (English and Indian scales, fractions)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceNumbers.Numerals">
+            <summary>Numerals as normalized decimal values</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceNumbers.Percents">
+            <summary>Numerals followed by <c>%</c>, <c>percent</c> or <c>per cent</c></summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceNumbers.Words">
+            <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.All">
+            <summary>
+            Numerals and numbers in words
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Contains(System.Decimal,System.Boolean)">
+            <summary>
+            Test if the text holds a number: as numeral, in words or, for a rate below 1, as percentage (0.085 as 8.5%)
+            </summary>
+            <param name="number">Entry number</param>
+            <param name="rate">The entry unit is a rate</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.IsWordOnly(System.Decimal,System.Boolean)">
+            <summary>
+            Test if the text holds a number in words only, not as numeral or percentage
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Scan(System.String)">
+            <summary>
+            Scan a text
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.SourceMatch">
             <summary>
             Verification state of one lex entry against its source
@@ -1450,17 +1569,28 @@
         <member name="F:PayrollEngine.Lex.SourceMatch.Found">
             <summary>All numbers of the entry are found in the source</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
+            <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is short
+            (two significant digits at most), occurs in many sections or is found in words only.
+            Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
             <summary>Some numbers are found, others are not</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NotFound">
             <summary>None of the numbers is found</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.QuoteNotFound">
+            <summary>The sourceQuote of the entry is not found in any readable source</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Unreadable">
             <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NoNumbers">
             <summary>The entry holds no numbers to look for</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.NoContent">
+            <summary>The content of the entry cannot be read (content file missing or not JSON)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NoEvidence">
             <summary>The entry has no local evidence file for any source (local verification)</summary>
@@ -1480,7 +1610,13 @@
             <summary>Verification state</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.NumbersTotal">
-            <summary>Numbers of the entry</summary>
+            <summary>Numbers of the entry that were looked up (a sample of a large table)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.ContentNumbers">
+            <summary>All numbers of the entry content; more than <see cref="P:PayrollEngine.Lex.SourceResult.NumbersTotal"/> when sampled</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Sampled">
+            <summary>The numbers of a large table were sampled</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.NumbersFound">
             <summary>Numbers found in the source</summary>
@@ -1492,12 +1628,33 @@
             <summary>Proposed source location (sections that hold the numbers)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.Reason">
-            <summary>Reason of an unreadable source; with several sources, the unreadable ones</summary>
+            <summary>Reason of an unreadable source; with several sources, the unreadable ones; reason of missing content</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Ambiguity">
+            <summary>Why the evidence of an ambiguous entry is weak</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Quote">
+            <summary>Source quote of the entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Evidence">
+            <summary>Local evidence file of the entry (first source with a local file), null for a live verification</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.ExcludedReason">
+            <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.CanWrite">
+            <summary>The source location and the automatic verification record may be written</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceVerifier">
             <summary>
             Looks up the numbers of lex entries in their source documents
             </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.WeakDigits">
+            <summary>A single number with this many significant digits or less is weak evidence</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.WeakSections">
+            <summary>A single number that occurs in more sections is weak evidence</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceVerifier.Method">
             <summary>
@@ -1513,8 +1670,14 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ContentNumbers(System.String)">
             <summary>
-            Numbers of an entry content (scalars, object properties, array items); 0, 1 and open upper bounds
+            Numbers of an entry content (scalars, object properties, array items), sorted; 0, 1 and open upper bounds
             (nines only, see <see cref="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)"/>) carry no information
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Sample(System.Collections.Generic.List{System.Decimal},System.Int32)">
+            <summary>
+            Deterministic sample of sorted numbers: all numbers up to the maximum, otherwise numbers evenly
+            distributed over the whole range, including the smallest and the largest
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)">
@@ -1522,9 +1685,22 @@
             Open upper bound of a range, written as nines only (999999, 99999999.99): not a value of the source
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Contains(System.Collections.Generic.HashSet{System.Decimal},System.Decimal)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.SignificantDigits(System.Decimal)">
             <summary>
-            Number matches when the source holds it, as a rate (0.085 as 8.5 or 8,5) or as it is
+            Significant digits of a number: 0.5, 22 and 340 have two at most, 7.25 has three
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.IsRateUnit(System.String)">
+            <summary>
+            The unit names a rate (<c>%</c>, <c>percent</c>, <c>rate</c> or <c>fraction</c>, also within a combined
+            unit like <c>USD / rate</c>): a value below 1 is also looked up as percentage
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.IsToolLocation(System.String)">
+            <summary>
+            Test if a source location was written by LexVerifySource (and may be refreshed):
+            <c>Section "Page 24"</c>, <c>Sections "Page 1", "Page 2"</c>, optionally prefixed with the evidence file
+            or the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated by <c>; </c>)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument)">
@@ -1532,17 +1708,47 @@
             Verify one entry against the document of its single source
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}})">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String)">
             <summary>
             Verify one entry against the documents of its sources: a number is found when any readable
-            document holds it
+            document holds it. With a source quote, the numbers must be in the section that holds the quote.
             </summary>
             <param name="entry">Lex entry</param>
             <param name="sources">Source URL and document, in the order of the entry source URLs</param>
+            <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
+            <summary>
+            Weak evidence of a single number, null for an entry with several numbers or a distinctive number
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Label(System.String)">
             <summary>
             Short source name: the host of a URL without www, otherwise the text
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Canonical(System.String)">
+            <summary>
+            Canonical text for the quote comparison: typographic quotes and apostrophes unified, hyphenation at
+            a line break joined (<c>supple- mental</c>), hyphens within words dropped and whitespace collapsed
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})">
+            <summary>
+            Verify the entries of a manifest with source URLs (inline content and JSON content files) against the local
+            evidence files or, with a live loader, against the source URLs. Per source URL the local evidence is the
+            documentRef for the first URL, otherwise the declared file with the same URL.
+            Entries that reference an official calculator are skipped.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <param name="loadLive">Loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>), null for the local evidence</param>
+            <param name="documents">Loaded documents by URL (live) or local path, shared over several manifests</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.LocalEvidence(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.Entry,System.String,System.Boolean,System.String)">
+            <summary>
+            Local evidence file of a source URL: the documentRef for the main source, otherwise a declared file
+            with the same source URL
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.SpreadsheetReader">

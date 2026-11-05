@@ -101,6 +101,7 @@ public sealed class SnapshotWriter
                     Unit = value.Unit,
                     SourceUrls = value.SourceUrls,
                     SourceLocation = value.SourceLocation,
+                    SourceQuote = value.SourceQuote,
                     LegalReference = value.LegalReference,
                     Description = value.Description,
                     Verification = value.Verification,
@@ -108,6 +109,7 @@ public sealed class SnapshotWriter
                 });
             }
 
+            hashInput.Append(value.QuoteHashInput());
             if (value.Verification != null)
             {
                 hashInput.Append(value.Verification.HashInput());

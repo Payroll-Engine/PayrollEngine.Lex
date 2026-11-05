@@ -71,15 +71,21 @@ public static class Validator
                     errors.Add($"Value '{value.Key}': contentFile not found: {resolved}");
                 }
             }
+
+            if (value.SourceQuote != null && string.IsNullOrWhiteSpace(value.SourceQuote))
+            {
+                errors.Add($"Value '{value.Key}': sourceQuote is empty");
+            }
         }
 
         // exclusions
         foreach (var exclusion in manifest.Exclusions)
         {
             if (exclusion.Kind != Exclusion.KindCoverage && exclusion.Kind != Exclusion.KindSourceLocation &&
-                exclusion.Kind != Exclusion.KindOrphan)
+                exclusion.Kind != Exclusion.KindOrphan && exclusion.Kind != Exclusion.KindAutoVerification)
             {
-                errors.Add($"Exclusion '{exclusion.Pattern}': kind must be '{Exclusion.KindCoverage}', '{Exclusion.KindSourceLocation}' or '{Exclusion.KindOrphan}'");
+                errors.Add($"Exclusion '{exclusion.Pattern}': kind must be '{Exclusion.KindCoverage}', '{Exclusion.KindSourceLocation}', " +
+                           $"'{Exclusion.KindOrphan}' or '{Exclusion.KindAutoVerification}'");
             }
             if (string.IsNullOrWhiteSpace(exclusion.Pattern))
             {
@@ -122,7 +128,8 @@ public static class Validator
             }
         }
 
-        // source review
+        // source review and official sources
+        var seenUrls = new Dictionary<string, bool>(StringComparer.Ordinal);
         foreach (var source in manifest.Sources)
         {
             if (source.Review != null && source.Review != Source.ReviewSingleAuthor &&
@@ -130,6 +137,15 @@ public static class Validator
             {
                 errors.Add($"Source '{source.Url}': review must be '{Source.ReviewSingleAuthor}' or '{Source.ReviewFourEyes}'");
             }
+            if (string.IsNullOrWhiteSpace(source.Url))
+            {
+                continue;
+            }
+            if (seenUrls.TryGetValue(source.Url, out var official) && official != source.IsOfficial)
+            {
+                errors.Add($"Source '{source.Url}' is declared as official and as secondary source");
+            }
+            seenUrls.TryAdd(source.Url, source.IsOfficial);
         }
 
         // verification

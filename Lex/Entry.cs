@@ -49,6 +49,12 @@ public sealed class Entry
     public string SourceLocation { get; init; }
 
     /// <summary>
+    /// Verbatim quote from the source that holds the value; LexVerifySource looks up the numbers
+    /// in the section of the quote
+    /// </summary>
+    public string SourceQuote { get; init; }
+
+    /// <summary>
     /// Legal norm reference (e.g. Income Tax Act §12(1))
     /// </summary>
     public string LegalReference { get; init; }
@@ -74,6 +80,12 @@ public sealed class Entry
     /// Canonical text of the open flag, part of the snapshot source hash
     /// </summary>
     internal const string OpenHashInput = "open";
+
+    /// <summary>
+    /// Canonical text of the source quote, part of the snapshot source hash (null without quote)
+    /// </summary>
+    internal string QuoteHashInput() =>
+        SourceQuote != null ? "sourceQuote:" + SourceQuote : null;
 
     /// <summary>
     /// Returns true if this value uses an inline content string

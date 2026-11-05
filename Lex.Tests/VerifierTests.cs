@@ -91,6 +91,42 @@ public class VerifierTests
         }
     }
 
+    private static Manifest WithQuote(Manifest manifest, string quote)
+    {
+        var value = manifest.Values[0];
+        manifest.Values[0] = new Entry
+        {
+            Key = value.Key, Content = value.Content, SourceUrls = value.SourceUrls, SourceLocation = value.SourceLocation,
+            LegalReference = value.LegalReference, SourceQuote = quote
+        };
+        return manifest;
+    }
+
+    [Fact]
+    public async Task AddedSourceQuote_IsReported()
+    {
+        var (s, _, snapshot) = await Prepare();
+        using (s)
+        {
+            var errors = Verifier.Verify(WithQuote(ManifestWithFile(), "the rate is 7.5%"), snapshot, s.LexDirectory);
+            Assert.Contains(errors, e => e.Contains("sourceQuote differs"));
+            Assert.Contains(errors, e => e.StartsWith("sourceHash differs", StringComparison.Ordinal));
+        }
+    }
+
+    [Fact]
+    public async Task SnapshotWithSourceQuote_IsVerified()
+    {
+        using var s = new TestSatellite();
+        await File.WriteAllTextAsync(Path.Combine(s.LexDirectory, "table.json"), "{\"a\":1}");
+        var manifest = WithQuote(ManifestWithFile(), "the rate is 7.5%");
+
+        var snapshot = await s.WriteSnapshot(manifest);
+
+        Assert.Equal("the rate is 7.5%", snapshot.Values[0].SourceQuote);
+        Assert.Empty(Verifier.Verify(manifest, snapshot, s.LexDirectory));
+    }
+
     private const string EvidenceFile = "evidence.pdf";
 
     private static Manifest ManifestWithVerification(string verifiedBy = "Jane Doe")

@@ -34,7 +34,8 @@ public static class CheckReport
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrls;MissingSourceLocation;" +
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
-                       "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open");
+                       "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
+                       "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -42,7 +43,8 @@ public static class CheckReport
                 r.CoveredDirect, r.CoveredByLookup, r.Uncovered, r.Orphans, r.UnresolvedSplit, r.Compared, r.Drift,
                 r.MissingSourceUrls, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
-                r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open));
+                r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
+                r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified));
         }
         return csv.ToString();
     }
@@ -52,7 +54,9 @@ public static class CheckReport
         var text = new StringBuilder();
         text.AppendLine("# Lex check report");
         text.AppendLine();
-        text.AppendLine($"Created {DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} by `pecmd LexCheck`.");
+        var release = results.Any(r => r.Release);
+        text.AppendLine($"Created {DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} by `pecmd LexCheck`" +
+                        (release ? " (release gate)." : "."));
         text.AppendLine();
         text.AppendLine("## Summary");
         text.AppendLine();
@@ -70,11 +74,19 @@ public static class CheckReport
         text.AppendLine($"| Compared values | {results.Sum(r => (long)r.Compared)} |");
         text.AppendLine($"| Differences (candidates) | {results.Sum(r => (long)r.Drift)} |");
         text.AppendLine($"| Entries without sourceLocation | {results.Sum(r => (long)r.MissingSourceLocation)} |");
+        text.AppendLine($"| Entries with a location that is not entry-specific | {results.Sum(r => (long)r.UnspecificLocations)} |");
+        text.AppendLine($"| Entries with a secondary main source | {results.Sum(r => (long)r.SecondaryMainSource)} |");
         text.AppendLine($"| Entries verified automatically | {results.Sum(r => (long)r.VerifiedAuto)} |");
         text.AppendLine($"| Entries verified manually | {results.Sum(r => (long)r.VerifiedManual)} |");
         text.AppendLine($"| Entries without verification | {results.Sum(r => (long)r.Unverified)} |");
         text.AppendLine($"| Manual verifications without second review | {results.Sum(r => (long)r.MissingReview)} |");
         text.AppendLine($"| Open entries (previous cycle, verify again) | {results.Sum(r => (long)r.Open)} |");
+        if (release)
+        {
+            text.AppendLine($"| Ambiguous entries without manual verification | {results.Sum(r => (long)r.Ambiguous)} |");
+            text.AppendLine($"| Entries with quote not found, without manual verification | {results.Sum(r => (long)r.QuoteNotFound)} |");
+            text.AppendLine($"| Entries excluded from auto verification with an auto record | {results.Sum(r => (long)r.ExcludedAutoVerified)} |");
+        }
         if (results.Any(r => r.UrlsChecked))
         {
             text.AppendLine($"| Source URLs not found | {results.Sum(r => (long)r.DeadUrls.Count)} |");
@@ -119,6 +131,12 @@ public static class CheckReport
                 text.AppendLine($"- Open entries, verify again ({r.Open}): {Join(r.OpenSamples, r.Open)}");
             if (r.MissingReview > 0)
                 text.AppendLine($"- Manual verification without second review ({r.MissingReview}): {Join(r.MissingReviewSamples, r.MissingReview)}");
+            if (r.RequireLocation && r.UnspecificLocations > 0)
+                text.AppendLine($"- Location not entry-specific ({r.UnspecificLocations}): {Join(r.UnspecificLocationSamples, r.UnspecificLocations)}");
+            if (r.Release && r.SecondaryMainSource > 0)
+                text.AppendLine($"- Secondary main source ({r.SecondaryMainSource}): {Join(r.SecondaryMainSourceSamples, r.SecondaryMainSource)}");
+            if (r.Release && r.ManualVerificationRequired > 0)
+                text.AppendLine($"- Manual verification required ({r.ManualVerificationRequired}): {Join(r.ManualVerificationSamples, r.ManualVerificationRequired)}");
             if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
             if (!r.ValidFromMatch) text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
             if (r.Note != null) text.AppendLine($"- Note: {r.Note}");
@@ -145,7 +163,8 @@ public static class CheckReport
             foreach (var r in excluded)
             {
                 text.AppendLine();
-                text.AppendLine($"### {r.Satellite} ({r.ExcludedCoverage} values, {r.ExcludedSourceLocation} entries without location, {r.ExcludedOrphans} entries without value)");
+                text.AppendLine($"### {r.Satellite} ({r.ExcludedCoverage} values, {r.ExcludedSourceLocation} entries without location, " +
+                                $"{r.ExcludedOrphans} entries without value, {r.ExcludedAutoVerification} entries excluded from auto verification)");
                 text.AppendLine();
                 foreach (var note in r.ExclusionNotes) text.AppendLine($"- {note}");
             }

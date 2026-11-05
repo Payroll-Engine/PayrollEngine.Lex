@@ -53,6 +53,10 @@ public static class Verifier
             {
                 errors.Add($"Value '{value.Key}': content differs from the snapshot");
             }
+            if (!string.Equals(value.SourceQuote, snapValue.SourceQuote, StringComparison.Ordinal))
+            {
+                errors.Add($"Value '{value.Key}': sourceQuote differs from the snapshot");
+            }
             VerifyVerification(errors, value, snapValue, snapshot);
         }
         foreach (var key in snapshotValues.Keys.Where(k => !manifestKeys.Contains(k)))
@@ -160,6 +164,7 @@ public static class Verifier
                 continue;
             }
 
+            input.Append(value.QuoteHashInput());
             if (value.Verification != null)
             {
                 input.Append(value.Verification.HashInput());

@@ -41,8 +41,20 @@ public sealed class Source
     public string Review { get; init; }
 
     /// <summary>
+    /// Official source of the issuing authority (default: true); a secondary source (e.g. a commercial summary)
+    /// must not be the main source of a value
+    /// </summary>
+    public bool? Official { get; init; }
+
+    /// <summary>
     /// True if manual verifications of this source require a second confirmation
     /// </summary>
     [JsonIgnore]
     public bool IsFourEyes => string.Equals(Review, ReviewFourEyes, StringComparison.Ordinal);
+
+    /// <summary>
+    /// True unless the source is marked as secondary (official: false)
+    /// </summary>
+    [JsonIgnore]
+    public bool IsOfficial => Official != false;
 }

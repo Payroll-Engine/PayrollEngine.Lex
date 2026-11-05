@@ -66,7 +66,7 @@ public static class Schema
             },
             "exclusions": {
               "type": "array",
-              "description": "Documented exclusions from the coverage and sourceLocation checks. Excluded items are listed in the check report.",
+              "description": "Documented exclusions from the coverage, sourceLocation, orphan and automatic verification rules. Excluded items are listed in the check report.",
               "items": {
                 "$ref": "#/$defs/exclusion"
               }
@@ -80,8 +80,8 @@ public static class Schema
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["coverage", "sourceLocation", "orphan"],
-                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code)."
+                  "enum": ["coverage", "sourceLocation", "orphan", "autoVerification"],
+                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code). autoVerification: lex entries verified manually only (LexVerifySource writes no source location and no automatic verification record)."
                 },
                 "pattern": {
                   "type": "string",
@@ -117,6 +117,11 @@ public static class Schema
                   "enum": ["SingleAuthor", "FourEyes"],
                   "default": "SingleAuthor",
                   "description": "Review rule for the values of this source (values whose sourceUrls list the source url). FourEyes: manual verifications require reviewedBy and reviewedOn."
+                },
+                "official": {
+                  "type": "boolean",
+                  "default": true,
+                  "description": "Official source of the issuing authority. false: secondary source (e.g. a commercial summary); it may be a further source of a value, but not the main source (first URL of sourceUrls)."
                 }
               }
             },
@@ -215,6 +220,11 @@ public static class Schema
                 "sourceLocation": {
                   "type": "string",
                   "description": "Precise location within the source document (free text). Examples: 'Calculation guide 2026, Page 12, Section 3.2.1', 'Income Tax Act §12(1) sentence 2', 'File tariff-a.txt'"
+                },
+                "sourceQuote": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Verbatim quote from the source that holds the value. LexVerifySource looks up the numbers of the value in the section of the quote; numbers in words within the quote count (e.g. 'one and one-half times')."
                 },
                 "legalReference": {
                   "type": "string",

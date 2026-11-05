@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -41,57 +40,15 @@ public sealed class SourceDocument
     internal List<(string Heading, string Text)> Sections { get; init; } = [];
 
     /// <summary>
-    /// Numbers of one section as normalized decimal values (every separator interpretation)
+    /// File name of the local evidence, null for a live source or an in-memory document
     /// </summary>
-    internal static HashSet<decimal> Numbers(string text)
-    {
-        var values = new HashSet<decimal>();
-        foreach (Match match in NumberToken.Matches(text))
-        {
-            if (match.Groups["lakh"].Success)
-            {
-                // the grouping is unambiguous: one reading only
-                if (decimal.TryParse(match.Value.Replace(",", string.Empty), NumberStyles.AllowDecimalPoint,
-                        CultureInfo.InvariantCulture, out var lakh))
-                {
-                    values.Add(Math.Round(lakh, 6));
-                }
-                continue;
-            }
-            foreach (var value in Interpretations(match.Value))
-            {
-                values.Add(Math.Round(value, 6));
-            }
-        }
-        return values;
-    }
+    internal string Name { get; private set; }
 
-    // lakh grouping (1,50,000 and 20,00,000.50): groups of two digits before the last group of three
-    private static readonly Regex NumberToken = new(
-        @"(?<lakh>\d{1,2}(?:,\d{2})+,\d{3}(?:\.\d+)?)(?!\d|,\d)|\d{1,3}(?:[ \u00a0\u202f.,'’]\d{3})+(?:[.,]\d+)?|\d+(?:[.,]\d+)?",
-        RegexOptions.Compiled);
-
-    private static IEnumerable<decimal> Interpretations(string token)
-    {
-        // integer reading: every separator is a group separator
-        var digits = new string(token.Where(char.IsDigit).ToArray());
-        if (digits.Length is > 0 and <= 15 &&
-            decimal.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, out var integer))
-        {
-            yield return integer;
-        }
-        // decimal reading: the last '.' or ',' is the decimal separator when 1-4 digits follow
-        var last = token.LastIndexOfAny(['.', ',']);
-        if (last > 0 && token.Length - last - 1 is >= 1 and <= 4)
-        {
-            var whole = new string(token[..last].Where(char.IsDigit).ToArray());
-            var fraction = token[(last + 1)..];
-            if (decimal.TryParse($"{whole}.{fraction}", NumberStyles.Number, CultureInfo.InvariantCulture, out var number))
-            {
-                yield return number;
-            }
-        }
-    }
+    /// <summary>
+    /// Numbers of one section as normalized decimal values (every separator interpretation and numbers in words)
+    /// </summary>
+    internal static HashSet<decimal> Numbers(string text) =>
+        SourceNumbers.Scan(text).All();
 
     /// <summary>
     /// Build a document from HTML
@@ -249,7 +206,8 @@ public sealed class SourceDocument
             var name = localPath ?? url;
             var extension = Path.GetExtension(name.Split('?')[0]).ToLowerInvariant();
             byte[] bytes;
-            if (localPath != null && File.Exists(localPath))
+            var local = localPath != null && File.Exists(localPath);
+            if (local)
             {
                 bytes = await File.ReadAllBytesAsync(localPath);
             }
@@ -262,7 +220,12 @@ public sealed class SourceDocument
                 }
                 bytes = await response.Content.ReadAsByteArrayAsync();
             }
-            return Read(bytes, extension, readers);
+            var document = Read(bytes, extension, readers);
+            if (local)
+            {
+                document.Name = Path.GetFileName(localPath);
+            }
+            return document;
         }
         catch (Exception exception)
         {

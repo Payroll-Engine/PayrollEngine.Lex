@@ -11,6 +11,7 @@ public class MultiSourceTests
     {
         Key = "Parameters.A",
         Content = content,
+        Unit = "USD / rate",
         SourceUrls = [UnemploymentUrl, LeaveUrl]
     };
 
@@ -98,9 +99,9 @@ public class MultiSourceTests
     [Fact]
     public void SingleSource_KeepsPlainLocationAndReason()
     {
-        var entry = new Entry { Key = "Rates.A", Content = "8.5", SourceUrls = [LeaveUrl] };
+        var entry = new Entry { Key = "Rates.A", Content = "8.55", SourceUrls = [LeaveUrl] };
 
-        var found = SourceVerifier.Verify(entry, Readable("Rates", "Standard rate 8.5%"));
+        var found = SourceVerifier.Verify(entry, Readable("Rates", "Standard rate 8.55%"));
         var blocked = SourceVerifier.Verify(entry, Unreadable("HTTP 403"));
 
         Assert.Equal("Section \"Rates\"", found.Location);

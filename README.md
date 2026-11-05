@@ -17,7 +17,9 @@ The library provides:
 - Check of a manifest against the lookup values of its regulation: coverage, value differences, traceability fields,
   evidence files, `validFrom`, verification records and open entries (`Checker`, `CheckReport`)
 - Availability check of the source URLs and detection of changed sources (`UrlChecker`, `LiveSource`)
-- Lookup of the entry numbers in the source document (`SourceVerifier`, `SourceDocument`)
+- Lookup of the entry numbers in the source document, with rating of weak matches, source quotes and sampling of
+  large tables (`SourceVerifier`, `SourceDocument`)
+- Release gate: entry-specific locations, official main sources, no weak automatic matches (`Checker`)
 - Transfer of the lex values into the lookup values of the regulation (`Applier`)
 - Rollover of a satellite to the next cycle (`Rollover`)
 
@@ -36,7 +38,19 @@ An entry lists its sources in `sourceUrls`; the first URL is the main source. A 
 several documents (e.g. a rate table and a separate ceiling notice) lists all of them. `SourceVerifier` reads every
 source and counts a number as found when any readable source holds it; an unreadable source is reported, but does
 not hide the numbers found in the others. A file in `files[]` also lists its `sourceUrls`: `SnapshotWriter`
-downloads it from the first URL that answers.
+downloads it from the first URL that answers. A source with `"official": false` is a secondary source; as main
+source it is reported by the checker (a finding in the release mode).
+
+## Evidence Quality
+
+`SourceVerifier.Verify` returns a `SourceMatch`. A single number is rated `Ambiguous` instead of `Found` when it has
+at most two significant digits, occurs in more than three sections, or is found in words only (`$1 million`,
+`one and one-half`, `2.5 lakh`). A rate below 1 is also looked up as percentage when the unit names a rate (`%`,
+`percent`, `rate`, `fraction`) and the source writes a percent sign after the number. A `sourceQuote` anchors the
+entry: the numbers must be in the section of the quote (`Found`), otherwise in the quote itself; a quote missing in
+the source gives `QuoteNotFound`. Tables with more than 40 numbers are sampled evenly. Entries with an
+`autoVerification` exclusion are never written (`SourceResult.CanWrite`). `SourceVerifier.VerifyManifest` checks
+all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 
 ## Verification and Open Entries
 
@@ -105,6 +119,13 @@ var differences = Verifier.Verify(manifest, snapshot, lexDirectory);
 // check against the regulation lookups
 var result = Checker.Check(manifest, lexPath, requireLocation: false, requireVerification: false);
 CheckReport.Write([result], "LexCheck.md");
+
+// release gate: verify the entries against the local evidence
+var release = Checker.Check(manifest, lexPath, requireLocation: true, requireVerification: true, release: true);
+await Checker.CheckSources(manifest, release);
+
+// look up the numbers of all entries in the local evidence
+var results = await SourceVerifier.VerifyManifest(manifest, lexDirectory);
 
 // write the lex values into the regulation lookups (dry run: differences only)
 var applied = Applier.Apply(manifest, lexPath, dryRun: true);

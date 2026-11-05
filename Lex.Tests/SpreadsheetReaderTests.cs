@@ -96,7 +96,7 @@ public class SpreadsheetReaderTests
         Assert.True(document.IsReadable);
         var result = SourceVerifier.Verify(new Entry { Key = "Limits.Ceiling", Content = "66150", SourceUrls = ["https://example.org/rates"] }, document);
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Section \"Limits\"", result.Location);
+        Assert.Equal($"rates{extension}: Section \"Limits\"", result.Location);
     }
 
     [Theory]

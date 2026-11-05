@@ -5,6 +5,7 @@ using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace PayrollEngine.Lex;
 
@@ -85,10 +86,25 @@ public sealed class CheckResult
     /// <summary>A missing sourceLocation is a finding only in the mode Required</summary>
     public bool RequireLocation { get; internal set; }
 
+    /// <summary>Lex entries whose sourceLocation is not entry-specific: the same long location on many entries
+    /// or an overlong location (a finding only in the mode Required)</summary>
+    public int UnspecificLocations { get; internal set; }
+
+    /// <summary>Samples of lex entries with a location that is not entry-specific</summary>
+    public List<string> UnspecificLocationSamples { get; } = [];
+
+    /// <summary>Lex entries whose main source (first source URL) is a secondary source (official: false);
+    /// a finding only in the release mode</summary>
+    public int SecondaryMainSource { get; internal set; }
+
+    /// <summary>Samples of lex entries with a secondary main source</summary>
+    public List<string> SecondaryMainSourceSamples { get; } = [];
+
     // documented exclusions
     internal int ExcludedCoverage { get; set; }
     internal int ExcludedSourceLocation { get; set; }
     internal int ExcludedOrphans { get; set; }
+    internal int ExcludedAutoVerification { get; set; }
     internal List<string> ExclusionNotes { get; } = [];
 
     /// <summary>Lex entries without legalReference</summary>
@@ -122,6 +138,29 @@ public sealed class CheckResult
     /// <summary>Samples of manual verifications without second review</summary>
     public List<string> MissingReviewSamples { get; } = [];
 
+    // release gate
+    /// <summary>Release mode: location and verification required, a secondary main source and an entry
+    /// that needs a manual verification are findings</summary>
+    public bool Release { get; internal set; }
+
+    /// <summary>The entries were verified against their local evidence (release mode)</summary>
+    public bool SourcesVerified { get; internal set; }
+
+    /// <summary>Entries without manual verification whose numbers are found with weak evidence only (ambiguous)</summary>
+    public int Ambiguous { get; internal set; }
+
+    /// <summary>Entries without manual verification whose sourceQuote is not found in the source</summary>
+    public int QuoteNotFound { get; internal set; }
+
+    /// <summary>Entries excluded from automatic verification with an automatic verification record</summary>
+    public int ExcludedAutoVerified { get; internal set; }
+
+    /// <summary>Samples of entries that need a manual verification (ambiguous, quote not found, excluded from auto verification)</summary>
+    public List<string> ManualVerificationSamples { get; } = [];
+
+    /// <summary>Entries that need a manual verification</summary>
+    public int ManualVerificationRequired => Ambiguous + QuoteNotFound + ExcludedAutoVerified;
+
     // evidence
     /// <summary>Problems of the evidence files</summary>
     public List<string> FileProblems { get; } = [];
@@ -150,7 +189,9 @@ public sealed class CheckResult
         Error != null || ValidationErrors.Count > 0 || !HasSnapshot || Uncovered > 0 || Orphans > 0 ||
         UnresolvedSplit > 0 || Drift > 0 || MissingSourceUrls > 0 || (RequireLocation && MissingSourceLocation > 0) ||
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
-        (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null;
+        (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null ||
+        (RequireLocation && UnspecificLocations > 0) ||
+        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0));
 }
 
 /// <summary>
@@ -183,8 +224,11 @@ public static class Checker
     /// <param name="lexPath">Full path of lex.json</param>
     /// <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
     /// <param name="requireVerification">Treat an entry without verification record as a finding</param>
+    /// <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
+    /// a secondary main source and an entry excluded from auto verification with an automatic record are findings.
+    /// The entries that need a manual verification are found by <see cref="CheckSources"/>.</param>
     public static CheckResult Check(Manifest manifest, string lexPath, bool requireLocation = false,
-        bool requireVerification = false)
+        bool requireVerification = false, bool release = false)
     {
         var lexDirectory = Path.GetDirectoryName(lexPath)!;
         var satelliteDirectory = Directory.GetParent(lexDirectory)?.FullName ?? lexDirectory;
@@ -192,8 +236,9 @@ public static class Checker
         {
             LexPath = lexPath,
             Satellite = Path.GetFileName(satelliteDirectory),
-            RequireLocation = requireLocation,
-            RequireVerification = requireVerification,
+            RequireLocation = requireLocation || release,
+            RequireVerification = requireVerification || release,
+            Release = release,
             LexEntries = manifest.Values.Count,
             LexValidFrom = manifest.ValidFrom,
             HasSnapshot = File.Exists(Path.Combine(lexDirectory, "snapshot.json"))
@@ -239,13 +284,71 @@ public static class Checker
         return result;
     }
 
+    /// <summary>
+    /// Release gate: verify the entries without manual verification against their local evidence
+    /// (<see cref="SourceVerifier.VerifyManifest"/>); an ambiguous entry and an entry whose quote is not found
+    /// need a manual verification
+    /// </summary>
+    /// <param name="manifest">Manifest (lex.json)</param>
+    /// <param name="result">Result of <see cref="Check"/></param>
+    public static async Task CheckSources(Manifest manifest, CheckResult result)
+    {
+        var manual = manifest.Values
+            .Where(x => x.Key != null && x.Verification?.Mode == Verification.ModeManual)
+            .Select(x => x.Key)
+            .ToHashSet(StringComparer.Ordinal);
+        var sources = await SourceVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!);
+        foreach (var source in sources.Where(x => !manual.Contains(x.Key)))
+        {
+            switch (source.Match)
+            {
+                case SourceMatch.Ambiguous:
+                    result.Ambiguous++;
+                    AddSample(result.ManualVerificationSamples, $"{source.Key} (ambiguous: {source.Ambiguity})");
+                    break;
+                case SourceMatch.QuoteNotFound:
+                    result.QuoteNotFound++;
+                    AddSample(result.ManualVerificationSamples, $"{source.Key} (quote not found)");
+                    break;
+            }
+        }
+        result.SourcesVerified = true;
+    }
+
+    private const int SharedLocationEntries = 5;
+    private const int SharedLocationLength = 200;
+    private const int MaxLocationLength = 500;
+
     private static void CheckTraceability(Manifest manifest, CheckResult result)
     {
         var exclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindSourceLocation).ToList();
         var used = new HashSet<Exclusion>();
+        var secondary = manifest.Sources
+            .Where(x => !x.IsOfficial && !string.IsNullOrWhiteSpace(x.Url))
+            .Select(x => x.Url)
+            .ToHashSet(StringComparer.Ordinal);
+        var shared = manifest.Values
+            .Select(x => x.SourceLocation?.Trim())
+            .Where(x => x is { Length: > SharedLocationLength })
+            .GroupBy(x => x, StringComparer.Ordinal)
+            .Where(g => g.Count() >= SharedLocationEntries)
+            .Select(g => g.Key)
+            .ToHashSet(StringComparer.Ordinal);
         foreach (var value in manifest.Values)
         {
             if (!value.Urls.Any()) result.MissingSourceUrls++;
+            var mainSource = value.Urls.FirstOrDefault();
+            if (mainSource != null && secondary.Contains(mainSource))
+            {
+                result.SecondaryMainSource++;
+                AddSample(result.SecondaryMainSourceSamples, $"{value.Key}: {mainSource}");
+            }
+            var location = value.SourceLocation?.Trim();
+            if (location != null && (location.Length > MaxLocationLength || shared.Contains(location)))
+            {
+                result.UnspecificLocations++;
+                AddSample(result.UnspecificLocationSamples, value.Key);
+            }
             if (string.IsNullOrWhiteSpace(value.SourceLocation))
             {
                 var exclusion = exclusions.FirstOrDefault(x => x.Matches(value.Key));
@@ -273,8 +376,16 @@ public static class Checker
             .Where(x => x.IsFourEyes && !string.IsNullOrWhiteSpace(x.Url))
             .Select(x => x.Url)
             .ToHashSet(StringComparer.Ordinal);
+        var autoExclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindAutoVerification).ToList();
+        var usedExclusions = new HashSet<Exclusion>();
         foreach (var value in manifest.Values)
         {
+            var autoExclusion = value.Key != null ? autoExclusions.FirstOrDefault(x => x.Matches(value.Key)) : null;
+            if (autoExclusion != null)
+            {
+                usedExclusions.Add(autoExclusion);
+                result.ExcludedAutoVerification++;
+            }
             if (value.Open)
             {
                 result.Open++;
@@ -286,6 +397,11 @@ public static class Checker
             {
                 case Verification.ModeAuto:
                     result.VerifiedAuto++;
+                    if (autoExclusion != null)
+                    {
+                        result.ExcludedAutoVerified++;
+                        AddSample(result.ManualVerificationSamples, $"{value.Key} (excluded from auto verification)");
+                    }
                     break;
                 case Verification.ModeManual:
                     result.VerifiedManual++;
@@ -301,6 +417,10 @@ public static class Checker
                     AddSample(result.UnverifiedSamples, value.Key);
                     break;
             }
+        }
+        foreach (var exclusion in autoExclusions.Where(x => !usedExclusions.Contains(x)))
+        {
+            result.ValidationErrors.Add($"Exclusion (autoVerification) '{exclusion.Pattern}' matches no entry: remove it");
         }
     }
 

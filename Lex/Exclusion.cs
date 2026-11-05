@@ -16,16 +16,21 @@ public sealed class Exclusion
     /// <summary>Kind: lex entries without a regulation value (evidence of a rule that is implemented in code or derived values)</summary>
     public const string KindOrphan = "orphan";
 
+    /// <summary>Kind: lex entries that are verified manually only; LexVerifySource writes no source location and
+    /// no automatic verification record</summary>
+    public const string KindAutoVerification = "autoVerification";
+
     /// <summary>
     /// Exclusion kind: <c>coverage</c> (regulation values without lex entry),
-    /// <c>sourceLocation</c> (lex entries without sourceLocation) or
-    /// <c>orphan</c> (lex entries without regulation value)
+    /// <c>sourceLocation</c> (lex entries without sourceLocation),
+    /// <c>orphan</c> (lex entries without regulation value) or
+    /// <c>autoVerification</c> (lex entries verified manually only)
     /// </summary>
     public string Kind { get; init; }
 
     /// <summary>
     /// Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
-    /// SourceLocation: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
+    /// SourceLocation, orphan and autoVerification: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
     /// </summary>
     public string Pattern { get; init; }
 

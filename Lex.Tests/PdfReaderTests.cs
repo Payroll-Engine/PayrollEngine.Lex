@@ -12,8 +12,8 @@ public class PdfReaderTests
     private static List<(string Heading, string Text)> Read(byte[] pdf) =>
         PdfReader.Read(new MemoryStream(pdf));
 
-    private static SourceResult Verify(SourceDocument document, string content) =>
-        SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, SourceUrls = ["https://example.org/doc"] }, document);
+    private static SourceResult Verify(SourceDocument document, string content, string unit = null) =>
+        SourceVerifier.Verify(new Entry { Key = "Rates.A", Content = content, Unit = unit, SourceUrls = ["https://example.org/doc"] }, document);
 
     private static async Task<SourceDocument> LoadLocal(string fileName, byte[] bytes)
     {
@@ -123,7 +123,7 @@ public class PdfReaderTests
         Assert.True(document.IsReadable);
         var result = Verify(document, "66150");
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Section \"Page 2\"", result.Location);
+        Assert.Equal("evidence: Section \"Page 2\"", result.Location);
     }
 
     [Fact]
@@ -131,10 +131,10 @@ public class PdfReaderTests
     {
         var document = await LoadLocal("rates.pdf", TestDocuments.Pdf([["Rate 8.5 %"]], [["Ceiling 66,150"]]));
 
-        var result = Verify(document, "{ \"rate\": 0.085, \"ceiling\": 66150 }");
+        var result = Verify(document, "{ \"rate\": 0.085, \"ceiling\": 66150 }", "mixed / rate");
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Sections \"Page 1\", \"Page 2\"", result.Location);
+        Assert.Equal("rates.pdf: Sections \"Page 1\", \"Page 2\"", result.Location);
     }
 
     [Fact]
@@ -145,7 +145,7 @@ public class PdfReaderTests
         var result = Verify(document, "66150");
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Section \"Form fields\"", result.Location);
+        Assert.Equal("form.pdf: Section \"Form fields\"", result.Location);
     }
 
     [Fact]

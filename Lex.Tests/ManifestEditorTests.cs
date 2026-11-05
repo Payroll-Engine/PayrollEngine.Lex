@@ -43,6 +43,39 @@ public class ManifestEditorTests
     }
 
     [Fact]
+    public void SourceLocation_Refresh_ReplacesToolLocationOnly()
+    {
+        var editor = ManifestEditor.Parse("""
+            { "values": [
+              { "key": "Rates.A", "sourceLocation": "Section \"Page 2\"" },
+              { "key": "Rates.B", "sourceLocation": "doc.pdf: Sections \"Page 1\", \"Page 2\"" },
+              { "key": "Rates.C", "sourceLocation": "Page 24, section 7" }
+            ] }
+            """);
+
+        Assert.False(editor.SetSourceLocation("Rates.A", "doc.pdf: Section \"Page 3\""));
+        Assert.True(editor.SetSourceLocation("Rates.A", "doc.pdf: Section \"Page 3\"", refresh: true));
+        Assert.True(editor.SetSourceLocation("Rates.B", "doc.pdf: Section \"Page 1\"", refresh: true));
+        Assert.False(editor.SetSourceLocation("Rates.C", "doc.pdf: Section \"Page 24\"", refresh: true));
+        Assert.False(editor.SetSourceLocation("Rates.A", "doc.pdf: Section \"Page 3\"", refresh: true));
+
+        Assert.Equal("doc.pdf: Section \"Page 3\"", Entry(editor, "Rates.A").GetProperty("sourceLocation").GetString());
+        Assert.Equal("doc.pdf: Section \"Page 1\"", Entry(editor, "Rates.B").GetProperty("sourceLocation").GetString());
+        Assert.Equal("Page 24, section 7", Entry(editor, "Rates.C").GetProperty("sourceLocation").GetString());
+        Assert.Equal(2, editor.Changes);
+    }
+
+    [Fact]
+    public void AddValue_WritesSourceQuote()
+    {
+        var editor = ManifestEditor.Parse("{ \"values\": [] }");
+
+        editor.AddValue(new Entry { Key = "Rates.A", Content = "1.5", SourceQuote = "one and one-half times the regular rate" });
+
+        Assert.Equal("one and one-half times the regular rate", Entry(editor, "Rates.A").GetProperty("sourceQuote").GetString());
+    }
+
+    [Fact]
     public void AutoVerification_IsWritten_AndKeepsOtherProperties()
     {
         var editor = ManifestEditor.Parse(Json);
