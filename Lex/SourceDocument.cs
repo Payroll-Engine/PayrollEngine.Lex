@@ -5,7 +5,6 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 
@@ -199,7 +198,7 @@ public sealed class SourceDocument
     ];
 
     /// <summary>
-    /// Built-in readers by lower-case file extension
+    /// Built-in readers by detected format (see <see cref="FormatDetector.Detect"/>)
     /// </summary>
     private static readonly Dictionary<string, Func<Stream, List<(string Heading, string Text)>>> BuiltInReaders = new()
     {
@@ -208,39 +207,22 @@ public sealed class SourceDocument
         [".xlsb"] = SpreadsheetReader.Read
     };
 
-    /// <summary>
-    /// File extension of a live source by media type fragment, used when the URL has no matching extension
-    /// </summary>
-    private static readonly (string MediaType, string Extension)[] MediaTypeExtensions =
-    [
-        // ReSharper disable once StringLiteralTypo
-        ("spreadsheetml", ".xlsx"),
-        ("ms-excel", ".xls")
-    ];
-
-    /// <summary>
-    /// Reader of a file extension: a passed reader, otherwise a built-in reader
-    /// </summary>
-    private static Func<Stream, List<(string Heading, string Text)>> GetReader(string extension,
-        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers)
-    {
-        if (readers != null && readers.TryGetValue(extension, out var reader))
-        {
-            return reader;
-        }
-        return BuiltInReaders.GetValueOrDefault(extension);
-    }
+    private static Func<Stream, List<(string Heading, string Text)>> PassedReader(string extension,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers) =>
+        readers != null && !string.IsNullOrEmpty(extension) && readers.TryGetValue(extension, out var reader) ? reader : null;
 
     /// <summary>
     /// Load the source: a local evidence file when present, otherwise the URL
     /// </summary>
-    /// <remarks>Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets
-    /// (<c>.xls</c>, <c>.xlsx</c>, <c>.xlsb</c>, one section per sheet).</remarks>
+    /// <remarks>The format is detected from the content, not from the file extension or media type.
+    /// Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
+    /// <c>.xlsb</c>, one section per sheet). Other binary content is unsupported.</remarks>
     /// <param name="url">Source URL</param>
     /// <param name="localPath">Local evidence file (optional)</param>
     /// <param name="client">HTTP client for the source URL</param>
-    /// <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>); a passed reader
-    /// replaces the built-in reader of the same extension. A reader returns the text sections of the document.</param>
+    /// <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>). A passed reader
+    /// for the detected format replaces the built-in reader, a passed reader for the file extension reads content
+    /// of a format without built-in reader. A reader returns the text sections of the document.</param>
     public static async Task<SourceDocument> Load(string url, string localPath, HttpClient client,
         IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers = null)
     {
@@ -248,10 +230,6 @@ public sealed class SourceDocument
         {
             var name = localPath ?? url;
             var extension = Path.GetExtension(name.Split('?')[0]).ToLowerInvariant();
-            if (extension == ".pdf")
-            {
-                return new SourceDocument { State = SourceState.Unsupported, Reason = "PDF" };
-            }
             byte[] bytes;
             if (localPath != null && File.Exists(localPath))
             {
@@ -265,32 +243,40 @@ public sealed class SourceDocument
                     return new SourceDocument { State = SourceState.Unreadable, Reason = $"HTTP {(int)response.StatusCode}" };
                 }
                 bytes = await response.Content.ReadAsByteArrayAsync();
-                var type = response.Content.Headers.ContentType?.MediaType ?? string.Empty;
-                if (type.Contains("pdf", StringComparison.OrdinalIgnoreCase))
-                {
-                    return new SourceDocument { State = SourceState.Unsupported, Reason = "PDF" };
-                }
-                foreach (var (mediaType, mediaExtension) in MediaTypeExtensions)
-                {
-                    if (type.Contains(mediaType, StringComparison.OrdinalIgnoreCase))
-                    {
-                        extension = mediaExtension;
-                        break;
-                    }
-                }
             }
-            var reader = GetReader(extension, readers);
-            if (reader != null)
-            {
-                return new SourceDocument { State = SourceState.Readable, Sections = reader(new MemoryStream(bytes)) };
-            }
-            var text = Encoding.UTF8.GetString(bytes);
-            return extension is ".txt" or ".csv" ? FromText(text) : FromHtml(text);
+            return Read(bytes, extension, readers);
         }
         catch (Exception exception)
         {
             return new SourceDocument { State = SourceState.Unreadable, Reason = exception.Message };
         }
+    }
+
+    /// <summary>
+    /// Read the content: a passed reader for the detected format or the file extension, otherwise the built-in
+    /// reader of the detected format; content without known signature is read as text or HTML unless it is binary
+    /// </summary>
+    private static SourceDocument Read(byte[] bytes, string extension,
+        IReadOnlyDictionary<string, Func<Stream, List<(string Heading, string Text)>>> readers)
+    {
+        var format = FormatDetector.Detect(bytes);
+        var reader = (format != null ? PassedReader(format, readers) : null) ??
+                     PassedReader(extension, readers) ??
+                     (format != null ? BuiltInReaders.GetValueOrDefault(format) : null);
+        if (reader != null)
+        {
+            return new SourceDocument { State = SourceState.Readable, Sections = reader(new MemoryStream(bytes)) };
+        }
+        if (format != null)
+        {
+            return new SourceDocument { State = SourceState.Unsupported, Reason = FormatDetector.Name(format) };
+        }
+        if (FormatDetector.IsBinary(bytes))
+        {
+            return new SourceDocument { State = SourceState.Unsupported, Reason = "unknown binary format" };
+        }
+        var text = FormatDetector.DecodeText(bytes);
+        return extension is ".txt" or ".csv" ? FromText(text) : FromHtml(text);
     }
 
     private static SourceDocument Create(List<(string Heading, string Text)> sections)

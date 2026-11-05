@@ -633,6 +633,43 @@
             Test if the file lies in a bin or obj folder below the search root
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.FormatDetector">
+            <summary>
+            Detects the format of a source document from its content, independent of file extension and media type
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.FormatDetector.PdfHeaderRange">
+            <summary>The PDF header may follow leading bytes within the first kilobyte</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.FormatDetector.TextSampleLength">
+            <summary>Length of the content sample of the binary check</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.FormatDetector.MimeTypeMaxLength">
+            <summary>Maximum length of the mimetype entry of an OpenDocument file</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.FormatDetector.Detect(System.Byte[])">
+            <summary>
+            Format of the content as lower-case file extension: <c>.pdf</c>, <c>.xls</c> (OLE compound file),
+            <c>.xlsx</c>, <c>.xlsb</c>, <c>.docx</c>, <c>.ods</c>, <c>.odt</c> or <c>.zip</c> (other ZIP archive);
+            null when the content has no known signature (text, HTML or an unknown binary format)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.FormatDetector.Name(System.String)">
+            <summary>
+            Display name of a detected format
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.FormatDetector.IsBinary(System.Byte[])">
+            <summary>
+            True if the content is not text: a zero byte or more than 1% control characters in the first bytes.
+            The encoding is not validated, so that text in a legacy code page stays text.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.FormatDetector.DecodeText(System.Byte[])">
+            <summary>
+            Text of a text document; a byte order mark selects the encoding, otherwise UTF-8
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.HtmlReader">
             <summary>
             Tolerant HTML tokenizer: extracts the text of a page as sections (headings h1-h4).
@@ -1279,30 +1316,28 @@
         </member>
         <member name="F:PayrollEngine.Lex.SourceDocument.BuiltInReaders">
             <summary>
-            Built-in readers by lower-case file extension
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceDocument.MediaTypeExtensions">
-            <summary>
-            File extension of a live source by media type fragment, used when the URL has no matching extension
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.SourceDocument.GetReader(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
-            <summary>
-            Reader of a file extension: a passed reader, otherwise a built-in reader
+            Built-in readers by detected format (see <see cref="M:PayrollEngine.Lex.FormatDetector.Detect(System.Byte[])"/>)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.Load(System.String,System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
             <summary>
             Load the source: a local evidence file when present, otherwise the URL
             </summary>
-            <remarks>Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets
-            (<c>.xls</c>, <c>.xlsx</c>, <c>.xlsb</c>, one section per sheet).</remarks>
+            <remarks>The format is detected from the content, not from the file extension or media type.
+            Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>) and spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
+            <c>.xlsb</c>, one section per sheet). Other binary content is unsupported.</remarks>
             <param name="url">Source URL</param>
             <param name="localPath">Local evidence file (optional)</param>
             <param name="client">HTTP client for the source URL</param>
-            <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>); a passed reader
-            replaces the built-in reader of the same extension. A reader returns the text sections of the document.</param>
+            <param name="readers">Additional readers by lower-case file extension (e.g. <c>.ods</c>). A passed reader
+            for the detected format replaces the built-in reader, a passed reader for the file extension reads content
+            of a format without built-in reader. A reader returns the text sections of the document.</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceDocument.Read(System.Byte[],System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})">
+            <summary>
+            Read the content: a passed reader for the detected format or the file extension, otherwise the built-in
+            reader of the detected format; content without known signature is read as text or HTML unless it is binary
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceMatch">
             <summary>
