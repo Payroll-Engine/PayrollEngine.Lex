@@ -918,6 +918,67 @@
             </summary>
             <param name="path">Target path</param>
         </member>
+        <member name="T:PayrollEngine.Lex.OfficeXmlReader">
+            <summary>
+            Reads the text of office XML documents without office library: OpenDocument spreadsheet (ods, one section
+            per sheet), OpenDocument text (odt) and Word document (docx), one section per heading (outline level 1-4).
+            Table rows are one line, table cells are separated by tabs.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxPartMegabytes">
+            <summary>Maximum uncompressed size of a document part in megabytes</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxRows">
+            <summary>Maximum number of rows read per sheet</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxRepeat">
+            <summary>Maximum repetitions of a repeated row or cell with a value</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.StartHeading">
+            <summary>Heading of the text before the first heading</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.ReadOds(System.IO.Stream)">
+            <summary>
+            Text of an OpenDocument spreadsheet: section heading is the sheet name, one line per row,
+            numbers in invariant format, dates as serial number (same as the spreadsheet reader)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.CellValue(System.Xml.XmlReader)">
+            <summary>
+            Value of a cell: numbers, dates and times from the typed value, other cells by their text.
+            Positions the reader after the cell.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.ReadOdt(System.IO.Stream)">
+            <summary>
+            Text of an OpenDocument text: sections by heading, one line per paragraph and table row.
+            Annotations and tracked changes are skipped.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.ReadDocx(System.IO.Stream)">
+            <summary>
+            Text of a Word document body: sections by heading (outline level of the paragraph or its style),
+            one line per paragraph and table row. Deleted text, field codes and fallback content are skipped;
+            headers, footers and notes are not read.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.StyleOutlineLevels(System.IO.Compression.ZipArchive)">
+            <summary>
+            Outline level of the paragraph styles by style id, including inherited levels (basedOn)
+            and built-in heading names (heading 1-9)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.OpenPart(System.IO.Compression.ZipArchive,System.String)">
+            <summary>
+            XML reader of a document part, limited in size
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder">
+            <summary>
+            Collects the text flow of a document into sections: paragraphs with outline level 0-3 outside tables
+            are headings, paragraphs in table cells stay on the row line
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.PdfReader">
             <summary>
             Reads the text layer of a PDF, one section per page (heading <c>Page N</c>) and the values
@@ -1275,7 +1336,7 @@
         </member>
         <member name="T:PayrollEngine.Lex.SourceDocument">
             <summary>
-            Text of a source document, split into sections (HTML headings, spreadsheet sheets, PDF pages)
+            Text of a source document, split into sections (document headings, spreadsheet sheets, PDF pages)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceDocument.Numbers(System.String)">
@@ -1348,8 +1409,8 @@
             </summary>
             <remarks>The format is detected from the content, not from the file extension or media type.
             Built-in formats: HTML, text (<c>.txt</c>, <c>.csv</c>), spreadsheets (<c>.xls</c>, <c>.xlsx</c>,
-            <c>.xlsb</c>, one section per sheet) and PDF (text layer, one section per page).
-            Other binary content is unsupported.</remarks>
+            <c>.xlsb</c>, <c>.ods</c>, one section per sheet), PDF (text layer, one section per page) and
+            text documents (<c>.docx</c>, <c>.odt</c>, one section per heading). Other binary content is unsupported.</remarks>
             <param name="url">Source URL</param>
             <param name="localPath">Local evidence file (optional)</param>
             <param name="client">HTTP client for the source URL</param>
