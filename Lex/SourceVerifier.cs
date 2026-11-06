@@ -317,7 +317,8 @@ public static class SourceVerifier
     /// <summary>
     /// Test if a source location was written by LexVerifySource (and may be refreshed):
     /// <c>Section "Page 24"</c>, <c>Sections "Page 1", "Page 2"</c>, optionally prefixed with the evidence file
-    /// or the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated by <c>; </c>)
+    /// or, without evidence file name, the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated
+    /// by <c>; </c>: <c>p15.pdf: Section "Page 24"; p1494.pdf: Section "Page 1"</c>)
     /// </summary>
     public static bool IsToolLocation(string location) =>
         !string.IsNullOrWhiteSpace(location) && ToolLocation.IsMatch(location.Trim());
@@ -348,7 +349,7 @@ public static class SourceVerifier
         var reason = sources.Count == 1
             ? failed.FirstOrDefault().Document?.Reason
             : failed.Count == 0 ? null
-            : string.Join("; ", failed.Select(s => $"{Label(s.Url)}: {s.Document.Reason}"));
+            : string.Join("; ", failed.Select(s => $"{Label(s.Url, s.Document)}: {s.Document.Reason}"));
         if (readable.Count == 0)
         {
             return new SourceResult
@@ -465,7 +466,8 @@ public static class SourceVerifier
     }
 
     /// <summary>
-    /// Source location of the covering sections; with several sources one part per source, in the order of the sources
+    /// Source location of the covering sections; with several sources one part per source, in the order of the
+    /// sources, named by the evidence file or, without file name, by the host
     /// </summary>
     private static string Location(IReadOnlyList<(string Url, SourceDocument Document)> sources, List<Section> cover)
     {
@@ -475,12 +477,18 @@ public static class SourceVerifier
             var name = cover[0].Name;
             return name != null ? $"{name}: {sections}" : sections;
         }
-        return string.Join("; ", sources.Select(s => s.Url).Distinct(StringComparer.Ordinal)
-            .Select(url => (Url: url, Headings: cover.Where(x => string.Equals(x.Url, url, StringComparison.Ordinal))
+        return string.Join("; ", sources.DistinctBy(s => s.Url, StringComparer.Ordinal)
+            .Select(s => (Source: s, Headings: cover.Where(x => string.Equals(x.Url, s.Url, StringComparison.Ordinal))
                 .Select(x => x.Heading).ToList()))
             .Where(x => x.Headings.Count > 0)
-            .Select(x => $"{Label(x.Url)}: {Sections(x.Headings)}"));
+            .Select(x => $"{Label(x.Source.Url, x.Source.Document)}: {Sections(x.Headings)}"));
     }
+
+    /// <summary>
+    /// Source name: the evidence file name of the document, otherwise the host of the URL
+    /// </summary>
+    private static string Label(string url, SourceDocument document) =>
+        string.IsNullOrWhiteSpace(document?.Name) ? Label(url) : document.Name;
 
     private static string Sections(List<string> headings) =>
         headings.Count == 1

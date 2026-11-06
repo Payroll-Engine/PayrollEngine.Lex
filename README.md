@@ -56,6 +56,11 @@ lookup; the other numbers are verified and the `auto` record lists the property 
 `SourceResult.Derived`). `SourceVerifier.VerifyManifest` checks
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 
+`SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by
+the host when the document has no file name (live source): `US-2026-p15.pdf: Sections "Page 24", "Page 25";
+US-2026-p1494.pdf: Section "Page 1"`. A location longer than 500 characters is not proposed.
+`SourceVerifier.IsToolLocation` recognizes these locations, so `/refreshlocations` may replace them.
+
 ## Verification and Open Entries
 
 Each entry can carry a `verification` record: `auto` when a tool found the value in the source

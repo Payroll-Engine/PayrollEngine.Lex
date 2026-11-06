@@ -107,6 +107,60 @@ public class MultiSourceTests
     }
 
     [Fact]
+    public void SourcesOfSameHost_AreNamedByEvidenceFile()
+    {
+        const string guideUrl = "https://www.irs.gov/pub/irs-pdf/p15.pdf";
+        const string limitsUrl = "https://www.irs.gov/pub/irs-pdf/p1494.pdf";
+        var entry = new Entry
+        {
+            Key = "Parameters.A", Content = "{\"WageBase\":42100,\"Exempt\":17350}", Unit = "USD",
+            SourceUrls = [guideUrl, limitsUrl]
+        };
+        var guide = Readable(("Page 1", "Wage base 42,100"));
+        guide.Name = "US-2026-p15.pdf";
+        var limits = Readable(("Page 1", "Exempt amount 17,350"));
+        limits.Name = "US-2026-p1494.pdf";
+
+        var result = SourceVerifier.Verify(entry, [(guideUrl, guide), (limitsUrl, limits)]);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Equal("US-2026-p15.pdf: Section \"Page 1\"; US-2026-p1494.pdf: Section \"Page 1\"", result.Location);
+        Assert.True(SourceVerifier.IsToolLocation(result.Location));
+    }
+
+    [Fact]
+    public void SourceWithoutName_IsNamedByHost()
+    {
+        var named = Readable(("Taxable wages", "Taxable wage base 42,000"));
+        named.Name = "unemployment-2026.html";
+
+        var result = SourceVerifier.Verify(Combined(),
+        [
+            (UnemploymentUrl, named),
+            (LeaveUrl, Readable("Employee share", "The employee share is 0.46%"))
+        ]);
+
+        Assert.Equal("unemployment-2026.html: Section \"Taxable wages\"; leave.example.org: Section \"Employee share\"",
+            result.Location);
+        Assert.True(SourceVerifier.IsToolLocation(result.Location));
+    }
+
+    [Fact]
+    public void UnreadableSourceWithName_IsNamedByEvidenceFile()
+    {
+        var scanned = Unreadable("scanned PDF");
+        scanned.Name = "leave-2026.pdf";
+
+        var result = SourceVerifier.Verify(Combined(),
+        [
+            (UnemploymentUrl, Readable("Taxable wages", "Taxable wage base 42,000")),
+            (LeaveUrl, scanned)
+        ]);
+
+        Assert.Equal("leave-2026.pdf: scanned PDF", result.Reason);
+    }
+
+    [Fact]
     public void NumberMissingInAllSources_IsPartial()
     {
         var result = SourceVerifier.Verify(Combined(),

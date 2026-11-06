@@ -42,7 +42,7 @@ public sealed class SourceDocument
     /// <summary>
     /// File name of the local evidence, null for a live source or an in-memory document
     /// </summary>
-    internal string Name { get; private set; }
+    internal string Name { get; set; }
 
     /// <summary>
     /// Numbers of one section as normalized decimal values (every separator interpretation and numbers in words)

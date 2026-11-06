@@ -1808,7 +1808,8 @@
             <summary>
             Test if a source location was written by LexVerifySource (and may be refreshed):
             <c>Section "Page 24"</c>, <c>Sections "Page 1", "Page 2"</c>, optionally prefixed with the evidence file
-            or the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated by <c>; </c>)
+            or, without evidence file name, the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated
+            by <c>; </c>: <c>p15.pdf: Section "Page 24"; p1494.pdf: Section "Page 1"</c>)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument)">
@@ -1834,7 +1835,13 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Location(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section})">
             <summary>
-            Source location of the covering sections; with several sources one part per source, in the order of the sources
+            Source location of the covering sections; with several sources one part per source, in the order of the
+            sources, named by the evidence file or, without file name, by the host
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Label(System.String,PayrollEngine.Lex.SourceDocument)">
+            <summary>
+            Source name: the evidence file name of the document, otherwise the host of the URL
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Label(System.String)">
