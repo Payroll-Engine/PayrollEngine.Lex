@@ -109,7 +109,7 @@ public sealed class SourceResult
 public static class SourceVerifier
 {
     private const int MaxNumbers = 40;
-    private const int MaxSections = 3;
+    private const int MaxSectionsPerSource = 3;
 
     /// <summary>A single number written with this many digits or less is weak evidence (22%, 1.5, 50)</summary>
     private const int WeakDigits = 2;
@@ -123,6 +123,9 @@ public static class SourceVerifier
 
     /// <summary>Note of an entry whose numbers are all derived</summary>
     internal const string AllDerivedNote = "all numbers derived: confirm with LexAttest";
+
+    /// <summary>Note of a found entry whose location exceeds the maximum location length</summary>
+    internal const string LocationTooLongNote = "location too long: set sourceLocation manually";
 
     /// <summary>
     /// Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
@@ -363,14 +366,19 @@ public static class SourceVerifier
             .SelectMany(s => s.Document.Sections.Select(x => new Section(s.Url, s.Document.Name, x.Heading, x.Text)))
             .ToList();
 
-        SourceResult Result(SourceMatch match, List<decimal> found = null, string location = null, string ambiguity = null) => new()
+        SourceResult Result(SourceMatch match, List<decimal> found = null, string location = null, string ambiguity = null)
         {
-            Key = entry.Key, Urls = urls, Match = match, NumbersTotal = numbers.Count, ContentNumbers = allNumbers.Count,
-            NumbersFound = found?.Count ?? 0,
-            Missing = found == null ? [] : numbers.Except(found).Select(n => n.ToString(CultureInfo.InvariantCulture)).ToList(),
-            Location = location, Reason = reason, Ambiguity = ambiguity, Quote = quote, Derived = derived,
-            Note = match == SourceMatch.NoNumbers && derivedNumbers > 0 ? AllDerivedNote : null
-        };
+            var tooLong = location is { Length: > Checker.MaxLocationLength };
+            return new()
+            {
+                Key = entry.Key, Urls = urls, Match = match, NumbersTotal = numbers.Count, ContentNumbers = allNumbers.Count,
+                NumbersFound = found?.Count ?? 0,
+                Missing = found == null ? [] : numbers.Except(found).Select(n => n.ToString(CultureInfo.InvariantCulture)).ToList(),
+                Location = tooLong ? null : location, Reason = reason, Ambiguity = ambiguity, Quote = quote, Derived = derived,
+                Note = tooLong ? LocationTooLongNote
+                    : match == SourceMatch.NoNumbers && derivedNumbers > 0 ? AllDerivedNote : null
+            };
+        }
 
         if (quote != null)
         {
@@ -391,7 +399,7 @@ public static class SourceVerifier
                 .First();
             var quoteMatch = Classify(best.Found.Count, numbers.Count);
             return Result(quoteMatch, best.Found,
-                quoteMatch == SourceMatch.Found ? Location(sources.Count, [best.Section]) : null);
+                quoteMatch == SourceMatch.Found ? Location(sources, [best.Section]) : null);
         }
 
         if (numbers.Count == 0)
@@ -411,19 +419,22 @@ public static class SourceVerifier
             return Result(SourceMatch.Ambiguous, found, ambiguity: weak);
         }
 
-        // greedy cover: the sections that hold most of the numbers
+        // greedy cover: the sections that hold most of the numbers, at most MaxSectionsPerSource per source
         var remaining = new HashSet<decimal>(found);
         var cover = new List<Section>();
-        while (remaining.Count > 0 && cover.Count <= MaxSections)
+        var perSource = new Dictionary<string, int>(StringComparer.Ordinal);
+        while (remaining.Count > 0)
         {
             var best = sections
+                .Where(s => perSource.GetValueOrDefault(s.Url ?? string.Empty) < MaxSectionsPerSource)
                 .Select(s => (Section: s, Hits: remaining.Where(n => s.Numbers.Contains(n, percent)).ToList()))
-                .OrderByDescending(x => x.Hits.Count).First();
-            if (best.Hits.Count == 0) break;
+                .OrderByDescending(x => x.Hits.Count).FirstOrDefault();
+            if (best.Section == null || best.Hits.Count == 0) break;
             cover.Add(best.Section);
+            perSource[best.Section.Url ?? string.Empty] = perSource.GetValueOrDefault(best.Section.Url ?? string.Empty) + 1;
             remaining.ExceptWith(best.Hits);
         }
-        var location = remaining.Count == 0 && cover.Count <= MaxSections ? Location(sources.Count, cover) : null;
+        var location = remaining.Count == 0 ? Location(sources, cover) : null;
         return Result(match, found, location);
     }
 
@@ -453,16 +464,22 @@ public static class SourceVerifier
         return digits <= FrequentDigits && hits.Count > WeakSections ? $"number in {hits.Count} sections" : null;
     }
 
-    private static string Location(int sourceCount, List<Section> cover)
+    /// <summary>
+    /// Source location of the covering sections; with several sources one part per source, in the order of the sources
+    /// </summary>
+    private static string Location(IReadOnlyList<(string Url, SourceDocument Document)> sources, List<Section> cover)
     {
-        if (sourceCount == 1)
+        if (sources.Count == 1)
         {
             var sections = Sections(cover.Select(x => x.Heading).ToList());
             var name = cover[0].Name;
             return name != null ? $"{name}: {sections}" : sections;
         }
-        return string.Join("; ", cover.GroupBy(x => x.Url)
-            .Select(g => $"{Label(g.Key)}: {Sections(g.Select(x => x.Heading).ToList())}"));
+        return string.Join("; ", sources.Select(s => s.Url).Distinct(StringComparer.Ordinal)
+            .Select(url => (Url: url, Headings: cover.Where(x => string.Equals(x.Url, url, StringComparison.Ordinal))
+                .Select(x => x.Heading).ToList()))
+            .Where(x => x.Headings.Count > 0)
+            .Select(x => $"{Label(x.Url)}: {Sections(x.Headings)}"));
     }
 
     private static string Sections(List<string> headings) =>

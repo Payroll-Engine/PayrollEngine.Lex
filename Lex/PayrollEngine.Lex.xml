@@ -1749,6 +1749,9 @@
         <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
             <summary>Note of an entry whose numbers are all derived</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.LocationTooLongNote">
+            <summary>Note of a found entry whose location exceeds the maximum location length</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceVerifier.Method">
             <summary>
             Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
@@ -1827,6 +1830,11 @@
         <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
             <summary>
             Weak evidence of a single number, null for an entry with several numbers or a distinctive number
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Location(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section})">
+            <summary>
+            Source location of the covering sections; with several sources one part per source, in the order of the sources
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Label(System.String)">

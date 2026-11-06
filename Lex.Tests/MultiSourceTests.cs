@@ -18,6 +18,9 @@ public class MultiSourceTests
     private static SourceDocument Readable(string heading, string text) =>
         new() { State = SourceState.Readable, Sections = [(heading, text)] };
 
+    private static SourceDocument Readable(params (string Heading, string Text)[] sections) =>
+        new() { State = SourceState.Readable, Sections = sections.ToList() };
+
     private static SourceDocument Unreadable(string reason) =>
         new() { State = SourceState.Unreadable, Reason = reason };
 
@@ -38,6 +41,69 @@ public class MultiSourceTests
         Assert.Equal("unemployment.example.org: Section \"Taxable wages\"; leave.example.org: Section \"Employee share\"",
             result.Location);
         Assert.Null(result.Reason);
+    }
+
+    [Fact]
+    public void SectionLimitPerSource_LocationNamesEverySource()
+    {
+        var result = SourceVerifier.Verify(
+            Combined("{\"A\":42100,\"B\":43200,\"C\":44300,\"D\":0.0046,\"E\":0.0052,\"F\":0.0061}"),
+            [
+                (UnemploymentUrl, Readable(("A1", "Wage base 42,100"), ("A2", "Wage base 43,200"), ("A3", "Wage base 44,300"))),
+                (LeaveUrl, Readable(("B1", "Shares 0.46% and 0.52%"), ("B2", "Employer share 0.61%")))
+            ]);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Equal("unemployment.example.org: Sections \"A1\", \"A2\", \"A3\"; leave.example.org: Sections \"B1\", \"B2\"",
+            result.Location);
+        Assert.Null(result.Note);
+    }
+
+    [Fact]
+    public void SourceNeedingFourSections_GivesNoLocation()
+    {
+        var result = SourceVerifier.Verify(
+            Combined("{\"A\":42100,\"B\":43200,\"C\":44300,\"D\":45400,\"E\":0.0046}"),
+            [
+                (UnemploymentUrl, Readable(("A1", "Wage base 42,100"), ("A2", "Wage base 43,200"),
+                    ("A3", "Wage base 44,300"), ("A4", "Wage base 45,400"))),
+                (LeaveUrl, Readable(("B1", "Employee share 0.46%")))
+            ]);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Location);
+        Assert.Null(result.Note);
+        Assert.True(result.CanWrite);
+    }
+
+    [Fact]
+    public void SingleSourceNeedingFourSections_GivesNoLocation()
+    {
+        var entry = new Entry { Key = "Rates.A", Content = "[42100,43200,44300,45400]", SourceUrls = [UnemploymentUrl] };
+
+        var result = SourceVerifier.Verify(entry, Readable(("A1", "Wage base 42,100"), ("A2", "Wage base 43,200"),
+            ("A3", "Wage base 44,300"), ("A4", "Wage base 45,400")));
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Location);
+    }
+
+    [Fact]
+    public void LocationOverMaximumLength_IsNotWritten()
+    {
+        static string Heading(int i) => $"Heading {i} " + new string('x', 90);
+        var result = SourceVerifier.Verify(
+            Combined("{\"A\":42100,\"B\":43200,\"C\":44300,\"D\":0.0046,\"E\":0.0052,\"F\":0.0061}"),
+            [
+                (UnemploymentUrl, Readable((Heading(1), "Wage base 42,100"), (Heading(2), "Wage base 43,200"),
+                    (Heading(3), "Wage base 44,300"))),
+                (LeaveUrl, Readable((Heading(4), "Share 0.46%"), (Heading(5), "Share 0.52%"), (Heading(6), "Share 0.61%")))
+            ]);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Location);
+        Assert.Equal(SourceVerifier.LocationTooLongNote, result.Note);
+        Assert.True(result.CanWrite);
     }
 
     [Fact]

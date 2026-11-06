@@ -321,7 +321,7 @@ public static class Checker
 
     private const int SharedLocationEntries = 5;
     private const int SharedLocationLength = 200;
-    private const int MaxLocationLength = 500;
+    internal const int MaxLocationLength = 500;
 
     private static void CheckTraceability(Manifest manifest, CheckResult result)
     {
