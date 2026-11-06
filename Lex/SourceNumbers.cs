@@ -8,14 +8,14 @@ namespace PayrollEngine.Lex;
 
 /// <summary>
 /// Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
-/// and numbers in words (English and Indian scales, fractions)
+/// (<c>%</c>, <c>percent</c>, <c>per cent</c>, <c>per centum</c>) and numbers in words (English and Indian scales, fractions)
 /// </summary>
 internal sealed class SourceNumbers
 {
     /// <summary>Numerals as normalized decimal values</summary>
     internal HashSet<decimal> Numerals { get; } = [];
 
-    /// <summary>Numerals followed by <c>%</c>, <c>percent</c> or <c>per cent</c></summary>
+    /// <summary>Numerals followed by <c>%</c>, <c>percent</c>, <c>per cent</c> or <c>per centum</c></summary>
     internal HashSet<decimal> Percents { get; } = [];
 
     /// <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
@@ -108,7 +108,7 @@ internal sealed class SourceNumbers
         RegexOptions.Compiled);
 
     private static readonly Regex PercentSign = new(
-        @"\G[ \u00a0\u202f]?(?:%|percent\b|per cent\b)",
+        @"\G[ \u00a0\u202f]?(?:%|percent\b|per cent\b|per centum\b)",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
     // a numeral directly before the scale word: "a million" holds no number

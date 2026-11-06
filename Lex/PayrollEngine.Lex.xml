@@ -1600,14 +1600,14 @@
         <member name="T:PayrollEngine.Lex.SourceNumbers">
             <summary>
             Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
-            and numbers in words (English and Indian scales, fractions)
+            (<c>%</c>, <c>percent</c>, <c>per cent</c>, <c>per centum</c>) and numbers in words (English and Indian scales, fractions)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Numerals">
             <summary>Numerals as normalized decimal values</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Percents">
-            <summary>Numerals followed by <c>%</c>, <c>percent</c> or <c>per cent</c></summary>
+            <summary>Numerals followed by <c>%</c>, <c>percent</c>, <c>per cent</c> or <c>per centum</c></summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Words">
             <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>

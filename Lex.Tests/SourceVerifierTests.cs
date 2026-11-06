@@ -106,8 +106,25 @@ public class SourceVerifierTests
     [InlineData("The employee share is 4.25%.")]
     [InlineData("The employee share is 4.25 percent.")]
     [InlineData("The employee share is 4.25 per cent.")]
+    [InlineData("The employee share is 4.25 per centum.")]
     public void PercentSign_IsLookedUpAsPercentage(string text) =>
         Assert.Equal(1, SourceVerifier.Verify(Entry("0.0425", "rate"), Sections(text)).NumbersFound);
+
+    [Fact]
+    public void PerCentum_StatuteWording_IsFound()
+    {
+        var result = SourceVerifier.Verify(
+            Entry("{\"CreditorMaxPercent\":0.25,\"ChildSupportCapNotSupporting\":0.6}", "mixed"),
+            Sections("the maximum part of the aggregate disposable earnings of an individual for any workweek which is " +
+                     "subjected to garnishment may not exceed 25 per centum of his disposable earnings for that week; " +
+                     "where such individual is not supporting such a spouse or dependent child, 60 per centum of such " +
+                     "individual's disposable earnings for that week"));
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Ambiguity);
+        Assert.Equal(2, result.NumbersFound);
+        Assert.True(result.CanWrite);
+    }
 
     [Fact]
     public void WithoutUnit_RateWithPercentSign_IsFound() =>
