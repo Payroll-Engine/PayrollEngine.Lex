@@ -105,6 +105,9 @@ public sealed class CheckResult
     internal int ExcludedSourceLocation { get; set; }
     internal int ExcludedOrphans { get; set; }
     internal int ExcludedAutoVerification { get; set; }
+
+    /// <summary>Entry properties documented as derived (exclusion kind derived)</summary>
+    public int ExcludedDerived { get; internal set; }
     internal List<string> ExclusionNotes { get; } = [];
 
     /// <summary>Lex entries without legalReference</summary>
@@ -268,6 +271,7 @@ public static class Checker
         CheckTraceability(manifest, result);
         CheckValidFrom(result);
         CheckCoverage(manifest, lexDirectory, result, regulation);
+        CheckDerived(manifest, lexDirectory, result);
         CheckEvidence(manifest, lexDirectory, result);
         foreach (var exclusion in manifest.Exclusions)
         {
@@ -526,6 +530,36 @@ public static class Checker
         foreach (var exclusion in orphanExclusions.Where(x => !usedExclusions.Contains(x)))
         {
             result.ValidationErrors.Add($"Exclusion (orphan) '{exclusion.Pattern}' matches no lex entry without regulation value: remove it");
+        }
+    }
+
+    /// <summary>
+    /// A derived exclusion must address an existing property of an entry (e.g. not renamed)
+    /// </summary>
+    private static void CheckDerived(Manifest manifest, string lexDirectory, CheckResult result)
+    {
+        var keys = DerivedProperties.Keys(manifest);
+        foreach (var exclusion in manifest.Exclusions.Where(x => x.Kind == Exclusion.KindDerived))
+        {
+            var (key, path) = DerivedProperties.Resolve(exclusion.Pattern, keys);
+            if (key == null)
+            {
+                result.ValidationErrors.Add($"Exclusion (derived) '{exclusion.Pattern}' matches no entry: remove or rename it");
+                continue;
+            }
+            if (path.Length == 0)
+            {
+                // whole entry: reported by the validator
+                continue;
+            }
+            var entry = manifest.Values.First(x => string.Equals(x.Key, key, StringComparison.Ordinal));
+            if (!DerivedProperties.Exists(CompareContent(entry, lexDirectory), path))
+            {
+                result.ValidationErrors.Add(
+                    $"Exclusion (derived) '{exclusion.Pattern}' matches no property '{path}' of entry '{key}': remove or rename it");
+                continue;
+            }
+            result.ExcludedDerived++;
         }
     }
 

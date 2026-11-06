@@ -82,10 +82,11 @@ public static class Validator
         foreach (var exclusion in manifest.Exclusions)
         {
             if (exclusion.Kind != Exclusion.KindCoverage && exclusion.Kind != Exclusion.KindSourceLocation &&
-                exclusion.Kind != Exclusion.KindOrphan && exclusion.Kind != Exclusion.KindAutoVerification)
+                exclusion.Kind != Exclusion.KindOrphan && exclusion.Kind != Exclusion.KindAutoVerification &&
+                exclusion.Kind != Exclusion.KindDerived)
             {
                 errors.Add($"Exclusion '{exclusion.Pattern}': kind must be '{Exclusion.KindCoverage}', '{Exclusion.KindSourceLocation}', " +
-                           $"'{Exclusion.KindOrphan}' or '{Exclusion.KindAutoVerification}'");
+                           $"'{Exclusion.KindOrphan}', '{Exclusion.KindAutoVerification}' or '{Exclusion.KindDerived}'");
             }
             if (string.IsNullOrWhiteSpace(exclusion.Pattern))
             {
@@ -93,7 +94,14 @@ public static class Validator
             }
             if (string.IsNullOrWhiteSpace(exclusion.Reason))
             {
-                errors.Add($"Exclusion '{exclusion.Pattern}': the 'reason' is mandatory");
+                errors.Add($"Exclusion '{exclusion.Pattern}': the 'reason' is mandatory" +
+                           (exclusion.Kind == Exclusion.KindDerived ? " (formula and legal reference)" : string.Empty));
+            }
+            if (exclusion.Kind == Exclusion.KindDerived && !string.IsNullOrWhiteSpace(exclusion.Pattern) &&
+                seenKeys.Contains(exclusion.Pattern.Trim()))
+            {
+                errors.Add($"Exclusion (derived) '{exclusion.Pattern}' addresses the whole entry: a derived exclusion needs a property " +
+                           $"(Lookup.Key.Property); to verify the whole entry manually use '{Exclusion.KindAutoVerification}'");
             }
         }
 
@@ -222,6 +230,10 @@ public static class Validator
             if (verification.Method != null)
             {
                 errors.Add($"{subject} method is only allowed in mode '{Verification.ModeAuto}'");
+            }
+            if (verification.Derived != null)
+            {
+                errors.Add($"{subject} derived is only allowed in mode '{Verification.ModeAuto}'");
             }
         }
         else if (verification.Mode == Verification.ModeAuto)

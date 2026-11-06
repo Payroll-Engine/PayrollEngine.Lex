@@ -50,7 +50,10 @@ up as percentage when the source writes a percent sign after the number, except 
 (`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the
 entry: the numbers must be in the section of the quote (`Found`), otherwise in the quote itself; a quote missing in
 the source gives `QuoteNotFound`. Tables with more than 40 numbers are sampled evenly. Entries with an
-`autoVerification` exclusion are never written (`SourceResult.CanWrite`). `SourceVerifier.VerifyManifest` checks
+`autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion
+(`Lookup.Key.Property`, formula and legal reference as reason) removes the numbers of a computed property from the
+lookup; the other numbers are verified and the `auto` record lists the property (`Verification.Derived`,
+`SourceResult.Derived`). `SourceVerifier.VerifyManifest` checks
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 
 ## Verification and Open Entries

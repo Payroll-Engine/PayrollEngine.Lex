@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 
 namespace PayrollEngine.Lex;
 
@@ -53,10 +54,17 @@ public sealed class Verification
     public string ReviewedOn { get; init; }
 
     /// <summary>
+    /// Properties of the entry that are derived from other values and not taken from the source
+    /// (auto mode only, exclusion kind derived)
+    /// </summary>
+    public List<string> Derived { get; init; }
+
+    /// <summary>
     /// Canonical text of the record, part of the snapshot source hash
     /// </summary>
     internal string HashInput() =>
-        $"verification:{Mode}|{VerifiedOn}|{VerifiedBy}|{Evidence}|{Method}|{ReviewedBy}|{ReviewedOn}";
+        $"verification:{Mode}|{VerifiedOn}|{VerifiedBy}|{Evidence}|{Method}|{ReviewedBy}|{ReviewedOn}" +
+        (Derived is { Count: > 0 } ? "|derived:" + string.Join(",", Derived) : string.Empty);
 
     /// <summary>
     /// Field-wise equality (ordinal)

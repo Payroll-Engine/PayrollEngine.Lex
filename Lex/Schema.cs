@@ -66,7 +66,7 @@ public static class Schema
             },
             "exclusions": {
               "type": "array",
-              "description": "Documented exclusions from the coverage, sourceLocation, orphan and automatic verification rules. Excluded items are listed in the check report.",
+              "description": "Documented exclusions from the coverage, sourceLocation, orphan and automatic verification rules, and derived properties of entries. Excluded items are listed in the check report.",
               "items": {
                 "$ref": "#/$defs/exclusion"
               }
@@ -80,16 +80,17 @@ public static class Schema
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["coverage", "sourceLocation", "orphan", "autoVerification"],
-                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code). autoVerification: lex entries verified manually only (LexVerifySource writes no source location and no automatic verification record)."
+                  "enum": ["coverage", "sourceLocation", "orphan", "autoVerification", "derived"],
+                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code). autoVerification: lex entries verified manually only (LexVerifySource writes no source location and no automatic verification record). derived: property of a lex entry that is derived from other values and is not in the source (LexVerifySource does not look up its numbers)."
                 },
                 "pattern": {
                   "type": "string",
-                  "description": "Key pattern: Lookup, Lookup.Key, or a prefix with trailing '*'. A name also matches all keys below it."
+                  "description": "Key pattern: Lookup, Lookup.Key, or a prefix with trailing '*'. A name also matches all keys below it. derived: entry key and property path of the JSON content (Lookup.Key.Property, nested properties separated by '.')."
                 },
                 "reason": {
                   "type": "string",
-                  "description": "Mandatory justification for the exclusion"
+                  "description": "Mandatory justification for the exclusion; derived: formula and legal reference",
+                  "examples": ["5% of BaseRate (0.06), Example Act s. 12(2)"]
                 }
               }
             },
@@ -166,6 +167,15 @@ public static class Schema
                   "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
                   "description": "Review date in YYYY-MM-DD format (sources with review FourEyes)",
                   "examples": ["2026-01-16"]
+                },
+                "derived": {
+                  "type": "array",
+                  "minItems": 1,
+                  "description": "Properties of the value that are derived from other values and not taken from the source (auto mode only, see exclusion kind derived)",
+                  "items": {
+                    "type": "string"
+                  },
+                  "examples": [["CreditReduction"]]
                 }
               },
               "dependentRequired": {
@@ -175,7 +185,10 @@ public static class Schema
               "allOf": [
                 {
                   "if": { "properties": { "mode": { "const": "manual" } } },
-                  "then": { "required": ["verifiedBy", "evidence"], "not": { "required": ["method"] } }
+                  "then": {
+                    "required": ["verifiedBy", "evidence"],
+                    "not": { "anyOf": [ { "required": ["method"] }, { "required": ["derived"] } ] }
+                  }
                 },
                 {
                   "if": { "properties": { "mode": { "const": "auto" } } },

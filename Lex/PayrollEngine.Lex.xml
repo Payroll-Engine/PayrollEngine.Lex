@@ -189,6 +189,9 @@
         <member name="P:PayrollEngine.Lex.CheckResult.SecondaryMainSourceSamples">
             <summary>Samples of lex entries with a secondary main source</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedDerived">
+            <summary>Entry properties documented as derived (exclusion kind derived)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
@@ -297,6 +300,11 @@
             <param name="manifest">Manifest (lex.json)</param>
             <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
         </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckDerived(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            A derived exclusion must address an existing property of an entry (e.g. not renamed)
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
             <summary>
             The evidence of a verification record must be frozen in the snapshot
@@ -358,6 +366,64 @@
         <member name="M:PayrollEngine.Lex.ContentHash.ResolvePath(System.String,System.String)">
             <summary>
             Resolve a path relative to a base directory
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.DerivedValue">
+            <summary>
+            Property of a lex entry that is derived from other values (exclusion kind <c>derived</c>):
+            its numbers are not looked up in the source
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Property">
+            <summary>Property path within the entry content (e.g. <c>CreditReduction</c> or <c>Group.Rate</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Value">
+            <summary>Value of the property in the entry content</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Reason">
+            <summary>Formula and legal reference (reason of the exclusion)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.DerivedProperties">
+            <summary>
+            Resolves the derived exclusions of a manifest to entry properties
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Resolve(System.String,System.Collections.Generic.ICollection{System.String})">
+            <summary>
+            Entry key and property path addressed by a derived pattern: the longest entry key the pattern starts with
+            (<see cref="M:PayrollEngine.Lex.EntryMapping.Splits(System.String)"/>). The path is empty when the pattern is an entry key; the key is null
+            when the pattern addresses no entry.
+            </summary>
+            <param name="pattern">Derived pattern (Lookup.Key.Property)</param>
+            <param name="keys">Entry keys of the manifest</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Keys(PayrollEngine.Lex.Manifest)">
+            <summary>
+            Entry keys of a manifest
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Of(System.String,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.Exclusion},System.Collections.Generic.ICollection{System.String})">
+            <summary>
+            Derived exclusions of a manifest that address a property of an entry
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Values(System.String,System.String,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.Exclusion})">
+            <summary>
+            Derived values of an entry: the properties of the content addressed by the derived exclusions.
+            A pattern whose property is missing in the content is ignored (reported by the checker).
+            </summary>
+            <param name="entryKey">Entry key</param>
+            <param name="content">Entry content (inline content or text of the content file)</param>
+            <param name="exclusions">Exclusions; only the derived exclusions of the entry are used</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Exists(System.String,System.String)">
+            <summary>
+            Test if a property path exists in a JSON content
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.TryGet(System.Text.Json.JsonElement,System.String,System.Text.Json.JsonElement@)">
+            <summary>
+            Property of a JSON object by path (object properties separated by a dot, names ignoring case)
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Entry">
@@ -592,23 +658,29 @@
             <summary>Kind: lex entries that are verified manually only; LexVerifySource writes no source location and
             no automatic verification record</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Exclusion.KindDerived">
+            <summary>Kind: property of a lex entry that is derived from other values (formula) and is not in the source;
+            LexVerifySource does not look up its numbers</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Kind">
             <summary>
             Exclusion kind: <c>coverage</c> (regulation values without lex entry),
             <c>sourceLocation</c> (lex entries without sourceLocation),
-            <c>orphan</c> (lex entries without regulation value) or
-            <c>autoVerification</c> (lex entries verified manually only)
+            <c>orphan</c> (lex entries without regulation value),
+            <c>autoVerification</c> (lex entries verified manually only) or
+            <c>derived</c> (derived property of a lex entry)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Pattern">
             <summary>
             Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
             SourceLocation, orphan and autoVerification: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
+            Derived: lex entry key and property path of the JSON content (<c>Lookup.Key.Property</c>, nested <c>Lookup.Key.Group.Property</c>).
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Reason">
             <summary>
-            Mandatory justification
+            Mandatory justification; for a derived property the formula and the legal reference
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Exclusion.Matches(System.String)">
@@ -893,7 +965,8 @@
         <member name="M:PayrollEngine.Lex.ManifestEditor.SetAutoVerification(System.String,PayrollEngine.Lex.Verification)">
             <summary>
             Set the automatic verification record of an entry. A manual verification is never replaced;
-            an automatic one only when method or evidence change, so that a repeated run leaves the snapshot valid.
+            an automatic one only when method, evidence or derived properties change, so that a repeated run leaves
+            the snapshot valid.
             </summary>
             <param name="key">Entry key</param>
             <param name="verification">Automatic verification record</param>
@@ -1649,6 +1722,12 @@
         <member name="P:PayrollEngine.Lex.SourceResult.ExcludedReason">
             <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Derived">
+            <summary>Derived properties of the entry (exclusion kind derived); their numbers are not looked up</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Note">
+            <summary>Hint for the review of the result, e.g. all numbers of the entry are derived</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceResult.CanWrite">
             <summary>The source location and the automatic verification record may be written</summary>
         </member>
@@ -1667,17 +1746,21 @@
         <member name="F:PayrollEngine.Lex.SourceVerifier.WeakSections">
             <summary>A single number that occurs in more sections is weak evidence</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
+            <summary>Note of an entry whose numbers are all derived</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceVerifier.Method">
             <summary>
             Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.AutoVerification(System.DateOnly,System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.AutoVerification(System.DateOnly,System.String,System.Collections.Generic.IEnumerable{System.String})">
             <summary>
             Automatic verification record for an entry whose numbers were all found
             </summary>
             <param name="verifiedOn">Verification date</param>
             <param name="evidence">Local evidence file name (declared in files[]), null for a live verification</param>
+            <param name="derived">Derived properties of the entry, not taken from the source</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ContentNumbers(System.String)">
             <summary>
@@ -1685,10 +1768,25 @@
             (nines only, see <see cref="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)"/>) carry no information
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.ContentNumbers(System.String,System.Collections.Generic.IReadOnlyCollection{System.String},System.Int32@)">
+            <summary>
+            Numbers of an entry content without the numbers of the derived properties; a number that is also
+            in a property that is not derived remains
+            </summary>
+            <param name="content">Entry content</param>
+            <param name="derived">Property paths of the derived properties</param>
+            <param name="derivedNumbers">Numbers of the derived properties</param>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Sample(System.Collections.Generic.List{System.Decimal},System.Int32)">
             <summary>
             Deterministic sample of sorted numbers: all numbers up to the maximum, otherwise numbers evenly
             distributed over the whole range, including the smallest and the largest
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Collect(System.Text.Json.JsonElement,System.Collections.Generic.HashSet{System.Decimal},System.String,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.HashSet{System.Decimal})">
+            <summary>
+            Collect the numbers of a JSON element; the numbers of a derived property go to <paramref name="derivedNumbers"/>.
+            The property path runs over objects only (null below an array: no derived property).
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.IsPlaceholder(System.Decimal)">
@@ -1715,7 +1813,7 @@
             Verify one entry against the document of its single source
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion})">
             <summary>
             Verify one entry against the documents of its sources: a number is found when any readable
             document holds it. With a source quote, the numbers must be in the section that holds the quote.
@@ -1723,6 +1821,8 @@
             <param name="entry">Lex entry</param>
             <param name="sources">Source URL and document, in the order of the entry source URLs</param>
             <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
+            <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
+            exclusion of the entry are not looked up</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
             <summary>
@@ -1893,6 +1993,12 @@
         <member name="P:PayrollEngine.Lex.Verification.ReviewedOn">
             <summary>
             Review date in YYYY-MM-DD format (sources with four-eyes review)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Verification.Derived">
+            <summary>
+            Properties of the entry that are derived from other values and not taken from the source
+            (auto mode only, exclusion kind derived)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Verification.HashInput">

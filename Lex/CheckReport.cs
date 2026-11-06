@@ -35,7 +35,7 @@ public static class CheckReport
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrls;MissingSourceLocation;" +
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
-                       "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified");
+                       "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -44,7 +44,7 @@ public static class CheckReport
                 r.MissingSourceUrls, r.MissingSourceLocation, r.MissingLegalReference, r.ValidationErrors.Count,
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
-                r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified));
+                r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified, r.ExcludedDerived));
         }
         return csv.ToString();
     }
@@ -98,6 +98,7 @@ public static class CheckReport
         }
         text.AppendLine($"| Excluded (documented): without lex entry | {results.Sum(r => (long)r.ExcludedCoverage)} |");
         text.AppendLine($"| Excluded (documented): without sourceLocation | {results.Sum(r => (long)r.ExcludedSourceLocation)} |");
+        text.AppendLine($"| Excluded (documented): derived properties | {results.Sum(r => (long)r.ExcludedDerived)} |");
         text.AppendLine();
         text.AppendLine("A value difference is a candidate: numbers are compared numerically, text ignoring case. " +
                         "Check each candidate against the source. Freshness of the snapshot is checked by `LexVerify`.");
@@ -164,7 +165,8 @@ public static class CheckReport
             {
                 text.AppendLine();
                 text.AppendLine($"### {r.Satellite} ({r.ExcludedCoverage} values, {r.ExcludedSourceLocation} entries without location, " +
-                                $"{r.ExcludedOrphans} entries without value, {r.ExcludedAutoVerification} entries excluded from auto verification)");
+                                $"{r.ExcludedOrphans} entries without value, {r.ExcludedAutoVerification} entries excluded from auto verification, " +
+                                $"{r.ExcludedDerived} derived properties)");
                 text.AppendLine();
                 foreach (var note in r.ExclusionNotes) text.AppendLine($"- {note}");
             }

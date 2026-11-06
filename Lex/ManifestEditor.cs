@@ -81,7 +81,8 @@ public sealed class ManifestEditor
 
     /// <summary>
     /// Set the automatic verification record of an entry. A manual verification is never replaced;
-    /// an automatic one only when method or evidence change, so that a repeated run leaves the snapshot valid.
+    /// an automatic one only when method, evidence or derived properties change, so that a repeated run leaves
+    /// the snapshot valid.
     /// </summary>
     /// <param name="key">Entry key</param>
     /// <param name="verification">Automatic verification record</param>
@@ -99,9 +100,11 @@ public sealed class ManifestEditor
         }
         if (entry["verification"] is JsonObject existing)
         {
+            var derived = (existing["derived"] as JsonArray)?.Select(x => x?.GetValue<string>()).ToList() ?? [];
             if (existing["mode"]?.GetValue<string>() != Verification.ModeAuto ||
                 (existing["method"]?.GetValue<string>() == verification.Method &&
-                 existing["evidence"]?.GetValue<string>() == verification.Evidence))
+                 existing["evidence"]?.GetValue<string>() == verification.Evidence &&
+                 derived.SequenceEqual(verification.Derived ?? [], StringComparer.Ordinal)))
             {
                 return false;
             }

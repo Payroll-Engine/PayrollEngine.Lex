@@ -93,6 +93,12 @@ public sealed class SourceResult
     /// <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
     public string ExcludedReason { get; internal set; }
 
+    /// <summary>Derived properties of the entry (exclusion kind derived); their numbers are not looked up</summary>
+    public List<DerivedValue> Derived { get; internal init; } = [];
+
+    /// <summary>Hint for the review of the result, e.g. all numbers of the entry are derived</summary>
+    public string Note { get; internal init; }
+
     /// <summary>The source location and the automatic verification record may be written</summary>
     public bool CanWrite => Match == SourceMatch.Found && ExcludedReason == null;
 }
@@ -115,6 +121,9 @@ public static class SourceVerifier
     /// <summary>A single number that occurs in more sections is weak evidence</summary>
     private const int WeakSections = 3;
 
+    /// <summary>Note of an entry whose numbers are all derived</summary>
+    internal const string AllDerivedNote = "all numbers derived: confirm with LexAttest";
+
     /// <summary>
     /// Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
     /// </summary>
@@ -126,20 +135,37 @@ public static class SourceVerifier
     /// </summary>
     /// <param name="verifiedOn">Verification date</param>
     /// <param name="evidence">Local evidence file name (declared in files[]), null for a live verification</param>
-    public static Verification AutoVerification(DateOnly verifiedOn, string evidence) => new()
+    /// <param name="derived">Derived properties of the entry, not taken from the source</param>
+    public static Verification AutoVerification(DateOnly verifiedOn, string evidence, IEnumerable<string> derived = null)
     {
-        Mode = Verification.ModeAuto,
-        VerifiedOn = verifiedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
-        Method = Method,
-        Evidence = evidence
-    };
+        var properties = derived?.ToList();
+        return new()
+        {
+            Mode = Verification.ModeAuto,
+            VerifiedOn = verifiedOn.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture),
+            Method = Method,
+            Evidence = evidence,
+            Derived = properties is { Count: > 0 } ? properties : null
+        };
+    }
 
     /// <summary>
     /// Numbers of an entry content (scalars, object properties, array items), sorted; 0, 1 and open upper bounds
     /// (nines only, see <see cref="IsPlaceholder"/>) carry no information
     /// </summary>
-    internal static List<decimal> ContentNumbers(string content)
+    internal static List<decimal> ContentNumbers(string content) =>
+        ContentNumbers(content, [], out _);
+
+    /// <summary>
+    /// Numbers of an entry content without the numbers of the derived properties; a number that is also
+    /// in a property that is not derived remains
+    /// </summary>
+    /// <param name="content">Entry content</param>
+    /// <param name="derived">Property paths of the derived properties</param>
+    /// <param name="derivedNumbers">Numbers of the derived properties</param>
+    private static List<decimal> ContentNumbers(string content, IReadOnlyCollection<string> derived, out int derivedNumbers)
     {
+        derivedNumbers = 0;
         var numbers = new HashSet<decimal>();
         if (string.IsNullOrWhiteSpace(content))
         {
@@ -148,7 +174,17 @@ public static class SourceVerifier
         try
         {
             using var document = JsonDocument.Parse(content);
-            Collect(document.RootElement, numbers);
+            if (derived.Count == 0)
+            {
+                Collect(document.RootElement, numbers);
+            }
+            else
+            {
+                var derivedValues = new HashSet<decimal>();
+                Collect(document.RootElement, numbers, string.Empty,
+                    derived.ToHashSet(StringComparer.OrdinalIgnoreCase), derivedValues);
+                derivedNumbers = derivedValues.Count;
+            }
         }
         catch (JsonException)
         {
@@ -175,7 +211,12 @@ public static class SourceVerifier
         return sample;
     }
 
-    private static void Collect(JsonElement element, HashSet<decimal> numbers)
+    /// <summary>
+    /// Collect the numbers of a JSON element; the numbers of a derived property go to <paramref name="derivedNumbers"/>.
+    /// The property path runs over objects only (null below an array: no derived property).
+    /// </summary>
+    private static void Collect(JsonElement element, HashSet<decimal> numbers, string path = null,
+        HashSet<string> derived = null, HashSet<decimal> derivedNumbers = null)
     {
         switch (element.ValueKind)
         {
@@ -186,7 +227,16 @@ public static class SourceVerifier
                 Add(numbers, element.GetString());
                 break;
             case JsonValueKind.Object:
-                foreach (var property in element.EnumerateObject()) Collect(property.Value, numbers);
+                foreach (var property in element.EnumerateObject())
+                {
+                    var propertyPath = path == null ? null : path.Length == 0 ? property.Name : path + "." + property.Name;
+                    if (propertyPath != null && derived != null && derived.Contains(propertyPath))
+                    {
+                        Collect(property.Value, derivedNumbers);
+                        continue;
+                    }
+                    Collect(property.Value, numbers, propertyPath, derived, derivedNumbers);
+                }
                 break;
             case JsonValueKind.Array:
                 foreach (var item in element.EnumerateArray()) Collect(item, numbers);
@@ -282,10 +332,14 @@ public static class SourceVerifier
     /// <param name="entry">Lex entry</param>
     /// <param name="sources">Source URL and document, in the order of the entry source URLs</param>
     /// <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
+    /// <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
+    /// exclusion of the entry are not looked up</param>
     public static SourceResult Verify(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources,
-        string content = null)
+        string content = null, IReadOnlyList<Exclusion> exclusions = null)
     {
         var urls = entry.Urls.ToList();
+        content ??= entry.Content;
+        var derived = DerivedProperties.Values(entry.Key, content, exclusions);
         var readable = sources.Where(s => s.Document.State == SourceState.Readable).ToList();
         var failed = sources.Where(s => s.Document.State != SourceState.Readable).ToList();
         var reason = sources.Count == 1
@@ -296,12 +350,12 @@ public static class SourceVerifier
         {
             return new SourceResult
             {
-                Key = entry.Key, Urls = urls, Reason = reason,
+                Key = entry.Key, Urls = urls, Reason = reason, Derived = derived,
                 Match = failed.All(s => s.Document.State == SourceState.Missing) ? SourceMatch.NoEvidence : SourceMatch.Unreadable
             };
         }
 
-        var allNumbers = ContentNumbers(content ?? entry.Content);
+        var allNumbers = ContentNumbers(content, derived.Select(x => x.Property).ToList(), out var derivedNumbers);
         var numbers = Sample(allNumbers);
         var percent = AllowsPercent(entry.Unit);
         var quote = string.IsNullOrWhiteSpace(entry.SourceQuote) ? null : entry.SourceQuote;
@@ -314,7 +368,8 @@ public static class SourceVerifier
             Key = entry.Key, Urls = urls, Match = match, NumbersTotal = numbers.Count, ContentNumbers = allNumbers.Count,
             NumbersFound = found?.Count ?? 0,
             Missing = found == null ? [] : numbers.Except(found).Select(n => n.ToString(CultureInfo.InvariantCulture)).ToList(),
-            Location = location, Reason = reason, Ambiguity = ambiguity, Quote = quote
+            Location = location, Reason = reason, Ambiguity = ambiguity, Quote = quote, Derived = derived,
+            Note = match == SourceMatch.NoNumbers && derivedNumbers > 0 ? AllDerivedNote : null
         };
 
         if (quote != null)
@@ -487,6 +542,7 @@ public static class SourceVerifier
     {
         documents ??= new Dictionary<string, SourceDocument>(StringComparer.Ordinal);
         var exclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindAutoVerification).ToList();
+        var keys = DerivedProperties.Keys(manifest);
         var results = new List<SourceResult>();
         foreach (var entry in manifest.Values)
         {
@@ -534,7 +590,7 @@ public static class SourceVerifier
                     }
                     sources.Add((url, document));
                 }
-                result = Verify(entry, sources, content);
+                result = Verify(entry, sources, content, DerivedProperties.Of(entry.Key, manifest.Exclusions, keys));
             }
             result.Evidence = evidence;
             result.ExcludedReason = exclusions.FirstOrDefault(x => x.Matches(entry.Key))?.Reason;
