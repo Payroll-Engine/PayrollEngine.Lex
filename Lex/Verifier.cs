@@ -57,6 +57,10 @@ public static class Verifier
             {
                 errors.Add($"Value '{value.Key}': sourceQuote differs from the snapshot");
             }
+            if (value.ReferenceYear != snapValue.ReferenceYear)
+            {
+                errors.Add($"Value '{value.Key}': referenceYear differs from the snapshot");
+            }
             VerifyVerification(errors, value, snapValue, snapshot);
         }
         foreach (var key in snapshotValues.Keys.Where(k => !manifestKeys.Contains(k)))
@@ -165,6 +169,7 @@ public static class Verifier
             }
 
             input.Append(value.QuoteHashInput());
+            input.Append(value.ReferenceYearHashInput());
             if (value.Verification != null)
             {
                 input.Append(value.Verification.HashInput());

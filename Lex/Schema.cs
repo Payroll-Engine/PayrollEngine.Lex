@@ -90,7 +90,7 @@ public static class Schema
                 "reason": {
                   "type": "string",
                   "description": "Mandatory justification for the exclusion; derived: formula and legal reference; notApplicable: why the rule does not apply",
-                  "examples": ["5% of BaseRate (0.06), Example Act s. 12(2)", "TX: no state disability insurance program"]
+                  "examples": ["5% of BaseRate (0.05), Example Act s. 12(2)", "XX: no disability insurance program"]
                 }
               }
             },
@@ -175,7 +175,7 @@ public static class Schema
                   "items": {
                     "type": "string"
                   },
-                  "examples": [["CreditReduction"]]
+                  "examples": [["Levy"]]
                 }
               },
               "dependentRequired": {
@@ -238,6 +238,13 @@ public static class Schema
                   "type": "string",
                   "minLength": 1,
                   "description": "Verbatim quote from the source that holds the value. LexVerifySource looks up the numbers of the value in the section of the quote; numbers in words within the quote count (e.g. 'one and one-half times')."
+                },
+                "referenceYear": {
+                  "type": "integer",
+                  "minimum": 1990,
+                  "maximum": 2100,
+                  "description": "Year the value belongs to legally when it differs from the cycle of the manifest (e.g. a surcharge for 2025 in the 2026 satellite). Replaces the validFrom year in the year context of LexVerifySource and for the year of the sourceQuote; LexCheck lists entries with another year as information.",
+                  "examples": [2025]
                 },
                 "legalReference": {
                   "type": "string",

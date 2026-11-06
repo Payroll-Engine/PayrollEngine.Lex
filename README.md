@@ -53,13 +53,31 @@ entry: the numbers must be in the section of the quote (`Found`), otherwise in t
 the source gives `QuoteNotFound`.
 
 Sources often hold tables over several years, so a number of another year may be "found". With the year of the
-manifest `validFrom`, a section is **multi-year** when it holds this year and at least one other year (four digits,
-1990–2100, not part of a longer number, an amount or a percentage). A number found only in multi-year sections
-rates the entry `Ambiguous` with `multi-year section: add sourceQuote with the year`; for a bundle the reason lists
-the affected numbers, e.g. `(0.0027, 152700)`. A `sourceQuote` that holds the year (`2025: employee rate 0.19%`)
-anchors the value; a quote without the year does not. Years of a legal source reference are ignored: directly
-after `Rev. Proc.`, `Notice`, `Pub.` or `Rev.` (also `Rev. 12-2025`), in a document number with hyphen (`2024-40`,
-also ISO dates and short ranges like `2025-26`) and in parentheses after a statute reference (`SB 951 (2022)`).
+entry — its `referenceYear`, otherwise the year of the manifest `validFrom` — each hit of a number is rated by the
+**closest year** in the text: the nearest four-digit year (1990–2100, not part of a longer number, an amount or a
+percentage) within 120 characters before or after the hit, considering only the years from the entry year minus 3
+to plus 1. An enumeration or range of years counts as one year group: `2024, 2025, or 2026`, `2024 and 2025`,
+`2024-2026`, `2024 through 2026`. A hit is
+
+- **positive** when the closest year (group) holds the entry year (at the same distance this group wins),
+- **weak** when the closest year is another year (`$52,400 in 2024` for validFrom 2025),
+- **neutral** without a year in the window; other years elsewhere on the page (`forms filed for 2019 or earlier`)
+  do not matter. A validity start up to the entry year is neutral too, it neither weakens nor confirms:
+  `effective January 1, 2025`, `beginning on or after January 1, 2025`, `2025 and after`.
+
+A number with a weak and without a positive hit rates the entry `Ambiguous` with
+`multi-year section: add sourceQuote with the year` — a neutral hit does not confirm it, a value of a wrong year
+is the greater risk. For a bundle the reason lists the affected numbers, e.g. `(0.0031, 148200)`. With a
+`sourceQuote` only the quote is rated: a quote with the entry year or a year group holding it
+(`2025: employee rate 0.19%`) or without any year (statute text) anchors the value, a quote whose number stands
+next to another year is year-weak. A four-digit number within a number row is no year: another number within
+12 characters on both sides without a word, colon or parenthesis in between (wage bracket table
+`1965 1995 32.50`), as is a number after a currency sign (`$ 2025`). A value that legally belongs to another year than the cycle (a
+surcharge `for 2025` in the 2026 satellite) sets `referenceYear` (e.g. `2025`): it replaces the validFrom year in
+the year rating and for the quote, and `LexCheck` lists such entries as information. `referenceYear` is part of
+the snapshot hash and is kept by `LexRollover`. Years of a legal source reference are ignored: directly
+after `Notice`, `Pub.` or `Rev.` (also `Rev. Guide 2024`, `Rev. 12-2025`), in a document number with hyphen (`2024-40`,
+also ISO dates and short ranges like `2025-26`) and in parentheses after a statute reference (`Bill 951 (2022)`).
 Print and typesetting marks are ignored too, a date with a time (`15:14 - 3-Dec-2025`, `16:58 Oct 31, 2025`):
 a document is printed before the year it is valid for.
 
@@ -67,7 +85,7 @@ Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion
 (`Lookup.Key.Property`, formula and legal reference as reason) removes the numbers of a computed property from the
 lookup; the other numbers are verified and the `auto` record lists the property (`Verification.Derived`,
-`SourceResult.Derived`). A property of a bundle with the value 0 (the rule does not apply, e.g. `"SDIRate": 0`)
+`SourceResult.Derived`). A property of a bundle with the value 0 (the rule does not apply, e.g. `"DisabilityRate": 0`)
 holds no number to look up: `SourceResult.Zero` lists these properties. A `notApplicable` exclusion
 (`Lookup.Key.Property`, the reason says why the rule does not apply) documents such a property
 (`SourceResult.NotApplicable`); a zero property without it is listed in `SourceResult.UnjustifiedZero`, so a rate

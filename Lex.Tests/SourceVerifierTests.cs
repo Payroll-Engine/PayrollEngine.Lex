@@ -144,7 +144,7 @@ public class SourceVerifierTests
     [Theory]
     [InlineData("22", "%", "The optional flat rate is 22%.")]
     [InlineData("0.22", "mixed", "The optional flat rate is 22%.")]
-    [InlineData("0.012", "percent", "The credit reduction is 1.2% for the year.")]
+    [InlineData("0.012", "percent", "The surcharge is 1.2% for the year.")]
     [InlineData("1.5", "factor", "Extra hours at 1.5 the base rate.")]
     [InlineData("50", null, "Maximum 50 hours.")]
     public void ShortSingleNumber_IsAmbiguous(string content, string unit, string text)
@@ -255,23 +255,104 @@ public class SourceVerifierTests
     [Fact]
     public void MultiYearTable_ValueOfOtherYear_IsAmbiguous()
     {
-        var result = SourceVerifier.Verify(Entry("{\"Rate\":0.0027,\"WageBase\":152700}", "mixed"),
+        var result = SourceVerifier.Verify(Entry("{\"Rate\":0.0031,\"WageBase\":148200}", "mixed"),
             Sections(YearTable), ValidFrom);
 
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
-        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0027, 152700)", result.Ambiguity);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0031, 148200)", result.Ambiguity);
         Assert.Null(result.Location);
         Assert.False(result.CanWrite);
     }
 
     [Fact]
+    public void MultiYearTable_ValueOfValidYear_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("{\"Rate\":0.0019,\"WageBase\":157300}", "mixed"), Sections(YearTable), ValidFrom).Match);
+
+    [Fact]
     public void MultiYearTable_SingleNumber_IsAmbiguous()
     {
-        var result = SourceVerifier.Verify(Entry("152700"), Sections(YearTable), ValidFrom);
+        var result = SourceVerifier.Verify(Entry("0.0027"), Sections(YearTable), ValidFrom);
 
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
         Assert.Equal(SourceVerifier.MultiYearAmbiguity, result.Ambiguity);
     }
+
+    [Fact]
+    public void ValueNextToOtherYear_IsAmbiguous()
+    {
+        const string text = "The wage base increases to $54,800 in 2025 from $52,400 in 2024.";
+
+        Assert.Equal(SourceMatch.Found, SourceVerifier.Verify(Entry("54800"), Sections(text), ValidFrom).Match);
+        var previous = SourceVerifier.Verify(Entry("52400"), Sections(text), ValidFrom);
+        Assert.Equal(SourceMatch.Ambiguous, previous.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity, previous.Ambiguity);
+    }
+
+    [Fact]
+    public void TableRowWithOtherYearPeriod_IsAmbiguous()
+    {
+        var result = SourceVerifier.Verify(Entry("0.0007"),
+            Sections("0.000615 0.0000 0.000315 0.0007 January 1, 2024 to December 31, 2024"), ValidFrom);
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity, result.Ambiguity);
+    }
+
+    [Theory]
+    [InlineData(true, SourceMatch.Found)]
+    [InlineData(false, SourceMatch.Ambiguous)]
+    public void OtherYearFarFromValue_IsIgnored(bool far, SourceMatch expected)
+    {
+        var text = "Use this table with forms filed for 2019 or earlier. " +
+                   (far ? string.Concat(Enumerable.Repeat("filler text ", 12)) : string.Empty) +
+                   "The allowance amount is $3,900.";
+
+        Assert.Equal(expected, SourceVerifier.Verify(Entry("3900"), Sections(text), "2020-01-01").Match);
+    }
+
+    [Theory]
+    [InlineData("2022", SourceMatch.Found)]
+    [InlineData("2028", SourceMatch.Found)]
+    [InlineData("2023", SourceMatch.Ambiguous)]
+    [InlineData("2027", SourceMatch.Ambiguous)]
+    public void YearOutsideRange_IsIgnored(string year, SourceMatch expected) =>
+        Assert.Equal(expected,
+            SourceVerifier.Verify(Entry("8600"), Sections($"In {year} the limit was raised to $8,600."), "2026-01-01").Match);
+
+    [Fact]
+    public void NeutralHit_DoesNotConfirmWeakHit() =>
+        Assert.Equal(SourceMatch.Ambiguous,
+            SourceVerifier.Verify(Entry("52400"),
+                Sections("2024 Taxable Wage Base: $52,400", "Taxable Wage Base | $52,400 | $54,800"), ValidFrom).Match);
+
+    [Fact]
+    public void OnlyNeutralHits_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("52400"), Sections("Taxable Wage Base | $52,400 | $54,800"), ValidFrom).Match);
+
+    [Fact]
+    public void PositiveHit_ConfirmsWeakHit() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("52400"),
+                Sections("2024 Taxable Wage Base: $52,400", "2025 Taxable Wage Base: $52,400"), ValidFrom).Match);
+
+    [Theory]
+    [InlineData("Semimonthly $490.83 $736.25 $981.67 | Status Reported on 2024, 2025, or 2026 forms", SourceMatch.Found)]
+    [InlineData("Rates for 2025 and 2026: semimonthly $736.25", SourceMatch.Found)]
+    [InlineData("Valid 2024-2026: semimonthly $736.25", SourceMatch.Found)]
+    [InlineData("Valid 2024 through 2026: semimonthly $736.25", SourceMatch.Found)]
+    [InlineData("Valid 2023 through 2025: semimonthly $736.25", SourceMatch.Ambiguous)]
+    [InlineData("Semimonthly $736.25 | Reported on 2024, 2025, or 2027 forms", SourceMatch.Ambiguous)]
+    public void YearGroup_WithValidYear_IsPositive(string text, SourceMatch expected) =>
+        Assert.Equal(expected, SourceVerifier.Verify(Entry("736.25"), Sections(text), "2026-01-01").Match);
+
+    [Theory]
+    [InlineData("Reported on 2024, 2025, or 2026 forms", new[] { 2024, 2025, 2026 })]
+    [InlineData("Valid 2024 through 2026", new[] { 2024, 2025, 2026 })]
+    [InlineData("Valid 2024\u20132026", new[] { 2024, 2025, 2026 })]
+    public void YearHits_GroupEnumerationAndRange(string text, int[] expected) =>
+        Assert.Equal(expected, Assert.Single(SourceVerifier.YearHits(text)).Years);
 
     [Fact]
     public void MultiYearTable_WithoutValidFrom_IsFound() =>
@@ -292,39 +373,119 @@ public class SourceVerifierTests
     }
 
     [Fact]
-    public void MultiYearTable_QuoteWithoutYear_IsAmbiguous()
+    public void MultiYearTable_QuoteWithoutYear_IsFound()
     {
         var result = SourceVerifier.Verify(
-            Quoted("{\"Rate\":0.0019,\"WageBase\":157300}", "employee rate 0.19%, wage base $157,300"),
+            Quoted("{\"Rate\":0.0031,\"WageBase\":148200}", "employee rate 0.31%, wage base $148,200"),
             Sections(YearTable), ValidFrom);
 
-        Assert.Equal(SourceMatch.Ambiguous, result.Match);
-        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0019, 157300)", result.Ambiguity);
-        Assert.False(result.CanWrite);
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.True(result.CanWrite);
     }
 
     [Fact]
-    public void NumberAlsoInSingleYearSection_IsFound() =>
+    public void MultiYearTable_QuoteWithOtherYear_IsAmbiguous()
+    {
+        var result = SourceVerifier.Verify(
+            Quoted("{\"Rate\":0.0031,\"WageBase\":148200}", "2023: employee rate 0.31%, wage base $148,200"),
+            Sections(YearTable), ValidFrom);
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0031, 148200)", result.Ambiguity);
+        Assert.False(result.CanWrite);
+    }
+
+    [Theory]
+    [InlineData("2024 and 2025: employee rate 0.31%, wage base $148,200")]
+    [InlineData("2023 through 2025: employee rate 0.31%, wage base $148,200")]
+    [InlineData("for 2023 and later years. Rate for 2025: employee rate 0.31%, wage base $148,200")]
+    public void Quote_WithValidYearOrGroup_IsFound(string quote) =>
         Assert.Equal(SourceMatch.Found,
-            SourceVerifier.Verify(Entry("157300"), Sections(YearTable, "Wage base 2025: $157,300"), ValidFrom).Match);
+            SourceVerifier.Verify(Quoted("{\"Rate\":0.0031,\"WageBase\":148200}", quote),
+                Sections("Contribution rates. " + quote + " Rates for 2023 and 2024 see archive."), ValidFrom).Match);
+
+    [Fact]
+    public void Quote_OnlyQuoteRated_SectionYearsIgnored() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Quoted("6400", "shall not exceed $6,400 ($3,200 in the case of a separate return"),
+                Sections("(A) In general. The amount shall not exceed $6,400 ($3,200 in the case of a separate return). " +
+                         "Amendments 2025—Act 12 substituted $6,400 ($3,200 for $4,800 ($2,400."),
+                "2026-01-01").Match);
+
+    // number rows -------------------------------------------------------------
+
+    private const string WageBrackets =
+        "Wages at least But less than 0 1 2 3\n" +
+        "1935 1965 31.40 25.90 20.30 14.80 10.65 4.15 0.90\n" +
+        "1965 1995 32.50 27.00 21.40 15.90 11.20 4.60 1.30\n" +
+        "1995 2025 33.60 28.10 22.50 17.00 11.75 5.05 1.70\n" +
+        "2025 2055 34.70 29.20 23.60 18.10 12.30 5.50 3.80\n";
+
+    [Fact]
+    public void NumberRow_AmountsAreNoYears() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("{\"A\":3.80,\"B\":10.65}", "mixed"), Sections(WageBrackets), "2026-01-01").Match);
+
+    [Theory]
+    [InlineData("1995 2025 33.60", new[] { 1995 })]
+    [InlineData("1.70 - - - -\n2025 2055 34.70", new int[0])]
+    [InlineData("Rates for 2024, 2025, 2026", new[] { 2024, 2025, 2026 })]
+    [InlineData("$ 2025 wage", new int[0])]
+    [InlineData("Rates 2025 0.0016 0.0007", new[] { 2025 })]
+    [InlineData("0.0016 0.0007\n2025 rates", new[] { 2025 })]
+    [InlineData("January 1, 2025 to December 31, 2025", new[] { 2025 })]
+    [InlineData("Reported on 2024, 2025, or 2026 forms", new[] { 2024, 2025, 2026 })]
+    public void Years_NumberRow(string text, int[] expected) =>
+        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
+    // validity ----------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Rate Table Effective January 1, 2025 | Income Between | $0 – $2,400 | $2,400 – $4,600")]
+    [InlineData("Effective 2025: brackets $2,400 and $4,600")]
+    [InlineData("For tax years beginning on or after January 1, 2025, the brackets are $2,400 and $4,600")]
+    [InlineData("(for tax year 2025 and after) Formula: wage - [$2,400 + (allowances x $4,600)]")]
+    public void Validity_UpToValidYear_IsNeutral(string text) =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("{\"A\":2400,\"B\":4600}", "mixed"), Sections(text), "2026-01-01").Match);
+
+    [Fact]
+    public void Validity_AfterValidYear_IsWeak() =>
+        Assert.Equal(SourceMatch.Ambiguous,
+            SourceVerifier.Verify(Entry("{\"A\":2400,\"B\":4600}", "mixed"),
+                Sections("Effective January 1, 2027 the brackets are $2,400 and $4,600"), "2026-01-01").Match);
+
+    [Fact]
+    public void Validity_IsNoPositiveEvidence() =>
+        Assert.Equal(SourceMatch.Ambiguous,
+            SourceVerifier.Verify(Entry("{\"A\":2400,\"B\":4600}", "mixed"),
+                Sections("Effective January 1, 2026 the brackets are $2,400 and $4,600",
+                         "Legislation of the 2025 session sets the brackets $2,400 and $4,600"), "2026-01-01").Match);
+
+    [Fact]
+    public void NumberAlsoNextToValidYear_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("148200"), Sections(YearTable, "Wage base 2025: $148,200"), ValidFrom).Match);
 
     [Fact]
     public void SectionWithReferenceYear_IsNotMultiYear()
     {
-        var result = SourceVerifier.Verify(Entry("24750"),
-            Sections("Rev. Proc. 2024-40 sets the deferral limit for 2025 at $24,750."), ValidFrom);
+        var result = SourceVerifier.Verify(Entry("21600"),
+            Sections("Circular 2024-40 sets the savings limit for 2025 at $21,600."), ValidFrom);
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Null(result.Ambiguity);
     }
 
     [Theory]
-    [InlineData("Rev. Proc. 2024-40 sets the limit for 2025", new[] { 2025 })]
+    [InlineData("Circular 2024-40 sets the limit for 2025", new[] { 2025 })]
+    [InlineData("Rev. Guide 2024 sets the limit for 2025", new[] { 2025 })]
     [InlineData("Notice 2023-34 applies in 2025", new[] { 2025 })]
     [InlineData("see Pub. 2024 for the 2025 table", new[] { 2025 })]
     [InlineData("Rev. 2024 of the 2025 guide", new[] { 2025 })]
-    [InlineData("SB 951 (2022) sets the 2025 rate", new[] { 2025 })]
-    [InlineData("P.L. 115-97 (2017) applies in 2025", new[] { 2025 })]
+    [InlineData("Bill 951 (2022) sets the 2025 rate", new[] { 2025 })]
+    [InlineData("L. 15-97 (2017) applies in 2025", new[] { 2025 })]
+    [InlineData("§ 12 (2017) applies in 2025", new[] { 2025 })]
     [InlineData("Document 2024-40, rate for 2025", new[] { 2025 })]
     [InlineData("Updated 2024-12-01: rate for 2025", new[] { 2025 })]
     [InlineData("Guide (Rev. 12- 2024) for 2025", new[] { 2025 })]

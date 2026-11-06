@@ -6,12 +6,12 @@ public class DerivedTests
 {
     private const string Url = "https://example.org/fees.pdf";
     private const string Key = "Fees.2026";
-    private const string Pattern = "Fees.2026.CreditReduction";
-    private const string Reason = "5% of BaseRate (0.06), Example Act s. 12(2)";
+    private const string Pattern = "Fees.2026.Levy";
+    private const string Reason = "5% of BaseRate (0.05), Example Act s. 12(2)";
 
-    private const string Bundle = "{\"WageBase\":7000,\"BaseRate\":0.06,\"NormalCredit\":0.054,\"CreditReduction\":0.003}";
+    private const string Bundle = "{\"WageBase\":8000,\"BaseRate\":0.05,\"StandardRebate\":0.042,\"Levy\":0.0025}";
 
-    private const string SourceText = "The tax rate is 6.0% of the first $7,000 of wages. The normal credit is 5.4%.";
+    private const string SourceText = "The contribution rate is 5.0% of the first $8,000 of wages. The standard rebate is 4.2%.";
 
     private static Entry Entry(string content = Bundle) => new()
     {
@@ -44,8 +44,8 @@ public class DerivedTests
         Assert.Equal(3, result.NumbersTotal);
         Assert.True(result.CanWrite);
         var derived = Assert.Single(result.Derived);
-        Assert.Equal("CreditReduction", derived.Property);
-        Assert.Equal("0.003", derived.Value);
+        Assert.Equal("Levy", derived.Property);
+        Assert.Equal("0.0025", derived.Value);
         Assert.Equal(Reason, derived.Reason);
     }
 
@@ -55,13 +55,13 @@ public class DerivedTests
         var result = Verify(Entry(), SourceText);
 
         Assert.Equal(SourceMatch.Partial, result.Match);
-        Assert.Contains("0.003", result.Missing);
+        Assert.Contains("0.0025", result.Missing);
     }
 
     [Fact]
     public void AllNumbersDerived_IsNoNumbersWithNote()
     {
-        var result = Verify(Entry("{\"CreditReduction\":0.003}"), SourceText, Derived());
+        var result = Verify(Entry("{\"Levy\":0.0025}"), SourceText, Derived());
 
         Assert.Equal(SourceMatch.NoNumbers, result.Match);
         Assert.Equal("all numbers derived: confirm with LexAttest", result.Note);
@@ -71,28 +71,28 @@ public class DerivedTests
     [Fact]
     public void NumberAlsoInPropertyNotDerived_IsLookedUp()
     {
-        var result = Verify(Entry("{\"WageBase\":7000,\"Surcharge\":0.003,\"CreditReduction\":0.003}"), SourceText, Derived());
+        var result = Verify(Entry("{\"WageBase\":8000,\"Surcharge\":0.0025,\"Levy\":0.0025}"), SourceText, Derived());
 
         Assert.Equal(SourceMatch.Partial, result.Match);
-        Assert.Contains("0.003", result.Missing);
+        Assert.Contains("0.0025", result.Missing);
         Assert.Single(result.Derived);
     }
 
     [Fact]
     public void NestedDerivedProperty_IsNotLookedUp()
     {
-        var content = "{\"WageBase\":7000,\"Credit\":{\"Normal\":0.054,\"Reduction\":0.003}}";
+        var content = "{\"WageBase\":8000,\"Rebate\":{\"Standard\":0.042,\"Levy\":0.0025}}";
 
-        var result = Verify(Entry(content), SourceText, Derived("Fees.2026.Credit.Reduction"));
+        var result = Verify(Entry(content), SourceText, Derived("Fees.2026.Rebate.Levy"));
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("Credit.Reduction", Assert.Single(result.Derived).Property);
+        Assert.Equal("Rebate.Levy", Assert.Single(result.Derived).Property);
     }
 
     [Fact]
     public void DerivedExclusionOfOtherEntry_IsIgnored()
     {
-        var result = Verify(Entry(), SourceText, Derived("Other.2026.CreditReduction"));
+        var result = Verify(Entry(), SourceText, Derived("Other.2026.Levy"));
 
         Assert.Equal(SourceMatch.Partial, result.Match);
         Assert.Empty(result.Derived);
@@ -118,7 +118,7 @@ public class DerivedTests
         var result = Assert.Single(await SourceVerifier.VerifyManifest(manifest, s.LexDirectory));
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("CreditReduction", Assert.Single(result.Derived).Property);
+        Assert.Equal("Levy", Assert.Single(result.Derived).Property);
     }
 
     // verification record ------------------------------------------------------
@@ -131,7 +131,7 @@ public class DerivedTests
         var verification = SourceVerifier.AutoVerification(new DateOnly(2026, 11, 6), "fees.html",
             result.Derived.Select(x => x.Property));
 
-        Assert.Equal(["CreditReduction"], verification.Derived);
+        Assert.Equal(["Levy"], verification.Derived);
     }
 
     [Fact]
@@ -142,10 +142,10 @@ public class DerivedTests
     public void HashInput_IncludesDerived()
     {
         var plain = SourceVerifier.AutoVerification(new DateOnly(2026, 11, 6), "fees.html");
-        var derived = SourceVerifier.AutoVerification(new DateOnly(2026, 11, 6), "fees.html", ["CreditReduction"]);
+        var derived = SourceVerifier.AutoVerification(new DateOnly(2026, 11, 6), "fees.html", ["Levy"]);
 
         Assert.DoesNotContain("derived", plain.HashInput());
-        Assert.EndsWith("|derived:CreditReduction", derived.HashInput());
+        Assert.EndsWith("|derived:Levy", derived.HashInput());
         Assert.False(plain.SameAs(derived));
     }
 
@@ -161,7 +161,7 @@ public class DerivedTests
 
         var plain = await s.WriteSnapshot(TestSatellite.Manifest(Verified(SourceVerifier.AutoVerification(date, null))));
         var derived = await s.WriteSnapshot(TestSatellite.Manifest(
-            Verified(SourceVerifier.AutoVerification(date, null, ["CreditReduction"]))));
+            Verified(SourceVerifier.AutoVerification(date, null, ["Levy"]))));
 
         Assert.NotEqual(plain.SourceHash, derived.SourceHash);
     }
@@ -172,9 +172,9 @@ public class DerivedTests
         var editor = ManifestEditor.Parse("{ \"values\": [ { \"key\": \"Fees.2026\", \"content\": \"1\" } ] }");
         var date = new DateOnly(2026, 11, 6);
 
-        Assert.True(editor.SetAutoVerification(Key, SourceVerifier.AutoVerification(date, "fees.html", ["CreditReduction"])));
+        Assert.True(editor.SetAutoVerification(Key, SourceVerifier.AutoVerification(date, "fees.html", ["Levy"])));
         Assert.Contains("\"derived\"", editor.ToJson());
-        Assert.False(editor.SetAutoVerification(Key, SourceVerifier.AutoVerification(date, "fees.html", ["CreditReduction"])));
+        Assert.False(editor.SetAutoVerification(Key, SourceVerifier.AutoVerification(date, "fees.html", ["Levy"])));
         Assert.True(editor.SetAutoVerification(Key, SourceVerifier.AutoVerification(date, "fees.html")));
         Assert.DoesNotContain("\"derived\"", editor.ToJson());
     }
@@ -216,7 +216,7 @@ public class DerivedTests
             Verification = new Verification
             {
                 Mode = Verification.ModeManual, VerifiedOn = "2026-11-06", VerifiedBy = "Jane Doe", Evidence = "fees.pdf",
-                Derived = ["CreditReduction"]
+                Derived = ["Levy"]
             }
         });
         manifest.Files.Add(new EvidenceFile { FileName = "fees.pdf" });
@@ -231,7 +231,7 @@ public class DerivedTests
         using var s = new TestSatellite();
         s.WriteRegulation("""
             [ { "name": "Fees", "values": [ { "key": "2026",
-              "value": "{\"WageBase\":7000,\"BaseRate\":0.06,\"NormalCredit\":0.054,\"CreditReduction\":0.003}" } ] } ]
+              "value": "{\"WageBase\":8000,\"BaseRate\":0.05,\"StandardRebate\":0.042,\"Levy\":0.0025}" } ] } ]
             """);
         var manifest = TestSatellite.Manifest(new Entry
         {
@@ -251,21 +251,21 @@ public class DerivedTests
         Assert.Equal(1, result.ExcludedDerived);
         Assert.Contains($"derived `{Pattern}`: {Reason}", result.ExclusionNotes);
         Assert.Contains("1 derived properties", CheckReport.BuildMarkdown([result]));
-        Assert.EndsWith(";1;0;0", CheckReport.BuildCsv([result]).Split('\n')[1].TrimEnd('\r'));
+        Assert.EndsWith(";1;0;0;0", CheckReport.BuildCsv([result]).Split('\n')[1].TrimEnd('\r'));
     }
 
     [Fact]
     public void Check_DerivedPatternOnMissingProperty_IsFinding()
     {
-        var result = Check(Derived("Fees.2026.CreditReductionPerYear"));
+        var result = Check(Derived("Fees.2026.LevyPerYear"));
 
-        Assert.Contains(result.ValidationErrors, e => e.Contains("matches no property 'CreditReductionPerYear' of entry 'Fees.2026'"));
+        Assert.Contains(result.ValidationErrors, e => e.Contains("matches no property 'LevyPerYear' of entry 'Fees.2026'"));
         Assert.Equal(0, result.ExcludedDerived);
         Assert.True(result.HasFindings);
     }
 
     [Fact]
     public void Check_DerivedPatternOnMissingEntry_IsFinding() =>
-        Assert.Contains(Check(Derived("Fees.2025.CreditReduction")).ValidationErrors,
-            e => e.Contains("'Fees.2025.CreditReduction' matches no entry"));
+        Assert.Contains(Check(Derived("Fees.2025.Levy")).ValidationErrors,
+            e => e.Contains("'Fees.2025.Levy' matches no entry"));
 }

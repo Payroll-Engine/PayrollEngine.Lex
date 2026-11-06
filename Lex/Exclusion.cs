@@ -24,7 +24,7 @@ public sealed class Exclusion
     /// LexVerifySource does not look up its numbers</summary>
     public const string KindDerived = "derived";
 
-    /// <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a state without
+    /// <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a region without
     /// disability insurance); a zero property without this exclusion is reported</summary>
     public const string KindNotApplicable = "notApplicable";
 

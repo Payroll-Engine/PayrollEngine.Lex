@@ -202,6 +202,12 @@
         <member name="P:PayrollEngine.Lex.CheckResult.UnjustifiedZeroSamples">
             <summary>Samples of bundle entries with zero properties without justification</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.OtherReferenceYear">
+            <summary>Entries with a reference year other than the validFrom year (information)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.OtherReferenceYearSamples">
+            <summary>Samples of entries with a reference year other than the validFrom year</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
@@ -317,6 +323,11 @@
             a notApplicable property must have the value 0
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Entries whose reference year differs from the validFrom year: listed as information for the review
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
             <summary>
             Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
@@ -393,7 +404,7 @@
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.DerivedValue.Property">
-            <summary>Property path within the entry content (e.g. <c>CreditReduction</c> or <c>Group.Rate</c>)</summary>
+            <summary>Property path within the entry content (e.g. <c>Levy</c> or <c>Group.Rate</c>)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.DerivedValue.Value">
             <summary>Value of the property in the entry content</summary>
@@ -520,6 +531,13 @@
             in the section of the quote
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.Entry.ReferenceYear">
+            <summary>
+            Year the value belongs to legally when it differs from the cycle of the manifest (e.g. a surcharge
+            for 2025 in the 2026 satellite, due with the annual return in January 2026); replaces the validFrom year in the year
+            context of LexVerifySource and for the year of the source quote
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Entry.LegalReference">
             <summary>
             Legal norm reference (e.g. Income Tax Act §12(1))
@@ -549,6 +567,11 @@
         <member name="M:PayrollEngine.Lex.Entry.QuoteHashInput">
             <summary>
             Canonical text of the source quote, part of the snapshot source hash (null without quote)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Entry.ReferenceYearHashInput">
+            <summary>
+            Canonical text of the reference year, part of the snapshot source hash (null without reference year)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.HasInlineContent">
@@ -708,7 +731,7 @@
             LexVerifySource does not look up its numbers</summary>
         </member>
         <member name="F:PayrollEngine.Lex.Exclusion.KindNotApplicable">
-            <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a state without
+            <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a region without
             disability insurance); a zero property without this exclusion is reported</summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Kind">
@@ -1664,6 +1687,13 @@
         <member name="P:PayrollEngine.Lex.SourceNumbers.Words">
             <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
         </member>
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Hits(System.Decimal,System.Boolean)">
+            <summary>
+            Text positions of the hits of a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
+            </summary>
+            <param name="number">Entry number</param>
+            <param name="percent">A value below 1 may be written as percentage</param>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.All">
             <summary>
             Numerals and numbers in words
@@ -1703,8 +1733,8 @@
         <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
             <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
             with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-            or is found in words only; or a number of the entry is found only in sections that hold values of several
-            years (multi-year table).
+            or is found in words only; or a number of the entry has a hit closest to another year and no hit closest
+            to the relevant year (reference year of the entry or year of validFrom; e.g. a table over several years).
             Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
@@ -1727,6 +1757,45 @@
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.NoEvidence">
             <summary>The entry has no local evidence file for any source (local verification)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.HitYear">
+            <summary>
+            Year context of a number hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Neutral">
+            <summary>No year within the window</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Positive">
+            <summary>The closest year is the relevant year, or a year group that holds it</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Weak">
+            <summary>The closest year is another year</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.YearHit">
+            <summary>
+            Year or year group (enumeration, range) of a text with its position
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            Year or year group (enumeration, range) of a text with its position
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Years">
+            <summary>Years of the hit, one year or the years of a group</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Index">
+            <summary>Text position of the first year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Length">
+            <summary>Text length up to the end of the last year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Validity">
+            <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.YearHit.Join(System.Int32,System.Int32)">
+            <summary>Group with a further year that ends at the text position</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceResult">
             <summary>
@@ -1809,7 +1878,7 @@
             <summary>A single number that occurs in more sections is weak evidence</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.MultiYearAmbiguity">
-            <summary>Ambiguity of a number found only in multi-year sections</summary>
+            <summary>Ambiguity of a year-weak number (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
             <summary>Note of an entry whose numbers are all derived</summary>
@@ -1898,8 +1967,9 @@
             <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
             <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
             exclusion of the entry are not looked up, a notApplicable exclusion justifies a zero property</param>
-            <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
-            in multi-year sections as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>), null without year context</param>
+            <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year, or the reference year of
+            the entry, rates a year-weak number as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>),
+            null without year context</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
             <summary>
@@ -1908,13 +1978,29 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean,System.Nullable{System.Int32})">
             <summary>
-            Weak year context: numbers whose hits are all in multi-year sections, null without year or when every
-            number is found in at least one section without other years
+            Weak year context: numbers with at least one year-weak hit and no positive hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>),
+            null without year or when no number is year-weak
             </summary>
+            <param name="numbers">Numbers of the entry</param>
+            <param name="sections">Sections to search</param>
+            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.QuoteYearWeakness(System.Collections.Generic.List{System.Decimal},System.String,PayrollEngine.Lex.SourceNumbers,System.Boolean,System.Int32)">
+            <summary>
+            Weak year context of a source quote, rated within the quote only: a quote with the relevant year (or a year
+            group that holds it) or without year anchors the value; a number of the quote whose closest year is another
+            year is year-weak
+            </summary>
+            <param name="numbers">Numbers of the entry</param>
+            <param name="quote">Source quote of the entry</param>
+            <param name="quoteNumbers">Numbers of the quote</param>
+            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.MultiYearReason(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{System.Decimal})">
             <summary>
-            Ambiguity of numbers found only in multi-year sections; a bundle lists the affected numbers
+            Ambiguity of year-weak numbers; a bundle lists the affected numbers
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ValidYear(System.String)">
@@ -1922,23 +2008,69 @@
             Year of a validFrom date (yyyy-MM-dd), null when the date has no year in the range of <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.YearWindow">
+            <summary>Maximum distance in characters between a number hit and the closest year</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.YearsBefore">
+            <summary>Years considered for the year context: from the relevant year minus this offset</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.YearsAfter">
+            <summary>Years considered for the year context: up to the relevant year plus this offset</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)">
+            <summary>
+            Year context of a number hit, rated by the closest year (or year group, see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)"/>) within
+            <see cref="F:PayrollEngine.Lex.SourceVerifier.YearWindow"/> characters in both directions. Only years from the relevant year minus 3 to plus 1
+            are considered; years of legal source references are ignored (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>).
+            <list type="bullet">
+            <item><see cref="F:PayrollEngine.Lex.HitYear.Positive"/>: the closest year is the relevant year, or a group that holds it
+            (at the same distance the relevant year wins)</item>
+            <item><see cref="F:PayrollEngine.Lex.HitYear.Weak"/>: the closest year is another year</item>
+            <item><see cref="F:PayrollEngine.Lex.HitYear.Neutral"/>: no year in the window, or the closest year starts a validity up to the
+            relevant year (<c>effective January 1, 2025</c>, <c>2025 and after</c>): the value may still apply</item>
+            </list>
+            A number is year-weak when at least one hit is weak and no hit is positive.
+            </summary>
+            <param name="hit">Text position of the hit</param>
+            <param name="years">Years and year groups of the text with their position (<see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)"/>)</param>
+            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)">
             <summary>
-            Years of a text, used for the year context of a section and a source quote. A year is a four-digit
+            Years of a text, used for the year context of a number hit and a source quote. A year is a four-digit
             number from 1990 to 2100 that is not part of a longer number, an amount or a percentage. Years that
             are part of a legal source reference are ignored, because they name the document, not the year of a value:
             <list type="bullet">
-            <item>directly after <c>Rev. Proc.</c>, <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c> (<c>Rev. Proc. 2024-40</c>),
-            also a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
+            <item>directly after <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c>, also with a word (<c>Rev. Guide 2024</c>)
+            or a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
             <item>in a document number with hyphen (<c>2024-40</c>); this also skips ISO dates and short year
             ranges (<c>2025-01-01</c>, <c>2025-26</c>), a range of full years (<c>2024-2025</c>) is kept</item>
-            <item>in parentheses after a statute reference (<c>SB 951 (2022)</c>, <c>P.L. 115-97 (2017)</c>)</item>
+            <item>in parentheses after a statute reference (<c>Bill 951 (2022)</c>, <c>Act 32 (2020)</c>)</item>
             <item>in a print or typesetting mark, a date with a time (<c>15:14 - 3-Dec-2025</c>,
             <c>16:58 Oct 31, 2025</c>, <c>Sep 11 2014 16:58</c>): a document is printed before the year it is valid for</item>
+            <item>in a number row, another number within 12 characters on both sides without a word, colon or
+            parenthesis in between
+            (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
             </list>
-            A section is multi-year when it holds the year of validFrom and at least one other year
-            (<see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> for numbers found only there); a source quote with the year of
-            validFrom anchors the value.
+            A validity start (<c>effective January 1, 2025</c>, <c>beginning on or after January 1, 2025</c>,
+            <c>2025 and after</c>) is kept but marked: up to the relevant year it rates a hit neutral.
+            A year enumeration (<c>2024, 2025, or 2026</c>, <c>2024 and 2025</c>) and a year range (<c>2024-2026</c>,
+            <c>2024 through 2026</c>) are one year group. A number with a year-weak hit and no positive hit is
+            <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>); a source quote with the relevant year
+            anchors the value.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)">
+            <summary>
+            Years of a text with their position, without the years of legal source references (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>);
+            an enumeration or a range of years is one group with all its years
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.InNumberRow(System.String,System.Int32,System.Int32)">
+            <summary>
+            A year candidate within a number row: another number within <see cref="F:PayrollEngine.Lex.SourceVerifier.RowWindow"/> characters on both
+            sides without a word, colon or parenthesis in between; a year of an enumeration or range
+            (<c>2024, 2025, 2026</c>) does not count
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Location(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section})">
@@ -1963,8 +2095,8 @@
             a line break joined (<c>supple- mental</c>), hyphens within words dropped and whitespace collapsed
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Section.IsMultiYear(System.Int32)">
-            <summary>The section holds the year and at least one other year</summary>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Section.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Int32)">
+            <summary>Year context of a hit in the section text</summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})">
             <summary>

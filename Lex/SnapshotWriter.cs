@@ -102,6 +102,7 @@ public sealed class SnapshotWriter
                     SourceUrls = value.SourceUrls,
                     SourceLocation = value.SourceLocation,
                     SourceQuote = value.SourceQuote,
+                    ReferenceYear = value.ReferenceYear,
                     LegalReference = value.LegalReference,
                     Description = value.Description,
                     Verification = value.Verification,
@@ -110,6 +111,7 @@ public sealed class SnapshotWriter
             }
 
             hashInput.Append(value.QuoteHashInput());
+            hashInput.Append(value.ReferenceYearHashInput());
             if (value.Verification != null)
             {
                 hashInput.Append(value.Verification.HashInput());

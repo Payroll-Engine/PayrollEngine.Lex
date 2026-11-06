@@ -12,7 +12,7 @@ namespace PayrollEngine.Lex;
 /// </summary>
 public sealed class DerivedValue
 {
-    /// <summary>Property path within the entry content (e.g. <c>CreditReduction</c> or <c>Group.Rate</c>)</summary>
+    /// <summary>Property path within the entry content (e.g. <c>Levy</c> or <c>Group.Rate</c>)</summary>
     public string Property { get; internal init; }
 
     /// <summary>Value of the property in the entry content</summary>

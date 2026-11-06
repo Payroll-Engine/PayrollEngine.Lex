@@ -21,6 +21,7 @@ public class SourceQuoteTests
     {
         var document = Pages(
             "Introduction 2026",
+            // ReSharper disable once StringLiteralTypo
             "If the addi-\ntional payments to the employee\nduring the year exceed $1 million, withhold at 39%.");
 
         var result = SourceVerifier.Verify(
@@ -34,6 +35,7 @@ public class SourceQuoteTests
     [Fact]
     public void QuoteWithCopiedHyphenation_IsFound() =>
         Assert.Equal(SourceMatch.Found, SourceVerifier.Verify(
+            // ReSharper disable once StringLiteralTypo
             Quoted("1000000", "the addi- tional payments exceed $1 million"),
             Pages("If the additional payments exceed $1 million, withhold at 39%.")).Match);
 
@@ -98,10 +100,11 @@ public class SourceQuoteTests
     }
 
     [Theory]
+    // ReSharper disable StringLiteralTypo
     [InlineData("addi-\ntional", "additional")]
     [InlineData("addi- tional", "additional")]
-    // ReSharper disable once StringLiteralTypo
     [InlineData("one-half", "onehalf")]
+    // ReSharper restore StringLiteralTypo
     [InlineData("employee\u2019s \u201crate\u201d", "employee's \"rate\"")]
     [InlineData("  wages \n paid\t now ", "wages paid now")]
     [InlineData("Rate - 39%", "Rate - 39%")]

@@ -5,13 +5,13 @@ namespace PayrollEngine.Lex.Tests;
 public class ZeroValueTests
 {
     private const string Url = "https://example.org/doc";
-    private const string Key = "StateRates.TX";
-    private const string Pattern = "StateRates.TX.SDIRate";
-    private const string Reason = "TX: no state disability insurance program";
+    private const string Key = "RegionRates.XX";
+    private const string Pattern = "RegionRates.XX.DisabilityRate";
+    private const string Reason = "XX: no disability insurance program";
 
-    private const string Bundle = "{\"UIRate\":0.027,\"UIWageBase\":9000,\"SDIRate\":0}";
+    private const string Bundle = "{\"Rate\":0.031,\"WageBase\":8500,\"DisabilityRate\":0}";
 
-    private const string SourceText = "The new employer rate is 2.7% of the first $9,000 of wages.";
+    private const string SourceText = "The new employer rate is 3.1% of the first $8,500 of wages.";
 
     private static Entry Entry(string content = Bundle, Verification verification = null) => new()
     {
@@ -20,7 +20,7 @@ public class ZeroValueTests
         Unit = "mixed",
         SourceUrls = [Url],
         SourceLocation = "p. 1",
-        LegalReference = "Texas Labor Code § 204.006",
+        LegalReference = "Example Act s. 4",
         DocumentRef = "rates.html",
         Verification = verification
     };
@@ -42,8 +42,8 @@ public class ZeroValueTests
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal(2, result.ContentNumbers);
-        Assert.Equal(["SDIRate"], result.Zero);
-        Assert.Equal(["SDIRate"], result.UnjustifiedZero);
+        Assert.Equal(["DisabilityRate"], result.Zero);
+        Assert.Equal(["DisabilityRate"], result.UnjustifiedZero);
         Assert.Empty(result.NotApplicable);
     }
 
@@ -53,10 +53,10 @@ public class ZeroValueTests
         var result = Verify(Entry(), NotApplicable());
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal(["SDIRate"], result.Zero);
+        Assert.Equal(["DisabilityRate"], result.Zero);
         Assert.Empty(result.UnjustifiedZero);
         var notApplicable = Assert.Single(result.NotApplicable);
-        Assert.Equal("SDIRate", notApplicable.Property);
+        Assert.Equal("DisabilityRate", notApplicable.Property);
         Assert.Equal("0", notApplicable.Value);
         Assert.Equal(Reason, notApplicable.Reason);
         Assert.Empty(result.Derived);
@@ -65,7 +65,7 @@ public class ZeroValueTests
     [Fact]
     public void ZeroWithDerived_IsNoHint()
     {
-        var derived = new Exclusion { Kind = Exclusion.KindDerived, Pattern = Pattern, Reason = "UIRate - 0.027" };
+        var derived = new Exclusion { Kind = Exclusion.KindDerived, Pattern = Pattern, Reason = "Rate - 0.031" };
 
         var result = Verify(Entry(), derived);
 
@@ -80,19 +80,19 @@ public class ZeroValueTests
             [(Url, new SourceDocument { State = SourceState.Unreadable, Reason = "scanned PDF" })]);
 
         Assert.Equal(SourceMatch.Unreadable, result.Match);
-        Assert.Equal(["SDIRate"], result.UnjustifiedZero);
+        Assert.Equal(["DisabilityRate"], result.UnjustifiedZero);
     }
 
     [Theory]
-    [InlineData("{\"Rate\":0.027,\"Disability\":{\"Rate\":0.0}}", "Disability.Rate")]
-    [InlineData("{\"Rate\":0.027,\"SDIRate\":\"0\"}", "SDIRate")]
+    [InlineData("{\"Rate\":0.031,\"Disability\":{\"Rate\":0.0}}", "Disability.Rate")]
+    [InlineData("{\"Rate\":0.031,\"DisabilityRate\":\"0\"}", "DisabilityRate")]
     public void ZeroProperty_IsListed(string content, string path) =>
         Assert.Equal([path], Verify(Entry(content)).Zero);
 
     [Theory]
     [InlineData("0")]
-    [InlineData("{\"Rate\":0.027,\"Tiers\":[{\"From\":0,\"Rate\":0}]}")]
-    [InlineData("{\"Rate\":0.027,\"Code\":\"TX\"}")]
+    [InlineData("{\"Rate\":0.031,\"Tiers\":[{\"From\":0,\"Rate\":0}]}")]
+    [InlineData("{\"Rate\":0.031,\"Code\":\"XX\"}")]
     public void NoBundleZero_IsNotListed(string content) =>
         Assert.Empty(Verify(Entry(content)).Zero);
 
@@ -108,7 +108,7 @@ public class ZeroValueTests
 
         var result = Assert.Single(await SourceVerifier.VerifyManifest(manifest, s.LexDirectory));
 
-        Assert.Equal("SDIRate", Assert.Single(result.NotApplicable).Property);
+        Assert.Equal("DisabilityRate", Assert.Single(result.NotApplicable).Property);
         Assert.Empty(result.UnjustifiedZero);
     }
 
@@ -140,8 +140,8 @@ public class ZeroValueTests
     {
         var s = new TestSatellite();
         s.WriteRegulation("""
-            [ { "name": "StateRates", "values": [ { "key": "TX",
-              "value": "{\"UIRate\":0.027,\"UIWageBase\":9000,\"SDIRate\":0}" } ] } ]
+            [ { "name": "RegionRates", "values": [ { "key": "XX",
+              "value": "{\"Rate\":0.031,\"WageBase\":8500,\"DisabilityRate\":0}" } ] } ]
             """);
         File.WriteAllText(Path.Combine(s.LexDirectory, "snapshot.json"), "{ \"files\": [ { \"fileName\": \"rates.html\" } ] }");
         File.WriteAllText(Path.Combine(s.LexDirectory, "rates.html"), "<html><body><p>" + SourceText + "</p></body></html>");
@@ -169,7 +169,7 @@ public class ZeroValueTests
         var release = Checker.Check(manifest, s.LexPath, release: true);
 
         Assert.Equal(1, plain.UnjustifiedZero);
-        Assert.Equal(["StateRates.TX (SDIRate)"], plain.UnjustifiedZeroSamples);
+        Assert.Equal(["RegionRates.XX (DisabilityRate)"], plain.UnjustifiedZeroSamples);
         Assert.False(plain.HasFindings);
         Assert.True(release.HasFindings);
         Assert.Contains("Zero values without justification (1)", CheckReport.BuildMarkdown([release]));
@@ -195,9 +195,9 @@ public class ZeroValueTests
     {
         using var s = Satellite();
 
-        var result = Checker.Check(Manifest(NotApplicable("StateRates.TX.UIRate")), s.LexPath);
+        var result = Checker.Check(Manifest(NotApplicable("RegionRates.XX.Rate")), s.LexPath);
 
-        Assert.Contains(result.ValidationErrors, e => e.Contains("property 'UIRate' of entry 'StateRates.TX' is 0.027, not 0"));
+        Assert.Contains(result.ValidationErrors, e => e.Contains("property 'Rate' of entry 'RegionRates.XX' is 0.031, not 0"));
         Assert.Equal(0, result.ExcludedNotApplicable);
         Assert.True(result.HasFindings);
     }
@@ -207,8 +207,8 @@ public class ZeroValueTests
     {
         using var s = Satellite();
 
-        var result = Checker.Check(Manifest(NotApplicable("StateRates.TX.PFLRate")), s.LexPath);
+        var result = Checker.Check(Manifest(NotApplicable("RegionRates.XX.LeaveRate")), s.LexPath);
 
-        Assert.Contains(result.ValidationErrors, e => e.Contains("(notApplicable) 'StateRates.TX.PFLRate' matches no property 'PFLRate'"));
+        Assert.Contains(result.ValidationErrors, e => e.Contains("(notApplicable) 'RegionRates.XX.LeaveRate' matches no property 'LeaveRate'"));
     }
 }

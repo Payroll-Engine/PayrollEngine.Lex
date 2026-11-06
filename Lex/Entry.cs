@@ -55,6 +55,14 @@ public sealed class Entry
     public string SourceQuote { get; init; }
 
     /// <summary>
+    /// Year the value belongs to legally when it differs from the cycle of the manifest (e.g. a surcharge
+    /// for 2025 in the 2026 satellite, due with the annual return in January 2026); replaces the validFrom year in the year
+    /// context of LexVerifySource and for the year of the source quote
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? ReferenceYear { get; init; }
+
+    /// <summary>
     /// Legal norm reference (e.g. Income Tax Act §12(1))
     /// </summary>
     public string LegalReference { get; init; }
@@ -86,6 +94,12 @@ public sealed class Entry
     /// </summary>
     internal string QuoteHashInput() =>
         SourceQuote != null ? "sourceQuote:" + SourceQuote : null;
+
+    /// <summary>
+    /// Canonical text of the reference year, part of the snapshot source hash (null without reference year)
+    /// </summary>
+    internal string ReferenceYearHashInput() =>
+        ReferenceYear != null ? "referenceYear:" + ReferenceYear.Value.ToString(System.Globalization.CultureInfo.InvariantCulture) : null;
 
     /// <summary>
     /// Returns true if this value uses an inline content string

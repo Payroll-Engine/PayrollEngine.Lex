@@ -20,8 +20,8 @@ public enum SourceMatch
 
     /// <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
     /// with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-    /// or is found in words only; or a number of the entry is found only in sections that hold values of several
-    /// years (multi-year table).
+    /// or is found in words only; or a number of the entry has a hit closest to another year and no hit closest
+    /// to the relevant year (reference year of the entry or year of validFrom; e.g. a table over several years).
     /// Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
     Ambiguous,
 
@@ -45,6 +45,42 @@ public enum SourceMatch
 
     /// <summary>The entry has no local evidence file for any source (local verification)</summary>
     NoEvidence
+}
+
+/// <summary>
+/// Year context of a number hit (see <see cref="SourceVerifier.YearContext"/>)
+/// </summary>
+internal enum HitYear
+{
+    /// <summary>No year within the window</summary>
+    Neutral,
+
+    /// <summary>The closest year is the relevant year, or a year group that holds it</summary>
+    Positive,
+
+    /// <summary>The closest year is another year</summary>
+    Weak
+}
+
+/// <summary>
+/// Year or year group (enumeration, range) of a text with its position
+/// </summary>
+internal sealed class YearHit(List<int> years, int index, int length, bool validity = false)
+{
+    /// <summary>Years of the hit, one year or the years of a group</summary>
+    internal List<int> Years => years;
+
+    /// <summary>Text position of the first year</summary>
+    internal int Index => index;
+
+    /// <summary>Text length up to the end of the last year</summary>
+    internal int Length => length;
+
+    /// <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>)</summary>
+    internal bool Validity => validity;
+
+    /// <summary>Group with a further year that ends at the text position</summary>
+    internal YearHit Join(int year, int end) => new([.. years, year], index, end - index, validity);
 }
 
 /// <summary>
@@ -132,7 +168,7 @@ public static class SourceVerifier
     /// <summary>A single number that occurs in more sections is weak evidence</summary>
     private const int WeakSections = 3;
 
-    /// <summary>Ambiguity of a number found only in multi-year sections</summary>
+    /// <summary>Ambiguity of a year-weak number (see <see cref="YearContext"/>)</summary>
     internal const string MultiYearAmbiguity = "multi-year section: add sourceQuote with the year";
 
     /// <summary>Note of an entry whose numbers are all derived</summary>
@@ -358,12 +394,13 @@ public static class SourceVerifier
     /// <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
     /// <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
     /// exclusion of the entry are not looked up, a notApplicable exclusion justifies a zero property</param>
-    /// <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
-    /// in multi-year sections as <see cref="SourceMatch.Ambiguous"/> (see <see cref="Years"/>), null without year context</param>
+    /// <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year, or the reference year of
+    /// the entry, rates a year-weak number as <see cref="SourceMatch.Ambiguous"/> (see <see cref="YearContext"/>),
+    /// null without year context</param>
     public static SourceResult Verify(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources,
         string content = null, IReadOnlyList<Exclusion> exclusions = null, string validFrom = null)
     {
-        var year = ValidYear(validFrom);
+        var year = entry.ReferenceYear ?? ValidYear(validFrom);
         var urls = entry.Urls.ToList();
         content ??= entry.Content;
         var derived = DerivedProperties.Values(entry.Key, content, exclusions);
@@ -425,10 +462,13 @@ public static class SourceVerifier
                 .OrderByDescending(x => x.Found.Count)
                 .First();
             var quoteMatch = Classify(best.Found.Count, numbers.Count);
-            if (quoteMatch == SourceMatch.Found && year != null && !Years(quote).Contains(year.Value) &&
-                best.Section.IsMultiYear(year.Value))
+            if (quoteMatch == SourceMatch.Found && year != null)
             {
-                return Result(SourceMatch.Ambiguous, best.Found, ambiguity: MultiYearReason(numbers, best.Found));
+                var quoteWeak = QuoteYearWeakness(numbers, quote, quoteNumbers, percent, year.Value);
+                if (quoteWeak != null)
+                {
+                    return Result(SourceMatch.Ambiguous, best.Found, ambiguity: quoteWeak);
+                }
             }
             return Result(quoteMatch, best.Found,
                 quoteMatch == SourceMatch.Found ? Location(sources, [best.Section]) : null);
@@ -497,9 +537,13 @@ public static class SourceVerifier
     }
 
     /// <summary>
-    /// Weak year context: numbers whose hits are all in multi-year sections, null without year or when every
-    /// number is found in at least one section without other years
+    /// Weak year context: numbers with at least one year-weak hit and no positive hit (see <see cref="YearContext"/>),
+    /// null without year or when no number is year-weak
     /// </summary>
+    /// <param name="numbers">Numbers of the entry</param>
+    /// <param name="sections">Sections to search</param>
+    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
     private static string YearWeakness(List<decimal> numbers, List<Section> sections, bool percent, int? year)
     {
         if (year == null)
@@ -507,13 +551,42 @@ public static class SourceVerifier
             return null;
         }
         var affected = numbers
-            .Where(n => sections.Where(s => s.Numbers.Contains(n, percent)).All(s => s.IsMultiYear(year.Value)))
+            .Where(n =>
+            {
+                var contexts = sections
+                    .SelectMany(s => s.Numbers.Hits(n, percent).Select(h => s.YearContext(h, year.Value)))
+                    .ToList();
+                return contexts.Contains(HitYear.Weak) && !contexts.Contains(HitYear.Positive);
+            })
             .ToList();
         return affected.Count == 0 ? null : MultiYearReason(numbers, affected);
     }
 
     /// <summary>
-    /// Ambiguity of numbers found only in multi-year sections; a bundle lists the affected numbers
+    /// Weak year context of a source quote, rated within the quote only: a quote with the relevant year (or a year
+    /// group that holds it) or without year anchors the value; a number of the quote whose closest year is another
+    /// year is year-weak
+    /// </summary>
+    /// <param name="numbers">Numbers of the entry</param>
+    /// <param name="quote">Source quote of the entry</param>
+    /// <param name="quoteNumbers">Numbers of the quote</param>
+    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+    private static string QuoteYearWeakness(List<decimal> numbers, string quote, SourceNumbers quoteNumbers, bool percent, int year)
+    {
+        var years = YearHits(quote);
+        if (years.Any(x => x.Years.Contains(year)))
+        {
+            return null;
+        }
+        var affected = numbers
+            .Where(n => quoteNumbers.Hits(n, percent).Any(h => YearContext(h, years, year) == HitYear.Weak))
+            .ToList();
+        return affected.Count == 0 ? null : MultiYearReason(numbers, affected);
+    }
+
+    /// <summary>
+    /// Ambiguity of year-weak numbers; a bundle lists the affected numbers
     /// </summary>
     private static string MultiYearReason(List<decimal> numbers, List<decimal> affected) =>
         numbers.Count == 1
@@ -535,12 +608,27 @@ public static class SourceVerifier
 
     // four digits 1990–2100, not part of a longer number (12,025, 2025.5), an amount ($2000) or a percentage
     private static readonly Regex YearToken = new(
-        @"(?<![\d.,$€£¥])(?:199\d|20\d\d|2100)(?!\d|[.,]\d|\s?%)", RegexOptions.Compiled);
+        @"(?<![\d.,$€£¥])(?<![$€£¥]\s)(?:199\d|20\d\d|2100)(?!\d|[.,]\d|\s?%)", RegexOptions.Compiled);
 
-    // a reference prefix directly before the year: Rev. Proc. 2024-40, Notice 2024-1, Pub. 2025, Rev. 2024,
+    // a number row (wage bracket table: 1965 1995 32.50): another number on both sides, no word, label colon
+    // or parenthesis in between (2025 (2024: 1.2%) keeps 2024)
+    private const int RowWindow = 12;
+    private static readonly Regex RowNumber = new(@"\d(?:[\d.,]*\d)?", RegexOptions.Compiled);
+    private static readonly Regex RowGap = new(@"^[^\p{L}:()]*$", RegexOptions.Compiled);
+
+    // a validity start: effective January 1, 2025; beginning on or after January 1, 2025; 2025 and after
+    private const int ValidityWindow = 64;
+    private static readonly Regex ValidityBefore = new(
+        @"\b(?:effective(?:\s+(?:on|from|as\s+of))?|beginning(?:\s+(?:on\s+or\s+after|on|after|in|with))?)\s+" +
+        @"(?:[a-z]{3,9}\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+|\d{1,2}\s+[a-z]{3,9}\.?,?\s+|\d{1,2}[/.\-]\d{1,2}[/.\-])?$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+    private static readonly Regex ValidityAfter = new(@"^\s+and\s+(?:after|later|thereafter|subsequent)\b",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    // a reference prefix directly before the year: Notice 2024-1, Pub. 2025, Rev. 2024, Rev. Guide 2024,
     // revision with month: Rev. 12-2025, Rev. December 2025
     private static readonly Regex ReferencePrefix = new(
-        @"(?:\bRev\.\s?Proc\.|\bNotice|\bPub\.|\bRev\.(?:\s?\d{1,2}\s?[-/]|\s?[A-Z][a-z]{2,8}\.?)?)\s?$", RegexOptions.Compiled);
+        @"(?:\bNotice|\bPub\.|\bRev\.(?:\s?\d{1,2}\s?[-/]|\s?[A-Z][a-z]{2,8}\.?)?)\s?$", RegexOptions.Compiled);
 
     // a print or typesetting mark: a date with a time before (15:14 - 3-Dec-2025, 16:58 Oct 31, 2025)
     private static readonly Regex TimeStampBefore = new(
@@ -553,32 +641,112 @@ public static class SourceVerifier
     // a document number: the year followed by a hyphen and up to three digits (2024-40)
     private static readonly Regex DocumentNumberSuffix = new(@"^[-\u2010\u2011\u2013]\d{1,3}(?!\d)", RegexOptions.Compiled);
 
-    // a statute reference before a year in parentheses: SB 951 (2022), P.L. 115-97 (2017), Act 32 (2020)
+    // a statute reference before a year in parentheses: Bill 951 (2022), L. 15-97 (2017), Act 32 (2020), § 12 (2017)
     private static readonly Regex StatuteBeforeParenthesis = new(
         @"(?:\b[A-Z][A-Z.]{0,5}|\bAct|\bLaw|\bBill|\bChapter|§)\s?\d[\d.\-]*[A-Za-z]?\s?\($", RegexOptions.Compiled);
 
     private const int ReferenceWindow = 32;
 
+    /// <summary>Maximum distance in characters between a number hit and the closest year</summary>
+    internal const int YearWindow = 120;
+
+    /// <summary>Years considered for the year context: from the relevant year minus this offset</summary>
+    private const int YearsBefore = 3;
+
+    /// <summary>Years considered for the year context: up to the relevant year plus this offset</summary>
+    private const int YearsAfter = 1;
+
     /// <summary>
-    /// Years of a text, used for the year context of a section and a source quote. A year is a four-digit
+    /// Year context of a number hit, rated by the closest year (or year group, see <see cref="YearHits"/>) within
+    /// <see cref="YearWindow"/> characters in both directions. Only years from the relevant year minus 3 to plus 1
+    /// are considered; years of legal source references are ignored (see <see cref="Years"/>).
+    /// <list type="bullet">
+    /// <item><see cref="HitYear.Positive"/>: the closest year is the relevant year, or a group that holds it
+    /// (at the same distance the relevant year wins)</item>
+    /// <item><see cref="HitYear.Weak"/>: the closest year is another year</item>
+    /// <item><see cref="HitYear.Neutral"/>: no year in the window, or the closest year starts a validity up to the
+    /// relevant year (<c>effective January 1, 2025</c>, <c>2025 and after</c>): the value may still apply</item>
+    /// </list>
+    /// A number is year-weak when at least one hit is weak and no hit is positive.
+    /// </summary>
+    /// <param name="hit">Text position of the hit</param>
+    /// <param name="years">Years and year groups of the text with their position (<see cref="YearHits"/>)</param>
+    /// <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+    internal static HitYear YearContext((int Index, int Length) hit, IEnumerable<YearHit> years, int year)
+    {
+        YearHit closest = null;
+        var distance = int.MaxValue;
+        foreach (var candidate in years)
+        {
+            if (!candidate.Years.Any(y => y >= year - YearsBefore && y <= year + YearsAfter))
+            {
+                continue;
+            }
+            var gap = candidate.Index >= hit.Index + hit.Length
+                ? candidate.Index - (hit.Index + hit.Length)
+                : hit.Index >= candidate.Index + candidate.Length
+                    ? hit.Index - (candidate.Index + candidate.Length)
+                    : -1;
+            if (gap < 0 || gap > YearWindow)
+            {
+                // the year is the hit itself, or out of the window
+                continue;
+            }
+            if (gap < distance || (gap == distance && candidate.Years.Contains(year)))
+            {
+                distance = gap;
+                closest = candidate;
+            }
+        }
+        if (closest == null || (closest.Validity && closest.Years.Max() <= year))
+        {
+            return HitYear.Neutral;
+        }
+        return closest.Years.Contains(year) ? HitYear.Positive : HitYear.Weak;
+    }
+
+    // connector of a year enumeration (2024, 2025, or 2026; 2024 and 2025) or a year range (2024-2026, 2024 through 2026)
+    private static readonly Regex YearEnumeration = new(@"^(?:\s*,\s*(?:(?:and|or)\s+)?|\s+(?:and|or)\s+)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private static readonly Regex YearRange = new(@"^(?:\s*[-\u2010-\u2015]\s*|\s+through\s+)$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
+    private const int MaxRangeYears = 10;
+
+    /// <summary>
+    /// Years of a text, used for the year context of a number hit and a source quote. A year is a four-digit
     /// number from 1990 to 2100 that is not part of a longer number, an amount or a percentage. Years that
     /// are part of a legal source reference are ignored, because they name the document, not the year of a value:
     /// <list type="bullet">
-    /// <item>directly after <c>Rev. Proc.</c>, <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c> (<c>Rev. Proc. 2024-40</c>),
-    /// also a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
+    /// <item>directly after <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c>, also with a word (<c>Rev. Guide 2024</c>)
+    /// or a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
     /// <item>in a document number with hyphen (<c>2024-40</c>); this also skips ISO dates and short year
     /// ranges (<c>2025-01-01</c>, <c>2025-26</c>), a range of full years (<c>2024-2025</c>) is kept</item>
-    /// <item>in parentheses after a statute reference (<c>SB 951 (2022)</c>, <c>P.L. 115-97 (2017)</c>)</item>
+    /// <item>in parentheses after a statute reference (<c>Bill 951 (2022)</c>, <c>Act 32 (2020)</c>)</item>
     /// <item>in a print or typesetting mark, a date with a time (<c>15:14 - 3-Dec-2025</c>,
     /// <c>16:58 Oct 31, 2025</c>, <c>Sep 11 2014 16:58</c>): a document is printed before the year it is valid for</item>
+    /// <item>in a number row, another number within 12 characters on both sides without a word, colon or
+    /// parenthesis in between
+    /// (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
     /// </list>
-    /// A section is multi-year when it holds the year of validFrom and at least one other year
-    /// (<see cref="SourceMatch.Ambiguous"/> for numbers found only there); a source quote with the year of
-    /// validFrom anchors the value.
+    /// A validity start (<c>effective January 1, 2025</c>, <c>beginning on or after January 1, 2025</c>,
+    /// <c>2025 and after</c>) is kept but marked: up to the relevant year it rates a hit neutral.
+    /// A year enumeration (<c>2024, 2025, or 2026</c>, <c>2024 and 2025</c>) and a year range (<c>2024-2026</c>,
+    /// <c>2024 through 2026</c>) are one year group. A number with a year-weak hit and no positive hit is
+    /// <see cref="SourceMatch.Ambiguous"/> (see <see cref="YearContext"/>); a source quote with the relevant year
+    /// anchors the value.
     /// </summary>
-    internal static HashSet<int> Years(string text)
+    internal static HashSet<int> Years(string text) =>
+        YearHits(text).SelectMany(x => x.Years).ToHashSet();
+
+    /// <summary>
+    /// Years of a text with their position, without the years of legal source references (see <see cref="Years"/>);
+    /// an enumeration or a range of years is one group with all its years
+    /// </summary>
+    internal static List<YearHit> YearHits(string text)
     {
-        var years = new HashSet<int>();
+        var years = new List<YearHit>();
         if (string.IsNullOrEmpty(text))
         {
             return years;
@@ -591,13 +759,63 @@ public static class SourceVerifier
             var after = text[end..Math.Min(text.Length, end + 8)];
             if (ReferencePrefix.IsMatch(before) || DocumentNumberSuffix.IsMatch(after) ||
                 TimeStampBefore.IsMatch(before) || TimeStampAfter.IsMatch(after) ||
-                (after.StartsWith(')') && StatuteBeforeParenthesis.IsMatch(before)))
+                (after.StartsWith(')') && StatuteBeforeParenthesis.IsMatch(before)) ||
+                InNumberRow(text, match.Index, end))
             {
                 continue;
             }
-            years.Add(int.Parse(match.Value, CultureInfo.InvariantCulture));
+            var validity = ValidityBefore.IsMatch(text[Math.Max(0, match.Index - ValidityWindow)..match.Index]) ||
+                           ValidityAfter.IsMatch(text[end..Math.Min(text.Length, end + 24)]);
+            var value = int.Parse(match.Value, CultureInfo.InvariantCulture);
+            var previous = years.Count > 0 ? years[^1] : null;
+            var connector = previous != null ? text[(previous.Index + previous.Length)..match.Index] : null;
+            if (connector != null && YearEnumeration.IsMatch(connector))
+            {
+                years[^1] = previous.Join(value, match.Index + match.Length);
+                continue;
+            }
+            if (connector != null && YearRange.IsMatch(connector) && value > previous.Years[^1] &&
+                value - previous.Years[^1] <= MaxRangeYears)
+            {
+                var join = previous;
+                for (var y = previous.Years[^1] + 1; y <= value; y++)
+                {
+                    join = join.Join(y, match.Index + match.Length);
+                }
+                years[^1] = join;
+                continue;
+            }
+            years.Add(new YearHit([value], match.Index, match.Length, validity));
         }
         return years;
+    }
+
+    /// <summary>
+    /// A year candidate within a number row: another number within <see cref="RowWindow"/> characters on both
+    /// sides without a word, colon or parenthesis in between; a year of an enumeration or range
+    /// (<c>2024, 2025, 2026</c>) does not count
+    /// </summary>
+    private static bool InNumberRow(string text, int index, int end) =>
+        RowNeighbor(text[Math.Max(0, index - RowWindow)..index], before: true) &&
+        RowNeighbor(text[end..Math.Min(text.Length, end + RowWindow)], before: false);
+
+    private static bool RowNeighbor(string window, bool before)
+    {
+        var numbers = RowNumber.Matches(window);
+        if (numbers.Count == 0)
+        {
+            return false;
+        }
+        var number = before ? numbers[^1] : numbers[0];
+        var gap = before ? window[(number.Index + number.Length)..] : window[..number.Index];
+        if (!RowGap.IsMatch(gap))
+        {
+            return false;
+        }
+        var groupYear = number.Length == 4 &&
+                        int.TryParse(number.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
+                        year is >= MinYear and <= MaxYear;
+        return !(groupYear && (YearEnumeration.IsMatch(gap) || YearRange.IsMatch(gap)));
     }
 
     /// <summary>
@@ -683,10 +901,10 @@ public static class SourceVerifier
         internal string Heading => heading;
         internal SourceNumbers Numbers { get; } = SourceNumbers.Scan(text);
         internal string CanonicalText => field ??= Canonical(text);
-        private HashSet<int> TextYears => field ??= Years(text);
+        private List<YearHit> TextYears => field ??= YearHits(text);
 
-        /// <summary>The section holds the year and at least one other year</summary>
-        internal bool IsMultiYear(int year) => TextYears.Contains(year) && TextYears.Count > 1;
+        /// <summary>Year context of a hit in the section text</summary>
+        internal HitYear YearContext((int Index, int Length) hit, int year) => SourceVerifier.YearContext(hit, TextYears, year);
     }
 
     // manifest -----------------------------------------------------------------

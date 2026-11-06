@@ -76,6 +76,11 @@ public static class Validator
             {
                 errors.Add($"Value '{value.Key}': sourceQuote is empty");
             }
+
+            if (value.ReferenceYear is < 1990 or > 2100)
+            {
+                errors.Add($"Value '{value.Key}': referenceYear {value.ReferenceYear} is not a year from 1990 to 2100");
+            }
         }
 
         // exclusions

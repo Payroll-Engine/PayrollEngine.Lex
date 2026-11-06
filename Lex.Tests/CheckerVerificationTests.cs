@@ -177,7 +177,7 @@ public class CheckerVerificationTests
         Assert.Contains("| Data.Test.2026 | 3 | 1 | 1 | 1 | 0 | 0 |", markdown);
         Assert.EndsWith(";VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                         "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                        "ExcludedNotApplicable;UnjustifiedZero", csv.Split('\n')[0].TrimEnd('\r'));
-        Assert.EndsWith(";1;1;1;0;0;0;0;False;0;0;0;0;0;0", csv.Split('\n')[1].TrimEnd('\r'));
+                        "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear", csv.Split('\n')[0].TrimEnd('\r'));
+        Assert.EndsWith(";1;1;1;0;0;0;0;False;0;0;0;0;0;0;0", csv.Split('\n')[1].TrimEnd('\r'));
     }
 }

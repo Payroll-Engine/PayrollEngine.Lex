@@ -36,7 +36,7 @@ public static class CheckReport
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                        "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                       "ExcludedNotApplicable;UnjustifiedZero");
+                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -46,7 +46,7 @@ public static class CheckReport
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
                 r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified, r.ExcludedDerived,
-                r.ExcludedNotApplicable, r.UnjustifiedZero));
+                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear));
         }
         return csv.ToString();
     }
@@ -84,6 +84,7 @@ public static class CheckReport
         text.AppendLine($"| Manual verifications without second review | {results.Sum(r => (long)r.MissingReview)} |");
         text.AppendLine($"| Open entries (previous cycle, verify again) | {results.Sum(r => (long)r.Open)} |");
         text.AppendLine($"| Entries with zero values without justification | {results.Sum(r => (long)r.UnjustifiedZero)} |");
+        text.AppendLine($"| Entries with a reference year other than the validFrom year | {results.Sum(r => (long)r.OtherReferenceYear)} |");
         if (release)
         {
             text.AppendLine($"| Ambiguous entries without manual verification | {results.Sum(r => (long)r.Ambiguous)} |");

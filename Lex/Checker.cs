@@ -120,6 +120,12 @@ public sealed class CheckResult
     /// <summary>Samples of bundle entries with zero properties without justification</summary>
     public List<string> UnjustifiedZeroSamples { get; } = [];
 
+    /// <summary>Entries with a reference year other than the validFrom year (information)</summary>
+    public int OtherReferenceYear { get; internal set; }
+
+    /// <summary>Samples of entries with a reference year other than the validFrom year</summary>
+    public List<string> OtherReferenceYearSamples { get; } = [];
+
     /// <summary>Lex entries without legalReference</summary>
     public int MissingLegalReference { get; internal set; }
 
@@ -284,6 +290,7 @@ public static class Checker
         CheckCoverage(manifest, lexDirectory, result, regulation);
         CheckPropertyExclusions(manifest, lexDirectory, result);
         CheckZeros(manifest, lexDirectory, result);
+        CheckReferenceYears(manifest, result);
         CheckEvidence(manifest, lexDirectory, result);
         foreach (var exclusion in manifest.Exclusions)
         {
@@ -584,6 +591,22 @@ public static class Checker
                 continue;
             }
             result.ExcludedNotApplicable++;
+        }
+    }
+
+    /// <summary>
+    /// Entries whose reference year differs from the validFrom year: listed as information for the review
+    /// </summary>
+    private static void CheckReferenceYears(Manifest manifest, CheckResult result)
+    {
+        var validYear = manifest.ValidFrom is { Length: >= 4 } &&
+                        int.TryParse(manifest.ValidFrom.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var year)
+            ? year
+            : (int?)null;
+        foreach (var entry in manifest.Values.Where(x => x.ReferenceYear != null && x.ReferenceYear != validYear))
+        {
+            result.OtherReferenceYear++;
+            AddSample(result.OtherReferenceYearSamples, $"{entry.Key} ({entry.ReferenceYear})");
         }
     }
 

@@ -25,6 +25,38 @@ internal sealed class SourceNumbers
     private readonly Dictionary<decimal, int> numeralDigits = [];
     private readonly Dictionary<decimal, int> percentDigits = [];
 
+    // text positions (index, length) of the hits per value
+    private readonly Dictionary<decimal, List<(int Index, int Length)>> numeralHits = [];
+    private readonly Dictionary<decimal, List<(int Index, int Length)>> percentHits = [];
+    private readonly Dictionary<decimal, List<(int Index, int Length)>> wordHits = [];
+
+    /// <summary>
+    /// Text positions of the hits of a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
+    /// </summary>
+    /// <param name="number">Entry number</param>
+    /// <param name="percent">A value below 1 may be written as percentage</param>
+    internal IEnumerable<(int Index, int Length)> Hits(decimal number, bool percent)
+    {
+        var value = Math.Round(number, 6);
+        var hits = Enumerable.Empty<(int Index, int Length)>();
+        if (numeralHits.TryGetValue(value, out var numerals)) hits = hits.Concat(numerals);
+        if (wordHits.TryGetValue(value, out var words)) hits = hits.Concat(words);
+        if (percent && number < 1m && percentHits.TryGetValue(Math.Round(number * 100m, 6), out var percents))
+        {
+            hits = hits.Concat(percents);
+        }
+        return hits.Distinct();
+    }
+
+    private static void AddHit(Dictionary<decimal, List<(int Index, int Length)>> hits, decimal value, Match match)
+    {
+        if (!hits.TryGetValue(value, out var list))
+        {
+            hits[value] = list = [];
+        }
+        list.Add((match.Index, match.Length));
+    }
+
     /// <summary>
     /// Numerals and numbers in words
     /// </summary>
@@ -79,10 +111,12 @@ internal sealed class SourceNumbers
             {
                 numbers.Numerals.Add(value);
                 AddDigits(numbers.numeralDigits, value, digits);
+                AddHit(numbers.numeralHits, value, match);
                 if (percent)
                 {
                     numbers.Percents.Add(value);
                     AddDigits(numbers.percentDigits, value, digits);
+                    AddHit(numbers.percentHits, value, match);
                 }
             }
         }
@@ -91,12 +125,16 @@ internal sealed class SourceNumbers
             if (decimal.TryParse(match.Groups["number"].Value, NumberStyles.AllowDecimalPoint,
                     CultureInfo.InvariantCulture, out var number))
             {
-                numbers.Words.Add(Math.Round(number * Scale(match.Groups["scale"].Value), 6));
+                var value = Math.Round(number * Scale(match.Groups["scale"].Value), 6);
+                numbers.Words.Add(value);
+                AddHit(numbers.wordHits, value, match);
             }
         }
         foreach (Match match in FractionWord.Matches(text))
         {
-            numbers.Words.Add(match.Groups["half"].Success ? 0.5m : match.Groups["double"].Success ? 2m : 1.5m);
+            var value = match.Groups["half"].Success ? 0.5m : match.Groups["double"].Success ? 2m : 1.5m;
+            numbers.Words.Add(value);
+            AddHit(numbers.wordHits, value, match);
         }
         return numbers;
     }

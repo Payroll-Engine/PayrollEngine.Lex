@@ -192,6 +192,7 @@ public sealed class ManifestEditor
         entry["sourceUrls"] = new JsonArray(value.Urls.Select(x => (JsonNode)x).ToArray());
         entry["sourceLocation"] = value.SourceLocation ?? string.Empty;
         if (value.SourceQuote != null) entry["sourceQuote"] = value.SourceQuote;
+        if (value.ReferenceYear != null) entry["referenceYear"] = value.ReferenceYear.Value;
         entry["legalReference"] = value.LegalReference ?? string.Empty;
         if (value.DocumentRef != null) entry["documentRef"] = value.DocumentRef;
         if (value.Description != null) entry["description"] = value.Description;
