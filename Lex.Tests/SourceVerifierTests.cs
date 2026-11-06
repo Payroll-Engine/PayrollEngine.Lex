@@ -114,11 +114,10 @@ public class SourceVerifierTests
     public void PerCentum_StatuteWording_IsFound()
     {
         var result = SourceVerifier.Verify(
-            Entry("{\"CreditorMaxPercent\":0.25,\"ChildSupportCapNotSupporting\":0.6}", "mixed"),
-            Sections("the maximum part of the aggregate disposable earnings of an individual for any workweek which is " +
-                     "subjected to garnishment may not exceed 25 per centum of his disposable earnings for that week; " +
-                     "where such individual is not supporting such a spouse or dependent child, 60 per centum of such " +
-                     "individual's disposable earnings for that week"));
+            Entry("{\"FirstClaimLimit\":0.25,\"SecondClaimLimit\":0.6}", "mixed"),
+            Sections("the part of the net earnings of a person for any week that is subject to a deduction order " +
+                     "may not exceed 25 per centum of the net earnings for that week; for a second order of the same " +
+                     "kind, the deduction may not exceed 60 per centum of such net earnings"));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Null(result.Ambiguity);
@@ -135,8 +134,8 @@ public class SourceVerifierTests
     public void MixedUnit_RateTableWithPercentSign_IsFound()
     {
         var result = SourceVerifier.Verify(
-            Entry("[{\"Over\":0,\"Amount\":0,\"Rate\":0.1},{\"Over\":19300,\"Amount\":1930,\"Rate\":0.12},{\"Over\":44100,\"Amount\":4906,\"Rate\":0.22}]", "mixed"),
-            Sections("$0 to $19,300: 10%; $19,300 to $44,100: $1,930.00 plus 12%; over $44,100: $4,906.00 plus 22%"));
+            Entry("[{\"Over\":0,\"Amount\":0,\"Rate\":0.1},{\"Over\":18000,\"Amount\":1800,\"Rate\":0.12},{\"Over\":42000,\"Amount\":4680,\"Rate\":0.22}]", "mixed"),
+            Sections("$0 to $18,000: 10%; $18,000 to $42,000: $1,800.00 plus 12%; over $42,000: $4,680.00 plus 22%"));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal(result.NumbersTotal, result.NumbersFound);
@@ -146,7 +145,7 @@ public class SourceVerifierTests
     [InlineData("22", "%", "The optional flat rate is 22%.")]
     [InlineData("0.22", "mixed", "The optional flat rate is 22%.")]
     [InlineData("0.012", "percent", "The credit reduction is 1.2% for the year.")]
-    [InlineData("1.5", "factor", "Overtime at 1.5 the regular rate.")]
+    [InlineData("1.5", "factor", "Extra hours at 1.5 the base rate.")]
     [InlineData("50", null, "Maximum 50 hours.")]
     public void ShortSingleNumber_IsAmbiguous(string content, string unit, string text)
     {
@@ -159,9 +158,9 @@ public class SourceVerifierTests
     }
 
     [Theory]
-    [InlineData("4300", "mixed", "Multiply the number of allowances by $4,300.")]
-    [InlineData("340", "mixed", "The monthly transit limit is $340.")]
-    [InlineData("8600", "USD", "Enter $8,600 on line 1g.")]
+    [InlineData("4700", "mixed", "Multiply the number of units by $4,700.")]
+    [InlineData("360", "mixed", "The monthly travel limit is $360.")]
+    [InlineData("8900", "USD", "Enter $8,900 on line 4.")]
     public void SingleNumberWithThreeOrMoreDigits_IsFound(string content, string unit, string text)
     {
         var result = SourceVerifier.Verify(Entry(content, unit), Sections(text));
@@ -173,14 +172,14 @@ public class SourceVerifierTests
     [Fact]
     public void LongNumberInManySections_IsFound() =>
         Assert.Equal(SourceMatch.Found,
-            SourceVerifier.Verify(Entry("12900", "mixed"),
-                Sections("Line 1g: $12,900", "Worksheet 1A: 12,900", "Example: subtract $12,900", "Table: 12,900")).Match);
+            SourceVerifier.Verify(Entry("13700", "mixed"),
+                Sections("Line 4: $13,700", "Worksheet 2: 13,700", "Example: subtract $13,700", "Table: 13,700")).Match);
 
     [Fact]
     public void TableWithManyNumbers_IsFound()
     {
-        var result = SourceVerifier.Verify(Entry("[{\"Over\":0,\"Rate\":0.1},{\"Over\":19300,\"Rate\":0.12},{\"Over\":44100,\"Rate\":0.22}]", "mixed / rate"),
-            Sections("Over 19,300 the rate is 10%; over 44,100 the rate is 12% and 22% above."));
+        var result = SourceVerifier.Verify(Entry("[{\"Over\":0,\"Rate\":0.1},{\"Over\":18000,\"Rate\":0.12},{\"Over\":42000,\"Rate\":0.22}]", "mixed / rate"),
+            Sections("Over 18,000 the rate is 10%; over 42,000 the rate is 12% and 22% above."));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal("Section \"Page 1\"", result.Location);
@@ -190,16 +189,16 @@ public class SourceVerifierTests
     [Fact]
     public void NumberInManySections_IsAmbiguous()
     {
-        var result = SourceVerifier.Verify(Entry("7.25"),
-            Sections("Minimum wage 7.25", "Example: 7.25 per hour", "Table: 7.25", "Worksheet 7.25"));
+        var result = SourceVerifier.Verify(Entry("8.15"),
+            Sections("Hourly rate 8.15", "Example: 8.15 per hour", "Table: 8.15", "Worksheet 8.15"));
 
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
         Assert.Equal("number in 4 sections", result.Ambiguity);
     }
 
     [Theory]
-    [InlineData("Minimum wage 7.25", 7.25, 3)]
-    [InlineData("Limit $4,300 per year", 4300, 4)]
+    [InlineData("Hourly rate 8.15", 8.15, 3)]
+    [InlineData("Limit $4,700 per year", 4700, 4)]
     [InlineData("Rate 1.2% of wages", 0.012, 2)]
     [InlineData("Rate 0.012 or 1.2%", 0.012, 2)]
     public void WrittenDigits_CountsDigitsAsWritten(string text, double value, int expected) =>
@@ -208,7 +207,7 @@ public class SourceVerifierTests
     [Fact]
     public void NumberInFewSections_IsFound() =>
         Assert.Equal(SourceMatch.Found,
-            SourceVerifier.Verify(Entry("7.25"), Sections("Minimum wage 7.25", "Example: 7.25 per hour", "Table: 7.25")).Match);
+            SourceVerifier.Verify(Entry("8.15"), Sections("Hourly rate 8.15", "Example: 8.15 per hour", "Table: 8.15")).Match);
 
     [Fact]
     public void Sample_IsEvenlyDistributed()
@@ -238,14 +237,117 @@ public class SourceVerifierTests
         Assert.Equal(120, result.ContentNumbers);
     }
 
+    private const string ValidFrom = "2025-01-01";
+
+    private const string YearTable =
+        "Contribution rates by year. 2023: employee rate 0.31%, wage base $148,200. " +
+        "2024: employee rate 0.27%, wage base $152,700. 2025: employee rate 0.19%, wage base $157,300.";
+
+    private static Entry Quoted(string content, string quote) => new()
+    {
+        Key = "Test.2025",
+        Content = content,
+        Unit = "mixed",
+        SourceQuote = quote,
+        SourceUrls = ["https://example.org/doc"]
+    };
+
+    [Fact]
+    public void MultiYearTable_ValueOfOtherYear_IsAmbiguous()
+    {
+        var result = SourceVerifier.Verify(Entry("{\"Rate\":0.0027,\"WageBase\":152700}", "mixed"),
+            Sections(YearTable), ValidFrom);
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0027, 152700)", result.Ambiguity);
+        Assert.Null(result.Location);
+        Assert.False(result.CanWrite);
+    }
+
+    [Fact]
+    public void MultiYearTable_SingleNumber_IsAmbiguous()
+    {
+        var result = SourceVerifier.Verify(Entry("152700"), Sections(YearTable), ValidFrom);
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity, result.Ambiguity);
+    }
+
+    [Fact]
+    public void MultiYearTable_WithoutValidFrom_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("{\"Rate\":0.0027,\"WageBase\":152700}", "mixed"), Sections(YearTable)).Match);
+
+    [Fact]
+    public void MultiYearTable_QuoteWithYear_IsFound()
+    {
+        var result = SourceVerifier.Verify(
+            Quoted("{\"Rate\":0.0019,\"WageBase\":157300}", "2025: employee rate 0.19%, wage base $157,300"),
+            Sections(YearTable), ValidFrom);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Ambiguity);
+        Assert.Equal("Section \"Page 1\"", result.Location);
+        Assert.True(result.CanWrite);
+    }
+
+    [Fact]
+    public void MultiYearTable_QuoteWithoutYear_IsAmbiguous()
+    {
+        var result = SourceVerifier.Verify(
+            Quoted("{\"Rate\":0.0019,\"WageBase\":157300}", "employee rate 0.19%, wage base $157,300"),
+            Sections(YearTable), ValidFrom);
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (0.0019, 157300)", result.Ambiguity);
+        Assert.False(result.CanWrite);
+    }
+
+    [Fact]
+    public void NumberAlsoInSingleYearSection_IsFound() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("157300"), Sections(YearTable, "Wage base 2025: $157,300"), ValidFrom).Match);
+
+    [Fact]
+    public void SectionWithReferenceYear_IsNotMultiYear()
+    {
+        var result = SourceVerifier.Verify(Entry("24750"),
+            Sections("Rev. Proc. 2024-40 sets the deferral limit for 2025 at $24,750."), ValidFrom);
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Null(result.Ambiguity);
+    }
+
+    [Theory]
+    [InlineData("Rev. Proc. 2024-40 sets the limit for 2025", new[] { 2025 })]
+    [InlineData("Notice 2023-34 applies in 2025", new[] { 2025 })]
+    [InlineData("see Pub. 2024 for the 2025 table", new[] { 2025 })]
+    [InlineData("Rev. 2024 of the 2025 guide", new[] { 2025 })]
+    [InlineData("SB 951 (2022) sets the 2025 rate", new[] { 2025 })]
+    [InlineData("P.L. 115-97 (2017) applies in 2025", new[] { 2025 })]
+    [InlineData("Document 2024-40, rate for 2025", new[] { 2025 })]
+    [InlineData("Updated 2024-12-01: rate for 2025", new[] { 2025 })]
+    [InlineData("Guide (Rev. 12- 2024) for 2025", new[] { 2025 })]
+    [InlineData("Guide (Rev. December 2024) for 2025", new[] { 2025 })]
+    [InlineData("/build07/source 15:14 - 3-Dec-2024 rates for 2025", new[] { 2025 })]
+    [InlineData("Printed Sep<11>2014 16:58 Oct 31, 2024 Job 1234 rates for 2025", new[] { 2025 })]
+    [InlineData("Effective January 1, 2024 to December 31, 2024; rate for 2025", new[] { 2024, 2025 })]
+    [InlineData("Rates 2024 and 2025", new[] { 2024, 2025 })]
+    [InlineData("Range 2024-2025", new[] { 2024, 2025 })]
+    [InlineData("Rate for 2025 (2024: 1.2%)", new[] { 2024, 2025 })]
+    [InlineData("Limit $2000, 2010 %, 12,025 and 2025.50 in 2025", new[] { 2025 })]
+    [InlineData("Valid 1989 to 2101", new int[0])]
+    public void Years_IgnoreReferenceYears(string text, int[] expected) =>
+        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
     [Theory]
     [InlineData("Section \"Page 24\"", true)]
     [InlineData("Sections \"Page 1\", \"Page 2\"", true)]
-    [InlineData("US-2026-p15.pdf: Section \"Page 24\"", true)]
+    [InlineData("XX-2026-guide.pdf: Section \"Page 24\"", true)]
     [InlineData("Section \"SUMMARY:\"", true)]
     [InlineData("unemployment.example.org: Section \"Taxable wages\"; leave.example.org: Sections \"A\", \"B\"", true)]
-    [InlineData("Page 24, section 7 \"supplemental wages\"", false)]
-    [InlineData("example.org: Page 1, §207(a)(1) \"at a rate\"", false)]
+    [InlineData("Page 24, section 7 \"additional payments\"", false)]
+    [InlineData("example.org: Page 1, §12(a)(1) \"at a rate\"", false)]
     [InlineData("Table 3", false)]
     [InlineData("", false)]
     public void IsToolLocation(string location, bool expected) =>

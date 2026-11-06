@@ -20,7 +20,8 @@ public enum SourceMatch
 
     /// <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
     /// with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-    /// or is found in words only.
+    /// or is found in words only; or a number of the entry is found only in sections that hold values of several
+    /// years (multi-year table).
     /// Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
     Ambiguous,
 
@@ -120,6 +121,9 @@ public static class SourceVerifier
 
     /// <summary>A single number that occurs in more sections is weak evidence</summary>
     private const int WeakSections = 3;
+
+    /// <summary>Ambiguity of a number found only in multi-year sections</summary>
+    internal const string MultiYearAmbiguity = "multi-year section: add sourceQuote with the year";
 
     /// <summary>Note of an entry whose numbers are all derived</summary>
     internal const string AllDerivedNote = "all numbers derived: confirm with LexAttest";
@@ -317,8 +321,8 @@ public static class SourceVerifier
     /// <summary>
     /// Test if a source location was written by LexVerifySource (and may be refreshed):
     /// <c>Section "Page 24"</c>, <c>Sections "Page 1", "Page 2"</c>, optionally prefixed with the evidence file
-    /// or, without evidence file name, the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated
-    /// by <c>; </c>: <c>p15.pdf: Section "Page 24"; p1494.pdf: Section "Page 1"</c>)
+    /// or, without evidence file name, the host (<c>guide.pdf: Section "Page 24"</c>, several sources separated
+    /// by <c>; </c>: <c>guide.pdf: Section "Page 24"; limits.pdf: Section "Page 1"</c>)
     /// </summary>
     public static bool IsToolLocation(string location) =>
         !string.IsNullOrWhiteSpace(location) && ToolLocation.IsMatch(location.Trim());
@@ -326,8 +330,11 @@ public static class SourceVerifier
     /// <summary>
     /// Verify one entry against the document of its single source
     /// </summary>
-    public static SourceResult Verify(Entry entry, SourceDocument document) =>
-        Verify(entry, [(entry.Urls.FirstOrDefault(), document)]);
+    /// <param name="entry">Lex entry</param>
+    /// <param name="document">Source document</param>
+    /// <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd), null without year context</param>
+    public static SourceResult Verify(Entry entry, SourceDocument document, string validFrom = null) =>
+        Verify(entry, [(entry.Urls.FirstOrDefault(), document)], validFrom: validFrom);
 
     /// <summary>
     /// Verify one entry against the documents of its sources: a number is found when any readable
@@ -338,9 +345,12 @@ public static class SourceVerifier
     /// <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
     /// <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
     /// exclusion of the entry are not looked up</param>
+    /// <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
+    /// in multi-year sections as <see cref="SourceMatch.Ambiguous"/> (see <see cref="Years"/>), null without year context</param>
     public static SourceResult Verify(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources,
-        string content = null, IReadOnlyList<Exclusion> exclusions = null)
+        string content = null, IReadOnlyList<Exclusion> exclusions = null, string validFrom = null)
     {
+        var year = ValidYear(validFrom);
         var urls = entry.Urls.ToList();
         content ??= entry.Content;
         var derived = DerivedProperties.Values(entry.Key, content, exclusions);
@@ -399,6 +409,11 @@ public static class SourceVerifier
                 .OrderByDescending(x => x.Found.Count)
                 .First();
             var quoteMatch = Classify(best.Found.Count, numbers.Count);
+            if (quoteMatch == SourceMatch.Found && year != null && !Years(quote).Contains(year.Value) &&
+                best.Section.IsMultiYear(year.Value))
+            {
+                return Result(SourceMatch.Ambiguous, best.Found, ambiguity: MultiYearReason(numbers, best.Found));
+            }
             return Result(quoteMatch, best.Found,
                 quoteMatch == SourceMatch.Found ? Location(sources, [best.Section]) : null);
         }
@@ -414,7 +429,7 @@ public static class SourceVerifier
             return Result(match, found);
         }
 
-        var weak = Weakness(numbers, sections, percent);
+        var weak = Weakness(numbers, sections, percent) ?? YearWeakness(numbers, sections, percent, year);
         if (weak != null)
         {
             return Result(SourceMatch.Ambiguous, found, ambiguity: weak);
@@ -463,6 +478,110 @@ public static class SourceVerifier
             return "short number";
         }
         return digits <= FrequentDigits && hits.Count > WeakSections ? $"number in {hits.Count} sections" : null;
+    }
+
+    /// <summary>
+    /// Weak year context: numbers whose hits are all in multi-year sections, null without year or when every
+    /// number is found in at least one section without other years
+    /// </summary>
+    private static string YearWeakness(List<decimal> numbers, List<Section> sections, bool percent, int? year)
+    {
+        if (year == null)
+        {
+            return null;
+        }
+        var affected = numbers
+            .Where(n => sections.Where(s => s.Numbers.Contains(n, percent)).All(s => s.IsMultiYear(year.Value)))
+            .ToList();
+        return affected.Count == 0 ? null : MultiYearReason(numbers, affected);
+    }
+
+    /// <summary>
+    /// Ambiguity of numbers found only in multi-year sections; a bundle lists the affected numbers
+    /// </summary>
+    private static string MultiYearReason(List<decimal> numbers, List<decimal> affected) =>
+        numbers.Count == 1
+            ? MultiYearAmbiguity
+            : $"{MultiYearAmbiguity} ({string.Join(", ", affected.Select(n => n.ToString(CultureInfo.InvariantCulture)))})";
+
+    private const int MinYear = 1990;
+    private const int MaxYear = 2100;
+
+    /// <summary>
+    /// Year of a validFrom date (yyyy-MM-dd), null when the date has no year in the range of <see cref="Years"/>
+    /// </summary>
+    private static int? ValidYear(string validFrom) =>
+        validFrom is { Length: >= 4 } &&
+        int.TryParse(validFrom.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
+        year is >= MinYear and <= MaxYear
+            ? year
+            : null;
+
+    // four digits 1990–2100, not part of a longer number (12,025, 2025.5), an amount ($2000) or a percentage
+    private static readonly Regex YearToken = new(
+        @"(?<![\d.,$€£¥])(?:199\d|20\d\d|2100)(?!\d|[.,]\d|\s?%)", RegexOptions.Compiled);
+
+    // a reference prefix directly before the year: Rev. Proc. 2024-40, Notice 2024-1, Pub. 2025, Rev. 2024,
+    // revision with month: Rev. 12-2025, Rev. December 2025
+    private static readonly Regex ReferencePrefix = new(
+        @"(?:\bRev\.\s?Proc\.|\bNotice|\bPub\.|\bRev\.(?:\s?\d{1,2}\s?[-/]|\s?[A-Z][a-z]{2,8}\.?)?)\s?$", RegexOptions.Compiled);
+
+    // a print or typesetting mark: a date with a time before (15:14 - 3-Dec-2025, 16:58 Oct 31, 2025)
+    private static readonly Regex TimeStampBefore = new(
+        @"\d{1,2}:\d{2}\s*[-\u2010-\u2015]?\s*(?:\d{1,2}\s*[-\u2010-\u2015\s]\s*)?[A-Z][a-z]{2,8}\.?\s*[-\u2010-\u2015\s]\s*(?:\d{1,2},?\s*)?$",
+        RegexOptions.Compiled);
+
+    // a print or typesetting mark: a year with a time after (Sep<11>2014 16:58)
+    private static readonly Regex TimeStampAfter = new(@"^\s+\d{1,2}:\d{2}(?!\d)", RegexOptions.Compiled);
+
+    // a document number: the year followed by a hyphen and up to three digits (2024-40)
+    private static readonly Regex DocumentNumberSuffix = new(@"^[-\u2010\u2011\u2013]\d{1,3}(?!\d)", RegexOptions.Compiled);
+
+    // a statute reference before a year in parentheses: SB 951 (2022), P.L. 115-97 (2017), Act 32 (2020)
+    private static readonly Regex StatuteBeforeParenthesis = new(
+        @"(?:\b[A-Z][A-Z.]{0,5}|\bAct|\bLaw|\bBill|\bChapter|§)\s?\d[\d.\-]*[A-Za-z]?\s?\($", RegexOptions.Compiled);
+
+    private const int ReferenceWindow = 32;
+
+    /// <summary>
+    /// Years of a text, used for the year context of a section and a source quote. A year is a four-digit
+    /// number from 1990 to 2100 that is not part of a longer number, an amount or a percentage. Years that
+    /// are part of a legal source reference are ignored, because they name the document, not the year of a value:
+    /// <list type="bullet">
+    /// <item>directly after <c>Rev. Proc.</c>, <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c> (<c>Rev. Proc. 2024-40</c>),
+    /// also a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
+    /// <item>in a document number with hyphen (<c>2024-40</c>); this also skips ISO dates and short year
+    /// ranges (<c>2025-01-01</c>, <c>2025-26</c>), a range of full years (<c>2024-2025</c>) is kept</item>
+    /// <item>in parentheses after a statute reference (<c>SB 951 (2022)</c>, <c>P.L. 115-97 (2017)</c>)</item>
+    /// <item>in a print or typesetting mark, a date with a time (<c>15:14 - 3-Dec-2025</c>,
+    /// <c>16:58 Oct 31, 2025</c>, <c>Sep 11 2014 16:58</c>): a document is printed before the year it is valid for</item>
+    /// </list>
+    /// A section is multi-year when it holds the year of validFrom and at least one other year
+    /// (<see cref="SourceMatch.Ambiguous"/> for numbers found only there); a source quote with the year of
+    /// validFrom anchors the value.
+    /// </summary>
+    internal static HashSet<int> Years(string text)
+    {
+        var years = new HashSet<int>();
+        if (string.IsNullOrEmpty(text))
+        {
+            return years;
+        }
+        foreach (Match match in YearToken.Matches(text))
+        {
+            var start = Math.Max(0, match.Index - ReferenceWindow);
+            var before = text[start..match.Index];
+            var end = match.Index + match.Length;
+            var after = text[end..Math.Min(text.Length, end + 8)];
+            if (ReferencePrefix.IsMatch(before) || DocumentNumberSuffix.IsMatch(after) ||
+                TimeStampBefore.IsMatch(before) || TimeStampAfter.IsMatch(after) ||
+                (after.StartsWith(')') && StatuteBeforeParenthesis.IsMatch(before)))
+            {
+                continue;
+            }
+            years.Add(int.Parse(match.Value, CultureInfo.InvariantCulture));
+        }
+        return years;
     }
 
     /// <summary>
@@ -548,6 +667,10 @@ public static class SourceVerifier
         internal string Heading => heading;
         internal SourceNumbers Numbers { get; } = SourceNumbers.Scan(text);
         internal string CanonicalText => field ??= Canonical(text);
+        private HashSet<int> TextYears => field ??= Years(text);
+
+        /// <summary>The section holds the year and at least one other year</summary>
+        internal bool IsMultiYear(int year) => TextYears.Contains(year) && TextYears.Count > 1;
     }
 
     // manifest -----------------------------------------------------------------
@@ -615,7 +738,8 @@ public static class SourceVerifier
                     }
                     sources.Add((url, document));
                 }
-                result = Verify(entry, sources, content, DerivedProperties.Of(entry.Key, manifest.Exclusions, keys));
+                result = Verify(entry, sources, content, DerivedProperties.Of(entry.Key, manifest.Exclusions, keys),
+                    manifest.ValidFrom);
             }
             result.Evidence = evidence;
             result.ExcludedReason = exclusions.FirstOrDefault(x => x.Matches(entry.Key))?.Reason;

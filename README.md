@@ -49,7 +49,20 @@ sections, or holds it in words only (`$1 million`, `one and one-half`, `2.5 lakh
 up as percentage when the source writes `%`, `percent`, `per cent` or `per centum` after the number, except for units that are no rate
 (`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the
 entry: the numbers must be in the section of the quote (`Found`), otherwise in the quote itself; a quote missing in
-the source gives `QuoteNotFound`. Tables with more than 40 numbers are sampled evenly. Entries with an
+the source gives `QuoteNotFound`.
+
+Sources often hold tables over several years, so a number of another year may be "found". With the year of the
+manifest `validFrom`, a section is **multi-year** when it holds this year and at least one other year (four digits,
+1990–2100, not part of a longer number, an amount or a percentage). A number found only in multi-year sections
+rates the entry `Ambiguous` with `multi-year section: add sourceQuote with the year`; for a bundle the reason lists
+the affected numbers, e.g. `(0.0027, 152700)`. A `sourceQuote` that holds the year (`2025: employee rate 0.19%`)
+anchors the value; a quote without the year does not. Years of a legal source reference are ignored: directly
+after `Rev. Proc.`, `Notice`, `Pub.` or `Rev.` (also `Rev. 12-2025`), in a document number with hyphen (`2024-40`,
+also ISO dates and short ranges like `2025-26`) and in parentheses after a statute reference (`SB 951 (2022)`).
+Print and typesetting marks are ignored too, a date with a time (`15:14 - 3-Dec-2025`, `16:58 Oct 31, 2025`):
+a document is printed before the year it is valid for.
+
+Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion
 (`Lookup.Key.Property`, formula and legal reference as reason) removes the numbers of a computed property from the
 lookup; the other numbers are verified and the `auto` record lists the property (`Verification.Derived`,
@@ -57,8 +70,8 @@ lookup; the other numbers are verified and the `auto` record lists the property 
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 
 `SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by
-the host when the document has no file name (live source): `US-2026-p15.pdf: Sections "Page 24", "Page 25";
-US-2026-p1494.pdf: Section "Page 1"`. A location longer than 500 characters is not proposed.
+the host when the document has no file name (live source): `XX-2026-guide.pdf: Sections "Page 24", "Page 25";
+XX-2026-limits.pdf: Section "Page 1"`. A location longer than 500 characters is not proposed.
 `SourceVerifier.IsToolLocation` recognizes these locations, so `/refreshlocations` may replace them.
 
 ## Verification and Open Entries

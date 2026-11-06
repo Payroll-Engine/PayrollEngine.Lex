@@ -109,22 +109,22 @@ public class MultiSourceTests
     [Fact]
     public void SourcesOfSameHost_AreNamedByEvidenceFile()
     {
-        const string guideUrl = "https://www.irs.gov/pub/irs-pdf/p15.pdf";
-        const string limitsUrl = "https://www.irs.gov/pub/irs-pdf/p1494.pdf";
+        const string guideUrl = "https://www.example.org/pub/guide.pdf";
+        const string limitsUrl = "https://www.example.org/pub/limits.pdf";
         var entry = new Entry
         {
-            Key = "Parameters.A", Content = "{\"WageBase\":42100,\"Exempt\":17350}", Unit = "USD",
+            Key = "Parameters.A", Content = "{\"WageBase\":42100,\"Exempt\":17450}", Unit = "USD",
             SourceUrls = [guideUrl, limitsUrl]
         };
         var guide = Readable(("Page 1", "Wage base 42,100"));
-        guide.Name = "US-2026-p15.pdf";
-        var limits = Readable(("Page 1", "Exempt amount 17,350"));
-        limits.Name = "US-2026-p1494.pdf";
+        guide.Name = "XX-2026-guide.pdf";
+        var limits = Readable(("Page 1", "Exempt amount 17,450"));
+        limits.Name = "XX-2026-limits.pdf";
 
         var result = SourceVerifier.Verify(entry, [(guideUrl, guide), (limitsUrl, limits)]);
 
         Assert.Equal(SourceMatch.Found, result.Match);
-        Assert.Equal("US-2026-p15.pdf: Section \"Page 1\"; US-2026-p1494.pdf: Section \"Page 1\"", result.Location);
+        Assert.Equal("XX-2026-guide.pdf: Section \"Page 1\"; XX-2026-limits.pdf: Section \"Page 1\"", result.Location);
         Assert.True(SourceVerifier.IsToolLocation(result.Location));
     }
 

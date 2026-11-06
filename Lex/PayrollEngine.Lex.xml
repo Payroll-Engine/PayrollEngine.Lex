@@ -1651,7 +1651,8 @@
         <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
             <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
             with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-            or is found in words only.
+            or is found in words only; or a number of the entry is found only in sections that hold values of several
+            years (multi-year table).
             Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
@@ -1746,6 +1747,9 @@
         <member name="F:PayrollEngine.Lex.SourceVerifier.WeakSections">
             <summary>A single number that occurs in more sections is weak evidence</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.MultiYearAmbiguity">
+            <summary>Ambiguity of a number found only in multi-year sections</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
             <summary>Note of an entry whose numbers are all derived</summary>
         </member>
@@ -1808,16 +1812,19 @@
             <summary>
             Test if a source location was written by LexVerifySource (and may be refreshed):
             <c>Section "Page 24"</c>, <c>Sections "Page 1", "Page 2"</c>, optionally prefixed with the evidence file
-            or, without evidence file name, the host (<c>p15.pdf: Section "Page 24"</c>, several sources separated
-            by <c>; </c>: <c>p15.pdf: Section "Page 24"; p1494.pdf: Section "Page 1"</c>)
+            or, without evidence file name, the host (<c>guide.pdf: Section "Page 24"</c>, several sources separated
+            by <c>; </c>: <c>guide.pdf: Section "Page 24"; limits.pdf: Section "Page 1"</c>)
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument,System.String)">
             <summary>
             Verify one entry against the document of its single source
             </summary>
+            <param name="entry">Lex entry</param>
+            <param name="document">Source document</param>
+            <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd), null without year context</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion})">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion},System.String)">
             <summary>
             Verify one entry against the documents of its sources: a number is found when any readable
             document holds it. With a source quote, the numbers must be in the section that holds the quote.
@@ -1827,10 +1834,47 @@
             <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
             <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
             exclusion of the entry are not looked up</param>
+            <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
+            in multi-year sections as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>), null without year context</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
             <summary>
             Weak evidence of a single number, null for an entry with several numbers or a distinctive number
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean,System.Nullable{System.Int32})">
+            <summary>
+            Weak year context: numbers whose hits are all in multi-year sections, null without year or when every
+            number is found in at least one section without other years
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.MultiYearReason(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{System.Decimal})">
+            <summary>
+            Ambiguity of numbers found only in multi-year sections; a bundle lists the affected numbers
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.ValidYear(System.String)">
+            <summary>
+            Year of a validFrom date (yyyy-MM-dd), null when the date has no year in the range of <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)">
+            <summary>
+            Years of a text, used for the year context of a section and a source quote. A year is a four-digit
+            number from 1990 to 2100 that is not part of a longer number, an amount or a percentage. Years that
+            are part of a legal source reference are ignored, because they name the document, not the year of a value:
+            <list type="bullet">
+            <item>directly after <c>Rev. Proc.</c>, <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c> (<c>Rev. Proc. 2024-40</c>),
+            also a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
+            <item>in a document number with hyphen (<c>2024-40</c>); this also skips ISO dates and short year
+            ranges (<c>2025-01-01</c>, <c>2025-26</c>), a range of full years (<c>2024-2025</c>) is kept</item>
+            <item>in parentheses after a statute reference (<c>SB 951 (2022)</c>, <c>P.L. 115-97 (2017)</c>)</item>
+            <item>in a print or typesetting mark, a date with a time (<c>15:14 - 3-Dec-2025</c>,
+            <c>16:58 Oct 31, 2025</c>, <c>Sep 11 2014 16:58</c>): a document is printed before the year it is valid for</item>
+            </list>
+            A section is multi-year when it holds the year of validFrom and at least one other year
+            (<see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> for numbers found only there); a source quote with the year of
+            validFrom anchors the value.
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Location(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section})">
@@ -1854,6 +1898,9 @@
             Canonical text for the quote comparison: typographic quotes and apostrophes unified, hyphenation at
             a line break joined (<c>supple- mental</c>), hyphens within words dropped and whitespace collapsed
             </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Section.IsMultiYear(System.Int32)">
+            <summary>The section holds the year and at least one other year</summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})">
             <summary>

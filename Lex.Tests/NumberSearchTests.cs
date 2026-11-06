@@ -112,11 +112,11 @@ public class NumberSearchTests
     // ReSharper disable once StringLiteralTypo
     [InlineData("turnover of 1 crore", 10000000)]
     [InlineData("deduction up to 2,50,000", 250000)]
-    [InlineData("at one-half the regular rate", 0.5)]
-    [InlineData("at one half the regular rate", 0.5)]
-    [InlineData("at ½ the regular rate", 0.5)]
-    [InlineData("one and one-half times the regular rate", 1.5)]
-    [InlineData("one and a half times the regular rate", 1.5)]
+    [InlineData("at one-half the base rate", 0.5)]
+    [InlineData("at one half the base rate", 0.5)]
+    [InlineData("at ½ the base rate", 0.5)]
+    [InlineData("one and one-half times the base rate", 1.5)]
+    [InlineData("one and a half times the base rate", 1.5)]
     [InlineData("paid at time and a half", 1.5)]
     [InlineData("paid at time and one-half", 1.5)]
     [InlineData("paid at 1½ times", 1.5)]
@@ -127,7 +127,7 @@ public class NumberSearchTests
     [Theory]
     [InlineData("a million reasons", 1000000)]
     [InlineData("billions of records", 1000000000)]
-    [InlineData("one and one-half times the regular rate", 0.5)]
+    [InlineData("one and one-half times the base rate", 0.5)]
     [InlineData("1,000 million", 1000000)]
     public void Numbers_InWords_NoFalseMatch(string text, double unexpected) =>
         Assert.DoesNotContain((decimal)unexpected, SourceDocument.Numbers(text));
@@ -135,7 +135,7 @@ public class NumberSearchTests
     [Fact]
     public void Verify_NumberInWords_IsAmbiguous()
     {
-        var result = Verify("1000000", "37% on supplemental wages that exceed $1 million during the year");
+        var result = Verify("1000000", "39% on additional payments that exceed $1 million during the year");
 
         Assert.Equal(SourceMatch.Ambiguous, result.Match);
         Assert.Equal("number in words", result.Ambiguity);
@@ -144,7 +144,7 @@ public class NumberSearchTests
     [Fact]
     public void Verify_FactorInWords_IsAmbiguous() =>
         Assert.Equal(SourceMatch.Ambiguous,
-            Verify("1.5", "overtime at a rate not less than one and one-half times the regular rate").Match);
+            Verify("1.5", "extra hours at one and one-half times the base rate").Match);
 
     [Fact]
     public void Verify_NumberInWordsWithinTable_IsFound() =>

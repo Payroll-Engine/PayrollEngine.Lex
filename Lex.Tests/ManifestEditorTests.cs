@@ -70,9 +70,9 @@ public class ManifestEditorTests
     {
         var editor = ManifestEditor.Parse("{ \"values\": [] }");
 
-        editor.AddValue(new Entry { Key = "Rates.A", Content = "1.5", SourceQuote = "one and one-half times the regular rate" });
+        editor.AddValue(new Entry { Key = "Rates.A", Content = "1.5", SourceQuote = "one and one-half times the base rate" });
 
-        Assert.Equal("one and one-half times the regular rate", Entry(editor, "Rates.A").GetProperty("sourceQuote").GetString());
+        Assert.Equal("one and one-half times the base rate", Entry(editor, "Rates.A").GetProperty("sourceQuote").GetString());
     }
 
     [Fact]
