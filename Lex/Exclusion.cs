@@ -24,24 +24,31 @@ public sealed class Exclusion
     /// LexVerifySource does not look up its numbers</summary>
     public const string KindDerived = "derived";
 
+    /// <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a state without
+    /// disability insurance); a zero property without this exclusion is reported</summary>
+    public const string KindNotApplicable = "notApplicable";
+
     /// <summary>
     /// Exclusion kind: <c>coverage</c> (regulation values without lex entry),
     /// <c>sourceLocation</c> (lex entries without sourceLocation),
     /// <c>orphan</c> (lex entries without regulation value),
-    /// <c>autoVerification</c> (lex entries verified manually only) or
-    /// <c>derived</c> (derived property of a lex entry)
+    /// <c>autoVerification</c> (lex entries verified manually only),
+    /// <c>derived</c> (derived property of a lex entry) or
+    /// <c>notApplicable</c> (zero property of a lex entry whose rule does not apply)
     /// </summary>
     public string Kind { get; init; }
 
     /// <summary>
     /// Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
     /// SourceLocation, orphan and autoVerification: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
-    /// Derived: lex entry key and property path of the JSON content (<c>Lookup.Key.Property</c>, nested <c>Lookup.Key.Group.Property</c>).
+    /// Derived and notApplicable: lex entry key and property path of the JSON content (<c>Lookup.Key.Property</c>,
+    /// nested <c>Lookup.Key.Group.Property</c>).
     /// </summary>
     public string Pattern { get; init; }
 
     /// <summary>
-    /// Mandatory justification; for a derived property the formula and the legal reference
+    /// Mandatory justification; for a derived property the formula and the legal reference, for a property that is
+    /// not applicable why the rule does not apply
     /// </summary>
     public string Reason { get; init; }
 

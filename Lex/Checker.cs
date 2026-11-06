@@ -108,7 +108,17 @@ public sealed class CheckResult
 
     /// <summary>Entry properties documented as derived (exclusion kind derived)</summary>
     public int ExcludedDerived { get; internal set; }
+
+    /// <summary>Zero entry properties documented as not applicable (exclusion kind notApplicable)</summary>
+    public int ExcludedNotApplicable { get; internal set; }
     internal List<string> ExclusionNotes { get; } = [];
+
+    /// <summary>Bundle entries with zero properties without justification (neither notApplicable nor derived);
+    /// a finding only in the release mode</summary>
+    public int UnjustifiedZero { get; internal set; }
+
+    /// <summary>Samples of bundle entries with zero properties without justification</summary>
+    public List<string> UnjustifiedZeroSamples { get; } = [];
 
     /// <summary>Lex entries without legalReference</summary>
     public int MissingLegalReference { get; internal set; }
@@ -194,7 +204,7 @@ public sealed class CheckResult
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
         (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null ||
         (RequireLocation && UnspecificLocations > 0) ||
-        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0));
+        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0));
 }
 
 /// <summary>
@@ -228,7 +238,8 @@ public static class Checker
     /// <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
     /// <param name="requireVerification">Treat an entry without verification record as a finding</param>
     /// <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
-    /// a secondary main source and an entry excluded from auto verification with an automatic record are findings.
+    /// a secondary main source, an entry excluded from auto verification with an automatic record and a zero property
+    /// without notApplicable exclusion are findings.
     /// The entries that need a manual verification are found by <see cref="CheckSources"/>.</param>
     public static CheckResult Check(Manifest manifest, string lexPath, bool requireLocation = false,
         bool requireVerification = false, bool release = false)
@@ -271,7 +282,8 @@ public static class Checker
         CheckTraceability(manifest, result);
         CheckValidFrom(result);
         CheckCoverage(manifest, lexDirectory, result, regulation);
-        CheckDerived(manifest, lexDirectory, result);
+        CheckPropertyExclusions(manifest, lexDirectory, result);
+        CheckZeros(manifest, lexDirectory, result);
         CheckEvidence(manifest, lexDirectory, result);
         foreach (var exclusion in manifest.Exclusions)
         {
@@ -534,17 +546,18 @@ public static class Checker
     }
 
     /// <summary>
-    /// A derived exclusion must address an existing property of an entry (e.g. not renamed)
+    /// A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
+    /// a notApplicable property must have the value 0
     /// </summary>
-    private static void CheckDerived(Manifest manifest, string lexDirectory, CheckResult result)
+    private static void CheckPropertyExclusions(Manifest manifest, string lexDirectory, CheckResult result)
     {
         var keys = DerivedProperties.Keys(manifest);
-        foreach (var exclusion in manifest.Exclusions.Where(x => x.Kind == Exclusion.KindDerived))
+        foreach (var exclusion in manifest.Exclusions.Where(x => DerivedProperties.IsPropertyKind(x.Kind)))
         {
             var (key, path) = DerivedProperties.Resolve(exclusion.Pattern, keys);
             if (key == null)
             {
-                result.ValidationErrors.Add($"Exclusion (derived) '{exclusion.Pattern}' matches no entry: remove or rename it");
+                result.ValidationErrors.Add($"Exclusion ({exclusion.Kind}) '{exclusion.Pattern}' matches no entry: remove or rename it");
                 continue;
             }
             if (path.Length == 0)
@@ -553,13 +566,54 @@ public static class Checker
                 continue;
             }
             var entry = manifest.Values.First(x => string.Equals(x.Key, key, StringComparison.Ordinal));
-            if (!DerivedProperties.Exists(CompareContent(entry, lexDirectory), path))
+            if (!DerivedProperties.TryGetValue(CompareContent(entry, lexDirectory), path, out var value))
             {
                 result.ValidationErrors.Add(
-                    $"Exclusion (derived) '{exclusion.Pattern}' matches no property '{path}' of entry '{key}': remove or rename it");
+                    $"Exclusion ({exclusion.Kind}) '{exclusion.Pattern}' matches no property '{path}' of entry '{key}': remove or rename it");
                 continue;
             }
-            result.ExcludedDerived++;
+            if (exclusion.Kind == Exclusion.KindDerived)
+            {
+                result.ExcludedDerived++;
+                continue;
+            }
+            if (!decimal.TryParse(value, NumberStyles.Number, CultureInfo.InvariantCulture, out var number) || number != 0m)
+            {
+                result.ValidationErrors.Add(
+                    $"Exclusion (notApplicable) '{exclusion.Pattern}': property '{path}' of entry '{key}' is {Shorten(value)}, not 0: remove it");
+                continue;
+            }
+            result.ExcludedNotApplicable++;
+        }
+    }
+
+    /// <summary>
+    /// Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
+    /// by mistake would otherwise never be looked up in the source
+    /// </summary>
+    private static void CheckZeros(Manifest manifest, string lexDirectory, CheckResult result)
+    {
+        var keys = DerivedProperties.Keys(manifest);
+        foreach (var entry in manifest.Values)
+        {
+            if (string.IsNullOrEmpty(entry.Key) || IsReferenceEntry(entry.Key))
+            {
+                continue;
+            }
+            var zeros = DerivedProperties.Zeros(CompareContent(entry, lexDirectory));
+            if (zeros.Count == 0)
+            {
+                continue;
+            }
+            var justified = DerivedProperties.Of(entry.Key, manifest.Exclusions, keys)
+                .Select(x => DerivedProperties.Resolve(x.Pattern, keys).Path);
+            var unjustified = DerivedProperties.Unjustified(zeros, justified);
+            if (unjustified.Count == 0)
+            {
+                continue;
+            }
+            result.UnjustifiedZero++;
+            AddSample(result.UnjustifiedZeroSamples, $"{entry.Key} ({string.Join(", ", unjustified)})");
         }
     }
 

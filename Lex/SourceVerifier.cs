@@ -97,6 +97,16 @@ public sealed class SourceResult
     /// <summary>Derived properties of the entry (exclusion kind derived); their numbers are not looked up</summary>
     public List<DerivedValue> Derived { get; internal init; } = [];
 
+    /// <summary>Property paths of a bundle entry with the value 0; their numbers are not looked up</summary>
+    public List<string> Zero { get; internal init; } = [];
+
+    /// <summary>Zero properties of the entry with a notApplicable exclusion</summary>
+    public List<DerivedValue> NotApplicable { get; internal init; } = [];
+
+    /// <summary>Zero properties without justification: neither a notApplicable nor a derived exclusion</summary>
+    public List<string> UnjustifiedZero =>
+        DerivedProperties.Unjustified(Zero, NotApplicable.Concat(Derived).Select(x => x.Property));
+
     /// <summary>Hint for the review of the result, e.g. all numbers of the entry are derived</summary>
     public string Note { get; internal init; }
 
@@ -127,6 +137,9 @@ public static class SourceVerifier
 
     /// <summary>Note of an entry whose numbers are all derived</summary>
     internal const string AllDerivedNote = "all numbers derived: confirm with LexAttest";
+
+    /// <summary>Hint for zero properties of a bundle without a notApplicable exclusion</summary>
+    public const string UnjustifiedZeroHint = "zero values without justification";
 
     /// <summary>Note of a found entry whose location exceeds the maximum location length</summary>
     internal const string LocationTooLongNote = "location too long: set sourceLocation manually";
@@ -344,7 +357,7 @@ public static class SourceVerifier
     /// <param name="sources">Source URL and document, in the order of the entry source URLs</param>
     /// <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
     /// <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
-    /// exclusion of the entry are not looked up</param>
+    /// exclusion of the entry are not looked up, a notApplicable exclusion justifies a zero property</param>
     /// <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
     /// in multi-year sections as <see cref="SourceMatch.Ambiguous"/> (see <see cref="Years"/>), null without year context</param>
     public static SourceResult Verify(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources,
@@ -354,6 +367,8 @@ public static class SourceVerifier
         var urls = entry.Urls.ToList();
         content ??= entry.Content;
         var derived = DerivedProperties.Values(entry.Key, content, exclusions);
+        var notApplicable = DerivedProperties.Values(entry.Key, content, exclusions, Exclusion.KindNotApplicable);
+        var zero = DerivedProperties.Zeros(content);
         var readable = sources.Where(s => s.Document.State == SourceState.Readable).ToList();
         var failed = sources.Where(s => s.Document.State != SourceState.Readable).ToList();
         var reason = sources.Count == 1
@@ -364,7 +379,7 @@ public static class SourceVerifier
         {
             return new SourceResult
             {
-                Key = entry.Key, Urls = urls, Reason = reason, Derived = derived,
+                Key = entry.Key, Urls = urls, Reason = reason, Derived = derived, Zero = zero, NotApplicable = notApplicable,
                 Match = failed.All(s => s.Document.State == SourceState.Missing) ? SourceMatch.NoEvidence : SourceMatch.Unreadable
             };
         }
@@ -386,6 +401,7 @@ public static class SourceVerifier
                 NumbersFound = found?.Count ?? 0,
                 Missing = found == null ? [] : numbers.Except(found).Select(n => n.ToString(CultureInfo.InvariantCulture)).ToList(),
                 Location = tooLong ? null : location, Reason = reason, Ambiguity = ambiguity, Quote = quote, Derived = derived,
+                Zero = zero, NotApplicable = notApplicable,
                 Note = tooLong ? LocationTooLongNote
                     : match == SourceMatch.NoNumbers && derivedNumbers > 0 ? AllDerivedNote : null
             };

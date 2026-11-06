@@ -19,7 +19,8 @@ The library provides:
 - Availability check of the source URLs and detection of changed sources (`UrlChecker`, `LiveSource`)
 - Lookup of the entry numbers in the source document, with rating of weak matches, source quotes and sampling of
   large tables (`SourceVerifier`, `SourceDocument`)
-- Release gate: entry-specific locations, official main sources, no weak automatic matches (`Checker`)
+- Release gate: entry-specific locations, official main sources, no weak automatic matches, no zero values
+  without justification (`Checker`)
 - Transfer of the lex values into the lookup values of the regulation (`Applier`)
 - Rollover of a satellite to the next cycle (`Rollover`)
 
@@ -66,7 +67,12 @@ Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion
 (`Lookup.Key.Property`, formula and legal reference as reason) removes the numbers of a computed property from the
 lookup; the other numbers are verified and the `auto` record lists the property (`Verification.Derived`,
-`SourceResult.Derived`). `SourceVerifier.VerifyManifest` checks
+`SourceResult.Derived`). A property of a bundle with the value 0 (the rule does not apply, e.g. `"SDIRate": 0`)
+holds no number to look up: `SourceResult.Zero` lists these properties. A `notApplicable` exclusion
+(`Lookup.Key.Property`, the reason says why the rule does not apply) documents such a property
+(`SourceResult.NotApplicable`); a zero property without it is listed in `SourceResult.UnjustifiedZero`, so a rate
+set to 0 by mistake does not stay unnoticed (the checker reports it, a finding in the release mode).
+`SourceVerifier.VerifyManifest` checks
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 
 `SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by

@@ -83,10 +83,11 @@ public static class Validator
         {
             if (exclusion.Kind != Exclusion.KindCoverage && exclusion.Kind != Exclusion.KindSourceLocation &&
                 exclusion.Kind != Exclusion.KindOrphan && exclusion.Kind != Exclusion.KindAutoVerification &&
-                exclusion.Kind != Exclusion.KindDerived)
+                exclusion.Kind != Exclusion.KindDerived && exclusion.Kind != Exclusion.KindNotApplicable)
             {
                 errors.Add($"Exclusion '{exclusion.Pattern}': kind must be '{Exclusion.KindCoverage}', '{Exclusion.KindSourceLocation}', " +
-                           $"'{Exclusion.KindOrphan}', '{Exclusion.KindAutoVerification}' or '{Exclusion.KindDerived}'");
+                           $"'{Exclusion.KindOrphan}', '{Exclusion.KindAutoVerification}', '{Exclusion.KindDerived}' " +
+                           $"or '{Exclusion.KindNotApplicable}'");
             }
             if (string.IsNullOrWhiteSpace(exclusion.Pattern))
             {
@@ -94,14 +95,24 @@ public static class Validator
             }
             if (string.IsNullOrWhiteSpace(exclusion.Reason))
             {
-                errors.Add($"Exclusion '{exclusion.Pattern}': the 'reason' is mandatory" +
-                           (exclusion.Kind == Exclusion.KindDerived ? " (formula and legal reference)" : string.Empty));
+                errors.Add($"Exclusion '{exclusion.Pattern}': the 'reason' is mandatory" + exclusion.Kind switch
+                {
+                    Exclusion.KindDerived => " (formula and legal reference)",
+                    Exclusion.KindNotApplicable => " (why the rule does not apply)",
+                    _ => string.Empty
+                });
             }
             if (exclusion.Kind == Exclusion.KindDerived && !string.IsNullOrWhiteSpace(exclusion.Pattern) &&
                 seenKeys.Contains(exclusion.Pattern.Trim()))
             {
                 errors.Add($"Exclusion (derived) '{exclusion.Pattern}' addresses the whole entry: a derived exclusion needs a property " +
                            $"(Lookup.Key.Property); to verify the whole entry manually use '{Exclusion.KindAutoVerification}'");
+            }
+            if (exclusion.Kind == Exclusion.KindNotApplicable && !string.IsNullOrWhiteSpace(exclusion.Pattern) &&
+                seenKeys.Contains(exclusion.Pattern.Trim()))
+            {
+                errors.Add($"Exclusion (notApplicable) '{exclusion.Pattern}' addresses the whole entry: a notApplicable exclusion " +
+                           "needs a property with the value 0 (Lookup.Key.Property)");
             }
         }
 

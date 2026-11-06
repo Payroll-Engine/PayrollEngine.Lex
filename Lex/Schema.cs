@@ -66,7 +66,7 @@ public static class Schema
             },
             "exclusions": {
               "type": "array",
-              "description": "Documented exclusions from the coverage, sourceLocation, orphan and automatic verification rules, and derived properties of entries. Excluded items are listed in the check report.",
+              "description": "Documented exclusions from the coverage, sourceLocation, orphan and automatic verification rules, derived properties and properties not applicable of entries. Excluded items are listed in the check report.",
               "items": {
                 "$ref": "#/$defs/exclusion"
               }
@@ -80,17 +80,17 @@ public static class Schema
               "properties": {
                 "kind": {
                   "type": "string",
-                  "enum": ["coverage", "sourceLocation", "orphan", "autoVerification", "derived"],
-                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code). autoVerification: lex entries verified manually only (LexVerifySource writes no source location and no automatic verification record). derived: property of a lex entry that is derived from other values and is not in the source (LexVerifySource does not look up its numbers)."
+                  "enum": ["coverage", "sourceLocation", "orphan", "autoVerification", "derived", "notApplicable"],
+                  "description": "coverage: regulation values without lex entry. sourceLocation: lex entries without sourceLocation. orphan: lex entries without regulation value (evidence of a rule implemented in code). autoVerification: lex entries verified manually only (LexVerifySource writes no source location and no automatic verification record). derived: property of a lex entry that is derived from other values and is not in the source (LexVerifySource does not look up its numbers). notApplicable: property of a lex entry with the value 0 because the rule does not apply (a zero property without this exclusion is reported)."
                 },
                 "pattern": {
                   "type": "string",
-                  "description": "Key pattern: Lookup, Lookup.Key, or a prefix with trailing '*'. A name also matches all keys below it. derived: entry key and property path of the JSON content (Lookup.Key.Property, nested properties separated by '.')."
+                  "description": "Key pattern: Lookup, Lookup.Key, or a prefix with trailing '*'. A name also matches all keys below it. derived and notApplicable: entry key and property path of the JSON content (Lookup.Key.Property, nested properties separated by '.')."
                 },
                 "reason": {
                   "type": "string",
-                  "description": "Mandatory justification for the exclusion; derived: formula and legal reference",
-                  "examples": ["5% of BaseRate (0.06), Example Act s. 12(2)"]
+                  "description": "Mandatory justification for the exclusion; derived: formula and legal reference; notApplicable: why the rule does not apply",
+                  "examples": ["5% of BaseRate (0.06), Example Act s. 12(2)", "TX: no state disability insurance program"]
                 }
               }
             },

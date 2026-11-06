@@ -192,6 +192,16 @@
         <member name="P:PayrollEngine.Lex.CheckResult.ExcludedDerived">
             <summary>Entry properties documented as derived (exclusion kind derived)</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedNotApplicable">
+            <summary>Zero entry properties documented as not applicable (exclusion kind notApplicable)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnjustifiedZero">
+            <summary>Bundle entries with zero properties without justification (neither notApplicable nor derived);
+            a finding only in the release mode</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnjustifiedZeroSamples">
+            <summary>Samples of bundle entries with zero properties without justification</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
@@ -288,7 +298,8 @@
             <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
             <param name="requireVerification">Treat an entry without verification record as a finding</param>
             <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
-            a secondary main source and an entry excluded from auto verification with an automatic record are findings.
+            a secondary main source, an entry excluded from auto verification with an automatic record and a zero property
+            without notApplicable exclusion are findings.
             The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)"/>.</param>
         </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
@@ -300,9 +311,16 @@
             <param name="manifest">Manifest (lex.json)</param>
             <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
         </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckDerived(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+        <member name="M:PayrollEngine.Lex.Checker.CheckPropertyExclusions(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
             <summary>
-            A derived exclusion must address an existing property of an entry (e.g. not renamed)
+            A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
+            a notApplicable property must have the value 0
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
+            by mistake would otherwise never be looked up in the source
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
@@ -370,8 +388,8 @@
         </member>
         <member name="T:PayrollEngine.Lex.DerivedValue">
             <summary>
-            Property of a lex entry that is derived from other values (exclusion kind <c>derived</c>):
-            its numbers are not looked up in the source
+            Property of a lex entry addressed by a property exclusion: derived from other values (exclusion kind
+            <c>derived</c>) or not applicable (exclusion kind <c>notApplicable</c>); its numbers are not looked up in the source
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.DerivedValue.Property">
@@ -381,20 +399,26 @@
             <summary>Value of the property in the entry content</summary>
         </member>
         <member name="P:PayrollEngine.Lex.DerivedValue.Reason">
-            <summary>Formula and legal reference (reason of the exclusion)</summary>
+            <summary>Reason of the exclusion: formula and legal reference (derived) or why the value does not apply
+            (notApplicable)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.DerivedProperties">
             <summary>
-            Resolves the derived exclusions of a manifest to entry properties
+            Resolves the property exclusions (derived, notApplicable) of a manifest to entry properties
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.IsPropertyKind(System.String)">
+            <summary>
+            Test if an exclusion kind addresses a property of an entry (Lookup.Key.Property)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.DerivedProperties.Resolve(System.String,System.Collections.Generic.ICollection{System.String})">
             <summary>
-            Entry key and property path addressed by a derived pattern: the longest entry key the pattern starts with
+            Entry key and property path addressed by a property pattern: the longest entry key the pattern starts with
             (<see cref="M:PayrollEngine.Lex.EntryMapping.Splits(System.String)"/>). The path is empty when the pattern is an entry key; the key is null
             when the pattern addresses no entry.
             </summary>
-            <param name="pattern">Derived pattern (Lookup.Key.Property)</param>
+            <param name="pattern">Property pattern (Lookup.Key.Property)</param>
             <param name="keys">Entry keys of the manifest</param>
         </member>
         <member name="M:PayrollEngine.Lex.DerivedProperties.Keys(PayrollEngine.Lex.Manifest)">
@@ -404,21 +428,42 @@
         </member>
         <member name="M:PayrollEngine.Lex.DerivedProperties.Of(System.String,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.Exclusion},System.Collections.Generic.ICollection{System.String})">
             <summary>
-            Derived exclusions of a manifest that address a property of an entry
+            Property exclusions (derived, notApplicable) of a manifest that address a property of an entry
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.DerivedProperties.Values(System.String,System.String,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.Exclusion})">
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Values(System.String,System.String,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.Exclusion},System.String)">
             <summary>
-            Derived values of an entry: the properties of the content addressed by the derived exclusions.
+            Excluded values of an entry: the properties of the content addressed by the exclusions of a kind.
             A pattern whose property is missing in the content is ignored (reported by the checker).
             </summary>
             <param name="entryKey">Entry key</param>
             <param name="content">Entry content (inline content or text of the content file)</param>
-            <param name="exclusions">Exclusions; only the derived exclusions of the entry are used</param>
+            <param name="exclusions">Exclusions; only the exclusions of the kind and the entry are used</param>
+            <param name="kind">Exclusion kind, default derived</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Zeros(System.String)">
+            <summary>
+            Property paths of a bundle (JSON object content) whose value is 0, number or numeric text.
+            The path runs over objects only: a 0 within an array (e.g. the first tier of a table) is not listed.
+            </summary>
+            <param name="content">Entry content (inline content or text of the content file)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.Unjustified(System.Collections.Generic.IEnumerable{System.String},System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            Zero properties of a bundle without justification: neither not applicable nor derived, also not below an
+            excluded group property
+            </summary>
+            <param name="zeros">Property paths with the value 0 (<see cref="M:PayrollEngine.Lex.DerivedProperties.Zeros(System.String)"/>)</param>
+            <param name="justified">Property paths of the notApplicable and derived exclusions of the entry</param>
         </member>
         <member name="M:PayrollEngine.Lex.DerivedProperties.Exists(System.String,System.String)">
             <summary>
             Test if a property path exists in a JSON content
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.DerivedProperties.TryGetValue(System.String,System.String,System.String@)">
+            <summary>
+            Value of a property path in a JSON content: the text of a string, otherwise the raw JSON
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.DerivedProperties.TryGet(System.Text.Json.JsonElement,System.String,System.Text.Json.JsonElement@)">
@@ -662,25 +707,32 @@
             <summary>Kind: property of a lex entry that is derived from other values (formula) and is not in the source;
             LexVerifySource does not look up its numbers</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Exclusion.KindNotApplicable">
+            <summary>Kind: property of a lex entry with the value 0 because the rule does not apply (e.g. a state without
+            disability insurance); a zero property without this exclusion is reported</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Kind">
             <summary>
             Exclusion kind: <c>coverage</c> (regulation values without lex entry),
             <c>sourceLocation</c> (lex entries without sourceLocation),
             <c>orphan</c> (lex entries without regulation value),
-            <c>autoVerification</c> (lex entries verified manually only) or
-            <c>derived</c> (derived property of a lex entry)
+            <c>autoVerification</c> (lex entries verified manually only),
+            <c>derived</c> (derived property of a lex entry) or
+            <c>notApplicable</c> (zero property of a lex entry whose rule does not apply)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Pattern">
             <summary>
             Key pattern. Coverage: <c>Lookup</c>, <c>Lookup.Key</c> or a prefix with trailing <c>*</c>.
             SourceLocation, orphan and autoVerification: lex entry key, same syntax. A name also matches all keys below it (<c>Name.*</c>).
-            Derived: lex entry key and property path of the JSON content (<c>Lookup.Key.Property</c>, nested <c>Lookup.Key.Group.Property</c>).
+            Derived and notApplicable: lex entry key and property path of the JSON content (<c>Lookup.Key.Property</c>,
+            nested <c>Lookup.Key.Group.Property</c>).
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Exclusion.Reason">
             <summary>
-            Mandatory justification; for a derived property the formula and the legal reference
+            Mandatory justification; for a derived property the formula and the legal reference, for a property that is
+            not applicable why the rule does not apply
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Exclusion.Matches(System.String)">
@@ -1726,6 +1778,15 @@
         <member name="P:PayrollEngine.Lex.SourceResult.Derived">
             <summary>Derived properties of the entry (exclusion kind derived); their numbers are not looked up</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Zero">
+            <summary>Property paths of a bundle entry with the value 0; their numbers are not looked up</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.NotApplicable">
+            <summary>Zero properties of the entry with a notApplicable exclusion</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.UnjustifiedZero">
+            <summary>Zero properties without justification: neither a notApplicable nor a derived exclusion</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceResult.Note">
             <summary>Hint for the review of the result, e.g. all numbers of the entry are derived</summary>
         </member>
@@ -1752,6 +1813,9 @@
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
             <summary>Note of an entry whose numbers are all derived</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.UnjustifiedZeroHint">
+            <summary>Hint for zero properties of a bundle without a notApplicable exclusion</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.LocationTooLongNote">
             <summary>Note of a found entry whose location exceeds the maximum location length</summary>
@@ -1833,7 +1897,7 @@
             <param name="sources">Source URL and document, in the order of the entry source URLs</param>
             <param name="content">Content to verify, default: the inline content of the entry (the text of a content file)</param>
             <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
-            exclusion of the entry are not looked up</param>
+            exclusion of the entry are not looked up, a notApplicable exclusion justifies a zero property</param>
             <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year rates numbers found only
             in multi-year sections as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>), null without year context</param>
         </member>
