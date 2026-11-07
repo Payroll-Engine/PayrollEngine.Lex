@@ -22,7 +22,7 @@
   "gazettes": ["BGBl.", "GBl.", "BStBl."],
   "dateLinks": ["vom"],
   "months": [
-    "Januar", "Jänner", "Februar", "Feber", "März", "April", "Mai", "Juni", "Juli", "August", "September",
-    "Oktober", "November", "Dezember"
+    ["Januar", "Jänner"], ["Februar", "Feber"], ["März"], ["April"], ["Mai"], ["Juni"], ["Juli"], ["August"],
+    ["September"], ["Oktober"], ["November"], ["Dezember"]
   ]
 }

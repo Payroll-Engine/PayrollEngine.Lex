@@ -19,7 +19,7 @@
   "gazettes": ["DR", "DOU", "D.O.U."],
   "dateLinks": ["de"],
   "months": [
-    "janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro",
-    "outubro", "novembro", "dezembro"
+    ["janeiro"], ["fevereiro"], ["março", "marco"], ["abril"], ["maio"], ["junho"], ["julho"], ["agosto"],
+    ["setembro"], ["outubro"], ["novembro"], ["dezembro"]
   ]
 }

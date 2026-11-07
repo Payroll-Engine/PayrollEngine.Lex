@@ -8,6 +8,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 // ReSharper disable CommentTypo
+// ReSharper disable GrammarMistakeInComment
 
 namespace PayrollEngine.Lex;
 
@@ -69,14 +70,40 @@ internal enum HitYear
 /// </summary>
 /// <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
 /// <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
-internal readonly record struct RelevantPeriod(int Year, bool Fiscal);
+/// <param name="StartMonth">Month of the tax year start (validFrom)</param>
+/// <param name="StartDay">Day of the tax year start (validFrom)</param>
+internal readonly record struct RelevantPeriod(int Year, bool Fiscal, int StartMonth = 1, int StartDay = 1)
+{
+    /// <summary>
+    /// Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
+    /// before; null when the date has no day in the start month and the tax year does not start on the 1st
+    /// </summary>
+    internal int? TaxYearOf(int year, int month, int? day)
+    {
+        if (month != StartMonth)
+        {
+            return month > StartMonth ? year : year - 1;
+        }
+        if (StartDay == 1)
+        {
+            return year;
+        }
+        return day == null ? null : day >= StartDay ? year : year - 1;
+    }
+}
 
 /// <summary>
 /// Year, year group (enumeration, range) or tax year period of a text with its position
 /// </summary>
 internal sealed class YearHit(List<int> years, int index, int length, bool validity = false,
-    int? periodStart = null, bool plain = false)
+    int? periodStart = null, bool plain = false, int? month = null, int? day = null)
 {
+    /// <summary>Month of a date with the year (<c>January 2026</c>, <c>17.09.2026</c>), null without date</summary>
+    internal int? Month => month;
+
+    /// <summary>Day of a date with the year, null without day</summary>
+    internal int? Day => day;
+
     /// <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
     internal List<int> Years => years;
 
@@ -102,7 +129,7 @@ internal sealed class YearHit(List<int> years, int index, int length, bool valid
     internal YearHit Join(int year, int end) => new([.. years, year], index, end - index, validity);
 
     /// <summary>The year at the start of the section text (year of the section heading)</summary>
-    internal YearHit AtStart() => new(years, 0, 0, validity, periodStart, plain);
+    internal YearHit AtStart() => new(years, 0, 0, validity, periodStart, plain, month, day);
 }
 
 /// <summary>
@@ -711,14 +738,24 @@ public static class SourceVerifier
     internal static RelevantPeriod? Period(int? referenceYear, string validFrom)
     {
         var year = referenceYear ?? ValidYear(validFrom);
-        return year == null ? null : new RelevantPeriod(year.Value, IsTaxYearStart(validFrom));
+        if (year == null)
+        {
+            return null;
+        }
+        var start = TaxYearStart(validFrom);
+        return start == null
+            ? new RelevantPeriod(year.Value, false)
+            : new RelevantPeriod(year.Value, true, start.Value.Month, start.Value.Day);
     }
 
-    private static bool IsTaxYearStart(string validFrom) =>
+    /// <summary>Start of a tax year: validFrom when it is not the 1st of January</summary>
+    private static DateOnly? TaxYearStart(string validFrom) =>
         validFrom is { Length: >= 10 } &&
         DateOnly.TryParseExact(validFrom[..10], "yyyy-MM-dd", CultureInfo.InvariantCulture, DateTimeStyles.None,
             out var date) &&
-        (date.Month != 1 || date.Day != 1);
+        (date.Month != 1 || date.Day != 1)
+            ? date
+            : null;
 
     private static bool IsYear(string text) =>
         text.Length == 4 && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
@@ -827,6 +864,16 @@ public static class SourceVerifier
         @"(?<!\p{L})FY\s?'?(?<end>\d{2})(?:[-\u2010-\u2015/](?<next>\d{2}))?(?![\d.,])", RegexOptions.Compiled);
 
     private const int PrefixWindow = 24;
+
+    // a tax year by its start date before the year: assessment year commencing on the 1st day of April, 2026 (income
+    // period 2025-26), previous year commencing on 1 April 2025, financial year beginning 1 July 2025
+    private static readonly Regex CommencingPrefix = new(
+        @"(?<!\p{L})(?:(?<assessment>AY|YA|[Aa]ssessment\s+[Yy]ear|[Yy]ear\s+of\s+[Aa]ssessment)|FY|" +
+        @"(?:[Ff]inancial|[Ff]iscal|[Tt]ax|[Ii]ncome|[Pp]revious)\s+[Yy]ear)\s+(?:commencing|beginning|starting)\s+" +
+        @"(?:on\s+|from\s+)?(?:the\s+)?$",
+        RegexOptions.Compiled);
+
+    private const int DateWindow = 48;
 
     /// <summary>
     /// Tax year period that starts with the year at the text position, null for a year: a short form
@@ -968,8 +1015,17 @@ public static class SourceVerifier
     /// </summary>
     private static bool Holds(YearHit candidate, RelevantPeriod period) =>
         period.Fiscal
-            ? candidate.PeriodStart == period.Year
+            ? candidate.PeriodStart == period.Year || DatedTaxYear(candidate, period) == period.Year
             : (candidate.PeriodStart == null || candidate.Plain) && candidate.Years.Contains(period.Year);
+
+    /// <summary>
+    /// Start year of the tax year that holds a dated year (<c>January 2026</c>: 2025 for a tax year from April),
+    /// null for a year without month, a group, a period or a month that does not decide
+    /// </summary>
+    private static int? DatedTaxYear(YearHit candidate, RelevantPeriod period) =>
+        candidate.PeriodStart == null && candidate.Years.Count == 1 && candidate.Month is { } month
+            ? period.TaxYearOf(candidate.Years[0], month, candidate.Day)
+            : null;
 
     /// <summary>
     /// Rating of the closest year hit (see <see cref="YearContext"/>)
@@ -985,6 +1041,10 @@ public static class SourceVerifier
         if (Holds(closest, period))
         {
             return HitYear.Positive;
+        }
+        if (period.Fiscal && DatedTaxYear(closest, period) != null)
+        {
+            return HitYear.Weak;
         }
         if (period.Fiscal && closest.PeriodStart == null && closest.Years.Any(y => y == year || y == year + 1))
         {
@@ -1077,6 +1137,19 @@ public static class SourceVerifier
                            languages.UnchangedBefore.IsMatch(validityBefore) ||
                            languages.ValidityAfter.IsMatch(text[end..Math.Min(text.Length, end + 24)]);
             var value = int.Parse(match.Value, CultureInfo.InvariantCulture);
+            var dateOffset = Math.Max(0, match.Index - DateWindow);
+            var date = languages.Date(text[dateOffset..match.Index], out var dateStart);
+            if (date != null)
+            {
+                var dateIndex = dateOffset + dateStart;
+                var commencing = CommencingPrefix.Match(text[Math.Max(0, dateIndex - DateWindow)..dateIndex]);
+                if (commencing.Success)
+                {
+                    var startYear = commencing.Groups["assessment"].Success ? value - 1 : value;
+                    years.Add(new YearHit([startYear, startYear + 1], match.Index, match.Length, validity, startYear));
+                    continue;
+                }
+            }
             var period = PeriodHit(text, match.Index, end, value, validity);
             if (period != null)
             {
@@ -1108,7 +1181,7 @@ public static class SourceVerifier
                 years[^1] = join;
                 continue;
             }
-            years.Add(new YearHit([value], match.Index, match.Length, validity));
+            years.Add(new YearHit([value], match.Index, match.Length, validity, month: date?.Month, day: date?.Day));
         }
         var taxYears = ShortTaxYears(text).ToList();
         return taxYears.Count == 0 ? years : years.Concat(taxYears).OrderBy(x => x.Index).ToList();

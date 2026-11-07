@@ -1017,8 +1017,14 @@
         <member name="P:PayrollEngine.Lex.LanguageProfile.DateLinks">
             <summary>Connectors between an enactment and its date (<c>Gesetz vom</c>, <c>loi du</c>, <c>Real Decreto … de</c>)</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.DayLinks">
+            <summary>Words between the day and the month of a date (<c>1st day of April</c>)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LanguageProfile.Months">
-            <summary>Month names and abbreviations</summary>
+            <summary>Months January to December, each with its names and abbreviations; empty or twelve entries</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LanguageProfile.MonthCount">
+            <summary>Number of months of a year</summary>
         </member>
         <member name="M:PayrollEngine.Lex.LanguageProfile.IsLanguageCode(System.String)">
             <summary>Test if a text is a language code: two or three lower-case letters (ISO 639-1 or 639-3)</summary>
@@ -1120,6 +1126,21 @@
         </member>
         <member name="M:PayrollEngine.Lex.LanguageSet.ToString">
             <inheritdoc />
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.MonthNumbers">
+            <summary>Month number (1–12) of a month name or abbreviation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.DateBefore">
+            <summary>Month and day of a date directly before a year (see <see cref="M:PayrollEngine.Lex.LanguageSet.Date(System.String,System.Int32@)"/>)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.Date(System.String,System.Int32@)">
+            <summary>
+            Month and day of the date that ends at the end of the text: a month name with or without day
+            (<c>January 2026</c>, <c>January 1, 2026</c>, <c>1 January 2026</c>, <c>the 1st day of April, 2026</c>)
+            or a numeric date with dots (<c>17.09.2026</c>); null without date or for a month name of several months
+            </summary>
+            <param name="before">Text before the year</param>
+            <param name="start">Text position of the date in <paramref name="before"/></param>
         </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
@@ -2007,14 +2028,18 @@
             </summary>
             <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
             <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+            <param name="StartMonth">Month of the tax year start (validFrom)</param>
+            <param name="StartDay">Day of the tax year start (validFrom)</param>
         </member>
-        <member name="M:PayrollEngine.Lex.RelevantPeriod.#ctor(System.Int32,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.RelevantPeriod.#ctor(System.Int32,System.Boolean,System.Int32,System.Int32)">
             <summary>
             Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
             the 1st of January: IN 2026-04-01 is the tax year 2026-27)
             </summary>
             <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
             <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+            <param name="StartMonth">Month of the tax year start (validFrom)</param>
+            <param name="StartDay">Day of the tax year start (validFrom)</param>
         </member>
         <member name="P:PayrollEngine.Lex.RelevantPeriod.Year">
             <summary>Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</summary>
@@ -2022,15 +2047,33 @@
         <member name="P:PayrollEngine.Lex.RelevantPeriod.Fiscal">
             <summary>The period is a tax year starting in <paramref name="Year"/></summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartMonth">
+            <summary>Month of the tax year start (validFrom)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartDay">
+            <summary>Day of the tax year start (validFrom)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RelevantPeriod.TaxYearOf(System.Int32,System.Int32,System.Nullable{System.Int32})">
+            <summary>
+            Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
+            before; null when the date has no day in the start month and the tax year does not start on the 1st
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.YearHit">
             <summary>
             Year, year group (enumeration, range) or tax year period of a text with its position
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Nullable{System.Int32},System.Boolean)">
+        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Nullable{System.Int32},System.Boolean,System.Nullable{System.Int32},System.Nullable{System.Int32})">
             <summary>
             Year, year group (enumeration, range) or tax year period of a text with its position
             </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Month">
+            <summary>Month of a date with the year (<c>January 2026</c>, <c>17.09.2026</c>), null without date</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Day">
+            <summary>Day of a date with the year, null without day</summary>
         </member>
         <member name="P:PayrollEngine.Lex.YearHit.Years">
             <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
@@ -2301,6 +2344,9 @@
             <param name="referenceYear">Reference year of the entry</param>
             <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd)</param>
         </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.TaxYearStart(System.String)">
+            <summary>Start of a tax year: validFrom when it is not the 1st of January</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.NumericDate">
             <summary>Day and month of a numeric date before its year, with dots: 17.09.2026, 1.4.2025</summary>
         </member>
@@ -2376,6 +2422,12 @@
         <member name="M:PayrollEngine.Lex.SourceVerifier.Holds(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">
             <summary>
             The year hit holds the relevant period: a calendar year within the year or group, a tax year as period start
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.DatedTaxYear(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">
+            <summary>
+            Start year of the tax year that holds a dated year (<c>January 2026</c>: 2025 for a tax year from April),
+            null for a year without month, a group, a period or a month that does not decide
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Rate(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">

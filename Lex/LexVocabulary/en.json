@@ -31,8 +31,10 @@
     "Act", "Acts", "Rules", "Regulations", "Ordinance", "Code",
     "ACT", "ACTS", "RULES", "REGULATIONS", "ORDINANCE", "CODE"
   ],
+  "dayLinks": ["day of"],
   "months": [
-    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
-    "November", "December", "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec"
+    ["January", "Jan"], ["February", "Feb"], ["March", "Mar"], ["April", "Apr"], ["May"], ["June", "Jun"],
+    ["July", "Jul"], ["August", "Aug"], ["September", "Sep", "Sept"], ["October", "Oct"], ["November", "Nov"],
+    ["December", "Dec"]
   ]
 }

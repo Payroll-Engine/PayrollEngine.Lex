@@ -13,7 +13,8 @@ public class LanguageSetTests
           "enumerationWords": ["og", "eller"],
           "rangeWords": ["til"],
           "validityBefore": ["med virkning fra", "fra og med"],
-          "months": ["januar", "februar", "marts", "april"]
+          "months": [["januar"], ["februar"], ["marts"], ["april"], ["maj"], ["juni"], ["juli"], ["august"],
+            ["september"], ["oktober"], ["november"], ["december"]]
         }
         """;
 
@@ -129,6 +130,13 @@ public class LanguageSetTests
     [InlineData("da.json", """{ "language": "da", "percentWord": ["procent"] }""", "percentWord")]
     [InlineData("da.json", """{ "language": "da", "rangeWords": [""] }""", "empty word")]
     [InlineData("da.json", """{ "language": "da", "scaleWords": [{ "word": "mio.", "factor": 0.5 }] }""", "below 1")]
+    [InlineData("da.json", """{ "language": "da", "months": [["januar"], ["februar"]] }""", "months has 2 entries")]
+    [InlineData("da.json", """{ "language": "da", "months": [[], [], [], [], [], [], [], [], [], [], [], []] }""",
+        "a month without name")]
+    [InlineData("da.json", """
+        { "language": "da", "months": [["januar"], ["jan"], ["marts"], ["april"], ["maj"], ["juni"], ["juli"],
+          ["august"], ["september"], ["oktober"], ["november"], ["december", "jan"]] }
+        """, "in several months")]
     [InlineData("danish.json", """{ "language": "da" }""", "language code")]
     [InlineData("da.json", "{ ", "Invalid language file")]
     public void AdditionalFolder_InvalidFile_Throws(string name, string json, string message)

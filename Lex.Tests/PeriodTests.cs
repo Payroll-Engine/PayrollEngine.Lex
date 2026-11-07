@@ -1,4 +1,5 @@
 using Xunit;
+// ReSharper disable StringLiteralTypo
 
 namespace PayrollEngine.Lex.Tests;
 
@@ -27,15 +28,17 @@ public class PeriodTests
     // period of the manifest ---------------------------------------------------
 
     [Theory]
-    [InlineData(null, "2026-01-01", 2026, false)]
-    [InlineData(null, "2026-04-01", 2026, true)]
-    [InlineData(null, "2025-07-01", 2025, true)]
-    [InlineData(null, "2026-04-06", 2026, true)]
-    [InlineData(2025, "2026-04-01", 2025, true)]
-    [InlineData(2025, "2026-01-01", 2025, false)]
-    [InlineData(2025, null, 2025, false)]
-    public void Period_FromValidFrom(int? referenceYear, string validFrom, int year, bool fiscal) =>
-        Assert.Equal(new RelevantPeriod(year, fiscal), SourceVerifier.Period(referenceYear, validFrom));
+    [InlineData(null, "2026-01-01", 2026, false, 1, 1)]
+    [InlineData(null, "2026-04-01", 2026, true, 4, 1)]
+    [InlineData(null, "2025-07-01", 2025, true, 7, 1)]
+    [InlineData(null, "2026-04-06", 2026, true, 4, 6)]
+    [InlineData(2025, "2026-04-01", 2025, true, 4, 1)]
+    [InlineData(2025, "2026-01-01", 2025, false, 1, 1)]
+    [InlineData(2025, null, 2025, false, 1, 1)]
+    public void Period_FromValidFrom(int? referenceYear, string validFrom, int year, bool fiscal,
+        int startMonth, int startDay) =>
+        Assert.Equal(new RelevantPeriod(year, fiscal, startMonth, startDay),
+            SourceVerifier.Period(referenceYear, validFrom));
 
     [Fact]
     public void Period_WithoutYear_IsNull() =>
@@ -91,7 +94,79 @@ public class PeriodTests
         Assert.Equal(years, hit.Years);
     }
 
+    [Theory]
+    [InlineData("Rates January 2026", 1, null)]
+    [InlineData("Rates Sept. 2026", 9, null)]
+    [InlineData("Rates January 1, 2026", 1, 1)]
+    [InlineData("Rates 1 January 2026", 1, 1)]
+    [InlineData("Rates the 1st day of April, 2026", 4, 1)]
+    [InlineData("Rates 17.09.2026", 9, 17)]
+    [InlineData("Ab 1. Jänner 2026", 1, 1)]
+    [InlineData("À compter du 1er janvier 2026", 1, 1)]
+    [InlineData("Desde el 1 de enero de 2026", 1, 1)]
+    public void YearHits_Date_HasMonthAndDay(string text, int month, int? day)
+    {
+        var hit = Assert.Single(SourceVerifier.YearHits(text));
+
+        Assert.Equal([2026], hit.Years);
+        Assert.Equal(month, hit.Month);
+        Assert.Equal(day, hit.Day);
+    }
+
+    [Theory]
+    [InlineData("Rates 2026")]
+    [InlineData("Tax year 2026")]
+    public void YearHits_WithoutDate_HasNoMonth(string text) =>
+        Assert.Null(Assert.Single(SourceVerifier.YearHits(text)).Month);
+
+    [Theory]
+    [InlineData("for the assessment year commencing on the 1st day of April, 2027", 2026)]
+    [InlineData("for the AY commencing 1 April 2027", 2026)]
+    [InlineData("for the previous year commencing on 1 April 2026", 2026)]
+    [InlineData("for the financial year beginning 1 July 2025", 2025)]
+    [InlineData("for the income year starting from 1 July 2025", 2025)]
+    public void YearHits_TaxYearByStartDate_IsPeriod(string text, int start)
+    {
+        var hit = Assert.Single(SourceVerifier.YearHits(text));
+
+        Assert.Equal(start, hit.PeriodStart);
+        Assert.Equal([start, start + 1], hit.Years);
+    }
+
     // tax year rating ------------------------------------------------------------
+
+    [Theory]
+    [InlineData("In April 2026 the limit is 1,75,000.", SourceMatch.Found)]
+    [InlineData("In January 2027 the limit is 1,75,000.", SourceMatch.Found)]
+    [InlineData("On 31 March 2027 the limit is 1,75,000.", SourceMatch.Found)]
+    [InlineData("In March 2026 the limit is 1,75,000.", SourceMatch.Ambiguous)]
+    [InlineData("In April 2027 the limit is 1,75,000.", SourceMatch.Ambiguous)]
+    [InlineData("On 01.04.2027 the limit is 1,75,000.", SourceMatch.Ambiguous)]
+    public void TaxYear_DatedYear_IsAssignedToTaxYear(string text, SourceMatch expected) =>
+        Assert.Equal(expected, Verify("175000", text, India));
+
+    [Theory]
+    [InlineData("On 5 April 2027 the limit is 4,567.", SourceMatch.Found)]
+    [InlineData("On 6 April 2027 the limit is 4,567.", SourceMatch.Ambiguous)]
+    [InlineData("In April 2027 the limit is 4,567.", SourceMatch.Found)]
+    [InlineData("In April 2026 the limit is 4,567.", SourceMatch.Found)]
+    [InlineData("In April 2025 the limit is 4,567.", SourceMatch.Ambiguous)]
+    public void TaxYear_DatedYearInStartMonth_NeedsDay(string text, SourceMatch expected) =>
+        Assert.Equal(expected, Verify("4567", text, Kingdom));
+
+    [Theory]
+    [InlineData("For the assessment year commencing on the 1st day of April, 2027, the limit is 1,75,000.",
+        SourceMatch.Found)]
+    [InlineData("For the assessment year commencing on the 1st day of April, 2026, the limit is 1,75,000.",
+        SourceMatch.Ambiguous)]
+    public void TaxYear_AssessmentYearByStartDate(string text, SourceMatch expected) =>
+        Assert.Equal(expected, Verify("175000", text, India));
+
+    [Theory]
+    [InlineData("In January 2026 the limit is 1,50,000.", SourceMatch.Found)]
+    [InlineData("In December 2025 the limit is 1,50,000.", SourceMatch.Ambiguous)]
+    public void CalendarYear_DatedYear_CountsByYear(string text, SourceMatch expected) =>
+        Assert.Equal(expected, Verify("150000", text, Calendar));
 
     private const string FinancialYears = "Limit FY 2025-26: 1,50,000. Limit FY 2026-27: 1,75,000.";
     private const string AssessmentYears = "Limit AY 2026-27: 1,50,000. Limit AY 2027-28: 1,75,000.";

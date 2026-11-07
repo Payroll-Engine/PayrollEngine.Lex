@@ -22,7 +22,7 @@
   "gazettes": ["JO", "JORF", "Mémorial"],
   "dateLinks": ["du"],
   "months": [
-    "janvier", "février", "fevrier", "mars", "avril", "mai", "juin", "juillet", "août", "aout", "septembre",
-    "octobre", "novembre", "décembre", "decembre"
+    ["janvier"], ["février", "fevrier"], ["mars"], ["avril"], ["mai"], ["juin"], ["juillet"], ["août", "aout"],
+    ["septembre"], ["octobre"], ["novembre"], ["décembre", "decembre"]
   ]
 }

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Security.Cryptography;
@@ -191,11 +192,30 @@ public sealed class LanguageSet
 
         // dates and validity -------------------------------------------------
 
-        var month = "(?:" + Words(p => p.Months) + ")";
+        var monthWords = Words(p => p.Months.SelectMany(x => x));
+        var month = "(?:" + monthWords + ")";
 
-        // a date before its year, day first: 1 January 2025, 1st April, 2026, 1. Januar 2025, 1er janvier 2025,
-        // 1 de enero de 2025, 1° gennaio 2025, 1º de janeiro de 2025
-        var dayMonthDate = @"\d{1,2}(?:st|nd|rd|th|er|\.|°|º|ª)?\s*(?:de\s+)?" + month + @"\.?(?:\s+de)?,?\s+";
+        // a month name of several languages counts only when all of them give the same month
+        MonthNumbers = profiles
+            .SelectMany(p => p.Months.SelectMany((names, index) => names.Select(name => (Name: name, Month: index + 1))))
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .Where(g => g.Select(x => x.Month).Distinct().Count() == 1)
+            .ToDictionary(g => g.Key, g => g.First().Month, StringComparer.OrdinalIgnoreCase);
+
+        // a date before its year, day first: 1 January 2025, 1st April, 2026, the 1st day of April, 2026,
+        // 1. Januar 2025, 1er janvier 2025, 1 de enero de 2025, 1° gennaio 2025, 1º de janeiro de 2025
+        var dayLink = "(?:(?:" + Words(p => p.DayLinks) + @")\s+)?";
+        var dayMonthDate = @"\d{1,2}(?:st|nd|rd|th|er|\.|°|º|ª)?\s*" + dayLink + @"(?:de\s+)?" + month + @"\.?(?:\s+de)?,?\s+";
+
+        // the month (and day) of a date directly before its year: January 2026, January 1, 2026, 1 January 2026,
+        // the 1st day of April, 2026, 1. Januar 2026, 17.09.2026
+        DateBefore = new(
+            @"(?:(?<!\p{L})(?<month>" + monthWords + @")\.?\s+(?<day>\d{1,2})(?:st|nd|rd|th)?,?\s+|" +
+            @"(?<![\d.,])(?<day>\d{1,2})(?:st|nd|rd|th|er|\.|°|º|ª)?\s*" + dayLink + @"(?:de\s+)?(?<!\p{L})(?<month>" +
+            monthWords + @")\.?(?:\s+de)?,?\s+|" +
+            @"(?<!\p{L})(?<month>" + monthWords + @")\.?,?\s+|" +
+            @"(?<![\d.,])(?<day>0?[1-9]|[12]\d|3[01])\.(?<number>0?[1-9]|1[0-2])\.)$",
+            RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // a full date before its year: January 1, 2025; a day-first date; 01.04.2025, 1/1/2025
         var fullDate = "(?:" + month + @"\.?\s+\d{1,2}(?:st|nd|rd|th)?,?\s+|" + dayMonthDate + @"|\d{1,2}[/.\-]\d{1,2}[/.\-])";
@@ -283,6 +303,42 @@ public sealed class LanguageSet
     public override string ToString() => Label;
 
     internal IReadOnlyList<LanguageProfile> Profiles { get; }
+
+    /// <summary>Month number (1–12) of a month name or abbreviation</summary>
+    internal IReadOnlyDictionary<string, int> MonthNumbers { get; }
+
+    /// <summary>Month and day of a date directly before a year (see <see cref="Date"/>)</summary>
+    internal Regex DateBefore { get; }
+
+    /// <summary>
+    /// Month and day of the date that ends at the end of the text: a month name with or without day
+    /// (<c>January 2026</c>, <c>January 1, 2026</c>, <c>1 January 2026</c>, <c>the 1st day of April, 2026</c>)
+    /// or a numeric date with dots (<c>17.09.2026</c>); null without date or for a month name of several months
+    /// </summary>
+    /// <param name="before">Text before the year</param>
+    /// <param name="start">Text position of the date in <paramref name="before"/></param>
+    internal (int Month, int? Day)? Date(string before, out int start)
+    {
+        start = before.Length;
+        var match = DateBefore.Match(before);
+        if (!match.Success)
+        {
+            return null;
+        }
+        int month;
+        if (match.Groups["number"].Success)
+        {
+            month = int.Parse(match.Groups["number"].Value, CultureInfo.InvariantCulture);
+        }
+        else if (!MonthNumbers.TryGetValue(match.Groups["month"].Value, out month))
+        {
+            return null;
+        }
+        start = match.Index;
+        int? day = match.Groups["day"].Success ? int.Parse(match.Groups["day"].Value, CultureInfo.InvariantCulture) : null;
+        return day is < 1 or > 31 ? null : (month, day);
+    }
+
     internal IReadOnlyDictionary<string, decimal> Scales { get; }
     internal Regex PercentSign { get; }
     internal Regex ScaleWord { get; }

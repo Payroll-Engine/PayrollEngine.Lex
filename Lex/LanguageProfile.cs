@@ -69,8 +69,14 @@ internal sealed class LanguageProfile
     /// <summary>Connectors between an enactment and its date (<c>Gesetz vom</c>, <c>loi du</c>, <c>Real Decreto … de</c>)</summary>
     public List<string> DateLinks { get; init; } = [];
 
-    /// <summary>Month names and abbreviations</summary>
-    public List<string> Months { get; init; } = [];
+    /// <summary>Words between the day and the month of a date (<c>1st day of April</c>)</summary>
+    public List<string> DayLinks { get; init; } = [];
+
+    /// <summary>Months January to December, each with its names and abbreviations; empty or twelve entries</summary>
+    public List<List<string>> Months { get; init; } = [];
+
+    /// <summary>Number of months of a year</summary>
+    internal const int MonthCount = 12;
 
     private static readonly Regex LanguageCode = new("^[a-z]{2,3}$", RegexOptions.Compiled);
 
@@ -126,15 +132,31 @@ internal sealed class LanguageProfile
         {
             PercentWords, HalfWords, OneAndHalfWords, DoubleWords, EnumerationWords, RangeWords, ValidityBefore,
             DatedValidityBefore, ValidityAfter, Unchanged, EnactmentWords, EnactmentEndings, TitleWords, Gazettes,
-            DateLinks, Months
+            DateLinks, DayLinks
         };
-        if (words.Any(x => x == null) || ScaleWords == null)
+        if (words.Any(x => x == null) || ScaleWords == null || Months == null || Months.Any(x => x == null))
         {
             return "a word list is null";
         }
-        if (words.SelectMany(x => x).Concat(ScaleWords.Select(x => x?.Word)).Any(string.IsNullOrWhiteSpace))
+        if (Months.Count != 0 && Months.Count != MonthCount)
+        {
+            return $"months has {Months.Count} entries: list the {MonthCount} months January to December";
+        }
+        if (Months.Any(x => x.Count == 0))
+        {
+            return "a month without name";
+        }
+        if (words.SelectMany(x => x).Concat(Months.SelectMany(x => x)).Concat(ScaleWords.Select(x => x?.Word))
+            .Any(string.IsNullOrWhiteSpace))
         {
             return "empty word";
+        }
+        var duplicate = Months.SelectMany((names, month) => names.Select(name => (Name: name, Month: month)))
+            .GroupBy(x => x.Name, StringComparer.OrdinalIgnoreCase)
+            .FirstOrDefault(g => g.Select(x => x.Month).Distinct().Count() > 1);
+        if (duplicate != null)
+        {
+            return $"month name '{duplicate.Key}' in several months";
         }
         var scale = ScaleWords.FirstOrDefault(x => x.Factor < 1m);
         return scale != null ? $"scale word '{scale.Word}' with factor {scale.Factor} below 1" : null;

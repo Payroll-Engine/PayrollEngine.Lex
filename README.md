@@ -116,11 +116,15 @@ A language file lists word arrays; every array is optional, an unknown property 
   "validityBefore": ["med virkning fra"], "datedValidityBefore": [], "validityAfter": [],
   "unchanged": ["uændret"],
   "enactmentWords": ["lov", "bekendtgørelse"], "enactmentEndings": ["loven"],
-  "titleWords": [], "gazettes": [], "dateLinks": ["af"],
-  "months": ["januar", "februar", "marts"]
+  "titleWords": [], "gazettes": [], "dateLinks": ["af"], "dayLinks": [],
+  "months": [["januar", "jan"], ["februar", "feb"], ["marts", "mar"], ["april", "apr"], ["maj"], ["juni", "jun"],
+    ["juli", "jul"], ["august", "aug"], ["september", "sep"], ["oktober", "okt"], ["november", "nov"],
+    ["december", "dec"]]
 }
 ```
 
+`months` lists the twelve months January to December, each with its names and abbreviations; a name belongs to
+one month only. `dayLinks` are the words between a day and its month (`the 1st day of April`).
 `titleWords` and `gazettes` are case-sensitive, all other words are not. Each result names the languages and
 the hash of their words (`SourceResult.Languages`, e.g. `de,en 3f2a9c1b`); the automatic verification record
 writes them into its method (`LexVerifySource 1.2.0; languages de,en 3f2a9c1b`), so a changed word list
@@ -152,7 +156,13 @@ manifest periods are rated: `2025-26`, `2025/26`, `2025-2026`, `2025 to 2026`, `
 `financial year 2025-26`, `income year 2025–26`, and the assessment year as the following year
 (`AY 2026-27`, `YA 2026`, `assessment year 2026-27` = tax year 2025). A period starting in the entry year is
 positive, a period of another start year is weak. A single year or a year group with the start year or the year
-after it is neutral (a tax year 2025-26 ends in 2026), any other year is weak. A validity start up to the start
+after it is neutral (a tax year 2025-26 ends in 2026), any other year is weak. A year with a month belongs to the
+tax year holding the date: for a tax year from April `January 2026` and `31 March 2026` are tax year 2025,
+`April 2026` and `01.04.2026` tax year 2026; a year with a month of the entry tax year is positive, of another tax
+year weak. In the start month of a tax year starting after the 1st (`2026-04-06`) only a date with day decides
+(`5 April 2027` is tax year 2026), `April 2027` stays neutral. A tax year given by its start date is a period:
+`previous year commencing on 1 April 2025`, `financial year beginning 1 July 2025` (tax year 2025) and
+`assessment year commencing on the 1st day of April, 2026` (tax year 2025). A validity start up to the start
 year is neutral as for calendar years. In a manifest from 1 January periods are no years, except two full
 consecutive years without prefix (`2024-2025`) which count as a year group.
 
