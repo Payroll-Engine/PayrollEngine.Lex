@@ -181,7 +181,11 @@ The local evidence of an entry is its `documentRef`, otherwise the declared file
 `Checker.UnusedEvidence` lists the evidence files that back no entry: a declared file without `documentRef`, source
 URL, `contentFile` or verification evidence pointing to it, and a file in `.lex` that is not declared in `files[]`.
 Such a file is never read, its entries count as without local evidence (the checker reports it, a finding in the
-release mode).
+release mode). In the release mode an entry without manual verification needs readable local evidence or a source
+that is readable live: an entry without readable local evidence and without a source URL with text hash in the
+snapshot (`liveSources`) can be verified neither locally nor live (`CheckResult.NotVerifiable`, a finding). A source
+behind bot protection, a script-only page or a scanned PDF therefore needs a local evidence file (a readable copy,
+e.g. the official text saved from the browser) or a manual verification.
 
 `SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by
 the host when the document has no file name (live source): `XX-2026-guide.pdf: Sections "Page 24", "Page 25";

@@ -15,6 +15,8 @@ public class ReleaseGateTests
 
     private static Verification Auto() => SourceVerifier.AutoVerification(new DateOnly(2026, 11, 3), "rates.html");
 
+    private static Verification LiveAuto() => SourceVerifier.AutoVerification(new DateOnly(2026, 11, 3), null);
+
     private static Verification Manual() => new()
     {
         Mode = Verification.ModeManual, VerifiedOn = "2026-11-03", VerifiedBy = "Jane Doe", Evidence = "rates.html"
@@ -70,6 +72,80 @@ public class ReleaseGateTests
         Assert.Equal(["Rates.A (ambiguous: short number)"], release.ManualVerificationSamples);
         Assert.True(release.HasFindings);
         Assert.Contains("Manual verification required (1)", CheckReport.BuildMarkdown([release]));
+    }
+
+    private static Entry WithoutEvidence(string key, string content, Verification verification) => new()
+    {
+        Key = key, Content = content, Unit = "%", SourceUrls = [DocUrl], SourceLocation = "p. 1",
+        LegalReference = "Test Act s. 1", Verification = verification
+    };
+
+    private static void WriteLiveSources(TestSatellite s, string textHash) =>
+        File.WriteAllText(Path.Combine(s.LexDirectory, "snapshot.json"),
+            "{ \"liveSources\": [ { \"url\": \"" + DocUrl + "\", " +
+            (textHash != null ? $"\"textHash\": \"{textHash}\"" : "\"reason\": \"HTTP 403\"") + " } ] }");
+
+    [Fact]
+    public async Task Release_NoLocalEvidenceAndNotReadableLive_IsNotVerifiable()
+    {
+        using var s = Satellite(("C", "12.75"));
+        WriteLiveSources(s, null);
+        var manifest = Manifest(WithoutEvidence("Rates.C", "12.75", LiveAuto()));
+        manifest.Files.Clear();
+        File.Delete(Path.Combine(s.LexDirectory, "rates.html"));
+
+        var plain = Checker.Check(manifest, s.LexPath);
+        var release = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, release);
+
+        Assert.False(plain.HasFindings);
+        Assert.Equal(1, release.NotVerifiable);
+        Assert.Equal(["Rates.C (no local evidence)"], release.NotVerifiableSamples);
+        Assert.True(release.HasFindings);
+        Assert.Contains("Verifiable neither locally nor live (1)", CheckReport.BuildMarkdown([release]));
+    }
+
+    [Fact]
+    public async Task Release_NoLocalEvidenceWithoutLiveState_IsNotVerifiable()
+    {
+        using var s = Satellite(("C", "12.75"));
+        var manifest = Manifest(WithoutEvidence("Rates.C", "12.75", LiveAuto()));
+        manifest.Files.Clear();
+        File.Delete(Path.Combine(s.LexDirectory, "rates.html"));
+        await File.WriteAllTextAsync(Path.Combine(s.LexDirectory, "snapshot.json"), "{}");
+
+        var release = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, release);
+
+        Assert.Equal(1, release.NotVerifiable);
+    }
+
+    [Fact]
+    public async Task Release_NoLocalEvidenceButReadableLive_IsVerifiable()
+    {
+        using var s = Satellite(("C", "12.75"));
+        WriteLiveSources(s, "sha256:abc");
+        var manifest = Manifest(WithoutEvidence("Rates.C", "12.75", LiveAuto()));
+        manifest.Files.Clear();
+        File.Delete(Path.Combine(s.LexDirectory, "rates.html"));
+
+        var release = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, release);
+
+        Assert.Equal(0, release.NotVerifiable);
+    }
+
+    [Fact]
+    public async Task Release_NoLocalEvidenceWithManualVerification_IsVerifiable()
+    {
+        using var s = Satellite(("C", "12.75"));
+        WriteLiveSources(s, null);
+        var manifest = Manifest(WithoutEvidence("Rates.C", "12.75", Manual()));
+
+        var release = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, release);
+
+        Assert.Equal(0, release.NotVerifiable);
     }
 
     [Fact]

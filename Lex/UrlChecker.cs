@@ -143,7 +143,7 @@ public sealed class UrlChecker : IDisposable
     /// <summary>
     /// Text hashes of the snapshot next to lex.json, by URL
     /// </summary>
-    private static Dictionary<string, string> ReadBaseline(string lexPath)
+    internal static Dictionary<string, string> ReadBaseline(string lexPath)
     {
         var baseline = new Dictionary<string, string>(StringComparer.Ordinal);
         var snapshotPath = string.IsNullOrWhiteSpace(lexPath)

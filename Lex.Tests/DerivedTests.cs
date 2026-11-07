@@ -251,7 +251,7 @@ public class DerivedTests
         Assert.Equal(1, result.ExcludedDerived);
         Assert.Contains($"derived `{Pattern}`: {Reason}", result.ExclusionNotes);
         Assert.Contains("1 derived properties", CheckReport.BuildMarkdown([result]));
-        Assert.EndsWith(";1;0;0;0;0", CheckReport.BuildCsv([result]).Split('\n')[1].TrimEnd('\r'));
+        Assert.EndsWith(";1;0;0;0;0;0", CheckReport.BuildCsv([result]).Split('\n')[1].TrimEnd('\r'));
     }
 
     [Fact]

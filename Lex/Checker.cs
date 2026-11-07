@@ -186,6 +186,13 @@ public sealed class CheckResult
     /// <summary>Entries that need a manual verification</summary>
     public int ManualVerificationRequired => Ambiguous + QuoteNotFound + ExcludedAutoVerified;
 
+    /// <summary>Entries without manual verification that can be verified neither locally nor live: no readable local
+    /// evidence and no source URL that is readable live according to the snapshot (release mode)</summary>
+    public int NotVerifiable { get; internal set; }
+
+    /// <summary>Samples of entries that can be verified neither locally nor live</summary>
+    public List<string> NotVerifiableSamples { get; } = [];
+
     // evidence
     /// <summary>Problems of the evidence files</summary>
     public List<string> FileProblems { get; } = [];
@@ -216,7 +223,8 @@ public sealed class CheckResult
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
         (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null ||
         (RequireLocation && UnspecificLocations > 0) ||
-        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0));
+        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0 ||
+                     NotVerifiable > 0));
 }
 
 /// <summary>
@@ -316,7 +324,8 @@ public static class Checker
     /// <summary>
     /// Release gate: verify the entries without manual verification against their local evidence
     /// (<see cref="SourceVerifier.VerifyManifest"/>); an ambiguous entry and an entry whose quote is not found
-    /// need a manual verification
+    /// need a manual verification; an entry without readable local evidence whose sources are not readable live
+    /// according to the snapshot (live sources with text hash) can be verified neither locally nor live
     /// </summary>
     /// <param name="manifest">Manifest (lex.json)</param>
     /// <param name="result">Result of <see cref="Check"/></param>
@@ -326,11 +335,18 @@ public static class Checker
             .Where(x => x.Key != null && x.Verification?.Mode == Verification.ModeManual)
             .Select(x => x.Key)
             .ToHashSet(StringComparer.Ordinal);
+        var readableLive = UrlChecker.ReadBaseline(result.LexPath);
         var sources = await SourceVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!);
         foreach (var source in sources.Where(x => !manual.Contains(x.Key)))
         {
             switch (source.Match)
             {
+                case SourceMatch.NoEvidence or SourceMatch.Unreadable when !source.Urls.Any(readableLive.ContainsKey):
+                    result.NotVerifiable++;
+                    AddSample(result.NotVerifiableSamples, source.Match == SourceMatch.NoEvidence
+                        ? $"{source.Key} (no local evidence)"
+                        : $"{source.Key} (local evidence not readable: {source.Reason})");
+                    break;
                 case SourceMatch.Ambiguous:
                     result.Ambiguous++;
                     AddSample(result.ManualVerificationSamples, $"{source.Key} (ambiguous: {source.Ambiguity})");

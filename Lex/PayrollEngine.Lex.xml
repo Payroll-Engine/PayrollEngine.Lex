@@ -266,6 +266,13 @@
         <member name="P:PayrollEngine.Lex.CheckResult.ManualVerificationRequired">
             <summary>Entries that need a manual verification</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.NotVerifiable">
+            <summary>Entries without manual verification that can be verified neither locally nor live: no readable local
+            evidence and no source URL that is readable live according to the snapshot (release mode)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.NotVerifiableSamples">
+            <summary>Samples of entries that can be verified neither locally nor live</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.FileProblems">
             <summary>Problems of the evidence files</summary>
         </member>
@@ -318,7 +325,8 @@
             <summary>
             Release gate: verify the entries without manual verification against their local evidence
             (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/>); an ambiguous entry and an entry whose quote is not found
-            need a manual verification
+            need a manual verification; an entry without readable local evidence whose sources are not readable live
+            according to the snapshot (live sources with text hash) can be verified neither locally nor live
             </summary>
             <param name="manifest">Manifest (lex.json)</param>
             <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>

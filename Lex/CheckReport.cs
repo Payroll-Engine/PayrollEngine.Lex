@@ -37,7 +37,7 @@ public static class CheckReport
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                        "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence");
+                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence;NotVerifiable");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -47,7 +47,7 @@ public static class CheckReport
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
                 r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified, r.ExcludedDerived,
-                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear, r.UnusedEvidence));
+                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear, r.UnusedEvidence, r.NotVerifiable));
         }
         return csv.ToString();
     }
@@ -92,6 +92,7 @@ public static class CheckReport
             text.AppendLine($"| Ambiguous entries without manual verification | {results.Sum(r => (long)r.Ambiguous)} |");
             text.AppendLine($"| Entries with quote not found, without manual verification | {results.Sum(r => (long)r.QuoteNotFound)} |");
             text.AppendLine($"| Entries excluded from auto verification with an auto record | {results.Sum(r => (long)r.ExcludedAutoVerified)} |");
+            text.AppendLine($"| Entries verifiable neither locally nor live | {results.Sum(r => (long)r.NotVerifiable)} |");
         }
         if (results.Any(r => r.UrlsChecked))
         {
@@ -149,6 +150,8 @@ public static class CheckReport
                 text.AppendLine($"- Zero values without justification ({r.UnjustifiedZero}): {Join(r.UnjustifiedZeroSamples, r.UnjustifiedZero)}");
             if (r.Release && r.UnusedEvidence > 0)
                 text.AppendLine($"- Evidence files that back no entry ({r.UnusedEvidence}): {Join(r.UnusedEvidenceSamples, r.UnusedEvidence)}");
+            if (r.Release && r.NotVerifiable > 0)
+                text.AppendLine($"- Verifiable neither locally nor live ({r.NotVerifiable}): {Join(r.NotVerifiableSamples, r.NotVerifiable)}");
             if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
             if (!r.ValidFromMatch) text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
             if (r.Note != null) text.AppendLine($"- Note: {r.Note}");
