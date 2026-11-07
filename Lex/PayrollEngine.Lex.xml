@@ -1844,6 +1844,20 @@
             reader of the detected format; content without known signature is read as text or HTML unless it is binary
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.PercentLookup">
+            <summary>
+            Lookup of a value below 1 as percentage (0.085 as 8.5)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.None">
+            <summary>No percentage: the value is looked up as written (factor, hours, currency amount)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.Sign">
+            <summary>As percentage with a percent sign or word: 8.5%, 8,5 Prozent</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.Points">
+            <summary>As percentage with or without a percent sign: a rate table of percentage points (2,60 for 0.026)</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.SourceNumbers">
             <summary>
             Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
@@ -1861,31 +1875,31 @@
         <member name="P:PayrollEngine.Lex.SourceNumbers.Words">
             <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>1,5 Mio.</c>, <c>one-half</c>, <c>time and a half</c></summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceNumbers.Hits(System.Decimal,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Hits(System.Decimal,PayrollEngine.Lex.PercentLookup)">
             <summary>
             Text positions of the hits of a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
             </summary>
             <param name="number">Entry number</param>
-            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="percent">Lookup of a value below 1 as percentage</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.All">
             <summary>
             Numerals and numbers in words
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceNumbers.Contains(System.Decimal,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Contains(System.Decimal,PayrollEngine.Lex.PercentLookup)">
             <summary>
             Test if the text holds a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
             </summary>
             <param name="number">Entry number</param>
-            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="percent">Lookup of a value below 1 as percentage</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceNumbers.IsWordOnly(System.Decimal,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.SourceNumbers.IsWordOnly(System.Decimal,PayrollEngine.Lex.PercentLookup)">
             <summary>
             Test if the text holds a number in words only, not as numeral or percentage
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceNumbers.WrittenDigits(System.Decimal,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.SourceNumbers.WrittenDigits(System.Decimal,PayrollEngine.Lex.PercentLookup)">
             <summary>
             Fewest digits of the number as written in the text (numeral or percentage), null when the text
             holds no numeral of it
@@ -2162,11 +2176,13 @@
             Open upper bound of a range, written as nines only (999999, 99999999.99): not a value of the source
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.AllowsPercent(System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Percent(System.String)">
             <summary>
-            A value below 1 may be looked up as percentage (0.085 as 8.5%, the source writes a percent sign):
-            always, except for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code
-            (<c>USD</c>, <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it
+            Lookup of a value below 1 as percentage (0.085 as 8.5%, the source writes a percent sign): always, except
+            for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code (<c>USD</c>,
+            <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it. The unit <c>percent points</c> (also
+            <c>percentage points</c>, <c>% points</c>) declares a source that writes the rate as percentage without
+            percent sign, a rate table under a heading (<c>Tipos de cotización</c>: 2,60 for 0.026)
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.IsToolLocation(System.String)">
@@ -2202,7 +2218,7 @@
             null without year context</param>
             <param name="languages">Languages of the number and year words, default: all available languages</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.CoverLocation(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Collections.Generic.IEnumerable{System.Decimal},System.Boolean,PayrollEngine.Lex.SourceVerifier.Section)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.CoverLocation(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Collections.Generic.IEnumerable{System.Decimal},PayrollEngine.Lex.PercentLookup,PayrollEngine.Lex.SourceVerifier.Section)">
             <summary>
             Source location of the sections that hold the numbers (greedy cover: the sections with most of the numbers,
             at most <see cref="F:PayrollEngine.Lex.SourceVerifier.MaxSectionsPerSource"/> per source), null when the numbers are not covered
@@ -2210,24 +2226,24 @@
             <param name="sources">Sources of the entry</param>
             <param name="sections">Sections to search</param>
             <param name="numbers">Numbers to cover</param>
-            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="percent">Lookup of a value below 1 as percentage</param>
             <param name="first">Section that starts the cover (section of the source quote), null for none</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},PayrollEngine.Lex.PercentLookup)">
             <summary>
             Weak evidence of a single number, null for an entry with several numbers or a distinctive number
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean,PayrollEngine.Lex.RelevantPeriod)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},PayrollEngine.Lex.PercentLookup,PayrollEngine.Lex.RelevantPeriod)">
             <summary>
             Year-weak numbers: at least one year-weak hit and no positive hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
             </summary>
             <param name="numbers">Numbers to rate</param>
             <param name="sections">Sections to search</param>
-            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="percent">Lookup of a value below 1 as percentage</param>
             <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.QuoteYearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.String,PayrollEngine.Lex.SourceNumbers,System.Boolean,PayrollEngine.Lex.RelevantPeriod,PayrollEngine.Lex.LanguageSet)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.QuoteYearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.String,PayrollEngine.Lex.SourceNumbers,PayrollEngine.Lex.PercentLookup,PayrollEngine.Lex.RelevantPeriod,PayrollEngine.Lex.LanguageSet)">
             <summary>
             Year-weak numbers of a source quote, rated within the quote only: a quote with the relevant year (or a year
             group that holds it; for a tax year the period starting in the year) or without year anchors its numbers;
@@ -2236,7 +2252,7 @@
             <param name="numbers">Numbers of the entry within the quote</param>
             <param name="quote">Source quote of the entry</param>
             <param name="quoteNumbers">Numbers of the quote</param>
-            <param name="percent">A value below 1 may be written as percentage</param>
+            <param name="percent">Lookup of a value below 1 as percentage</param>
             <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
             <param name="languages">Languages</param>
         </member>

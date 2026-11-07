@@ -375,20 +375,31 @@ public static class SourceVerifier
 
     private static readonly Regex CurrencyCode = new("^[A-Z]{3}$", RegexOptions.Compiled);
 
+    private static readonly string[] PercentTokens = ["%", "percent", "percentage"];
+
     /// <summary>
-    /// A value below 1 may be looked up as percentage (0.085 as 8.5%, the source writes a percent sign):
-    /// always, except for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code
-    /// (<c>USD</c>, <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it
+    /// Lookup of a value below 1 as percentage (0.085 as 8.5%, the source writes a percent sign): always, except
+    /// for units that are no rate — <c>factor</c>, <c>hours</c>, <c>days</c> or a currency code (<c>USD</c>,
+    /// <c>EUR</c>); a combined unit like <c>USD / rate</c> allows it. The unit <c>percent points</c> (also
+    /// <c>percentage points</c>, <c>% points</c>) declares a source that writes the rate as percentage without
+    /// percent sign, a rate table under a heading (<c>Tipos de cotización</c>: 2,60 for 0.026)
     /// </summary>
-    internal static bool AllowsPercent(string unit)
+    internal static PercentLookup Percent(string unit)
     {
         if (string.IsNullOrWhiteSpace(unit))
         {
-            return true;
+            return PercentLookup.Sign;
         }
         var tokens = UnitToken.Matches(unit).Select(x => x.Value).ToList();
+        if (tokens.Contains("points", StringComparer.OrdinalIgnoreCase) &&
+            tokens.Any(t => PercentTokens.Contains(t, StringComparer.OrdinalIgnoreCase)))
+        {
+            return PercentLookup.Points;
+        }
         return tokens.Count == 0 || !tokens.All(t =>
-            CurrencyCode.IsMatch(t) || NonRateTokens.Contains(t, StringComparer.OrdinalIgnoreCase));
+            CurrencyCode.IsMatch(t) || NonRateTokens.Contains(t, StringComparer.OrdinalIgnoreCase))
+            ? PercentLookup.Sign
+            : PercentLookup.None;
     }
 
     // a location written by LexVerifySource: Section "…" or Sections "…", "…", optionally with a source prefix
@@ -466,7 +477,7 @@ public static class SourceVerifier
 
         var allNumbers = ContentNumbers(content, derived.Select(x => x.Property).ToList(), out var derivedNumbers);
         var numbers = Sample(allNumbers);
-        var percent = AllowsPercent(entry.Unit);
+        var percent = Percent(entry.Unit);
         var quote = string.IsNullOrWhiteSpace(entry.SourceQuote) ? null : entry.SourceQuote;
         var sections = readable
             .SelectMany(s => s.Document.Sections.Select(x => new Section(s.Url, s.Document.Name, x.Heading, x.Text, languages)))
@@ -568,10 +579,10 @@ public static class SourceVerifier
     /// <param name="sources">Sources of the entry</param>
     /// <param name="sections">Sections to search</param>
     /// <param name="numbers">Numbers to cover</param>
-    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="percent">Lookup of a value below 1 as percentage</param>
     /// <param name="first">Section that starts the cover (section of the source quote), null for none</param>
     private static string CoverLocation(IReadOnlyList<(string Url, SourceDocument Document)> sources,
-        List<Section> sections, IEnumerable<decimal> numbers, bool percent, Section first = null)
+        List<Section> sections, IEnumerable<decimal> numbers, PercentLookup percent, Section first = null)
     {
         var remaining = new HashSet<decimal>(numbers);
         var cover = new List<Section>();
@@ -605,7 +616,7 @@ public static class SourceVerifier
     /// <summary>
     /// Weak evidence of a single number, null for an entry with several numbers or a distinctive number
     /// </summary>
-    private static string Weakness(List<decimal> numbers, List<Section> sections, bool percent)
+    private static string Weakness(List<decimal> numbers, List<Section> sections, PercentLookup percent)
     {
         if (numbers.Count != 1)
         {
@@ -630,9 +641,9 @@ public static class SourceVerifier
     /// </summary>
     /// <param name="numbers">Numbers to rate</param>
     /// <param name="sections">Sections to search</param>
-    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="percent">Lookup of a value below 1 as percentage</param>
     /// <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
-    private static List<decimal> YearWeakNumbers(List<decimal> numbers, List<Section> sections, bool percent,
+    private static List<decimal> YearWeakNumbers(List<decimal> numbers, List<Section> sections, PercentLookup percent,
         RelevantPeriod period) =>
         numbers
             .Where(n =>
@@ -652,11 +663,11 @@ public static class SourceVerifier
     /// <param name="numbers">Numbers of the entry within the quote</param>
     /// <param name="quote">Source quote of the entry</param>
     /// <param name="quoteNumbers">Numbers of the quote</param>
-    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="percent">Lookup of a value below 1 as percentage</param>
     /// <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
     /// <param name="languages">Languages</param>
     private static List<decimal> QuoteYearWeakNumbers(List<decimal> numbers, string quote, SourceNumbers quoteNumbers,
-        bool percent, RelevantPeriod period, LanguageSet languages)
+        PercentLookup percent, RelevantPeriod period, LanguageSet languages)
     {
         var years = YearHits(quote, languages);
         if (years.Any(x => Holds(x, period)))

@@ -58,7 +58,7 @@ public class SourceScriptTests
     {
         const string text = "Limit \u0661\u066c\u0662\u0663\u0664 in \u0662\u0660\u0662\u0666";
 
-        var hit = Assert.Single(SourceNumbers.Scan(text).Hits(1234m, false));
+        var hit = Assert.Single(SourceNumbers.Scan(text).Hits(1234m, PercentLookup.None));
         var year = Assert.Single(SourceVerifier.YearHits(text));
 
         Assert.Equal((6, 5), hit);

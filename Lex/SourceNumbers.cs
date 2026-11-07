@@ -8,6 +8,21 @@ using System.Text.RegularExpressions;
 namespace PayrollEngine.Lex;
 
 /// <summary>
+/// Lookup of a value below 1 as percentage (0.085 as 8.5)
+/// </summary>
+internal enum PercentLookup
+{
+    /// <summary>No percentage: the value is looked up as written (factor, hours, currency amount)</summary>
+    None,
+
+    /// <summary>As percentage with a percent sign or word: 8.5%, 8,5 Prozent</summary>
+    Sign,
+
+    /// <summary>As percentage with or without a percent sign: a rate table of percentage points (2,60 for 0.026)</summary>
+    Points
+}
+
+/// <summary>
 /// Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
 /// (<c>%</c> or a percent word of a language: <c>percent</c>, <c>per centum</c>, <c>Prozent</c>,
 /// <c>pour cent</c>) and numbers in words (scales and fractions of the languages, see
@@ -37,16 +52,18 @@ internal sealed class SourceNumbers
     /// Text positions of the hits of a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
     /// </summary>
     /// <param name="number">Entry number</param>
-    /// <param name="percent">A value below 1 may be written as percentage</param>
-    internal IEnumerable<(int Index, int Length)> Hits(decimal number, bool percent)
+    /// <param name="percent">Lookup of a value below 1 as percentage</param>
+    internal IEnumerable<(int Index, int Length)> Hits(decimal number, PercentLookup percent)
     {
         var value = Math.Round(number, 6);
         var hits = Enumerable.Empty<(int Index, int Length)>();
         if (numeralHits.TryGetValue(value, out var numerals)) hits = hits.Concat(numerals);
         if (wordHits.TryGetValue(value, out var words)) hits = hits.Concat(words);
-        if (percent && number < 1m && percentHits.TryGetValue(Math.Round(number * 100m, 6), out var percents))
+        if (percent != PercentLookup.None && number < 1m)
         {
-            hits = hits.Concat(percents);
+            var points = Math.Round(number * 100m, 6);
+            if (percentHits.TryGetValue(points, out var percents)) hits = hits.Concat(percents);
+            if (percent == PercentLookup.Points && numeralHits.TryGetValue(points, out var plain)) hits = hits.Concat(plain);
         }
         return hits.Distinct();
     }
@@ -69,26 +86,35 @@ internal sealed class SourceNumbers
     /// Test if the text holds a number: as numeral, in words or, below 1, as percentage (0.085 as 8.5%)
     /// </summary>
     /// <param name="number">Entry number</param>
-    /// <param name="percent">A value below 1 may be written as percentage</param>
-    internal bool Contains(decimal number, bool percent) =>
+    /// <param name="percent">Lookup of a value below 1 as percentage</param>
+    internal bool Contains(decimal number, PercentLookup percent) =>
         WrittenDigits(number, percent) != null || Words.Contains(Math.Round(number, 6));
 
     /// <summary>
     /// Test if the text holds a number in words only, not as numeral or percentage
     /// </summary>
-    internal bool IsWordOnly(decimal number, bool percent) =>
+    internal bool IsWordOnly(decimal number, PercentLookup percent) =>
         WrittenDigits(number, percent) == null && Words.Contains(Math.Round(number, 6));
 
     /// <summary>
     /// Fewest digits of the number as written in the text (numeral or percentage), null when the text
     /// holds no numeral of it
     /// </summary>
-    internal int? WrittenDigits(decimal number, bool percent)
+    internal int? WrittenDigits(decimal number, PercentLookup percent)
     {
         int? digits = numeralDigits.TryGetValue(Math.Round(number, 6), out var numeral) ? numeral : null;
-        if (percent && number < 1m && percentDigits.TryGetValue(Math.Round(number * 100m, 6), out var written))
+        if (percent == PercentLookup.None || number >= 1m)
+        {
+            return digits;
+        }
+        var points = Math.Round(number * 100m, 6);
+        if (percentDigits.TryGetValue(points, out var written))
         {
             digits = Math.Min(digits ?? written, written);
+        }
+        if (percent == PercentLookup.Points && numeralDigits.TryGetValue(points, out var plain))
+        {
+            digits = Math.Min(digits ?? plain, plain);
         }
         return digits;
     }

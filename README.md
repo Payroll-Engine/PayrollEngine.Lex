@@ -48,7 +48,9 @@ source it is reported by the checker (a finding in the release mode).
 source writes it with at most two digits (`22%`, `1.5`), writes it with at most three digits in more than three
 sections, or holds it in words only (`$1 million`, `one and one-half`, `2.5 lakh`). A value below 1 is also looked
 up as percentage when the source writes `%`, `percent`, `per cent` or `per centum` after the number, except for units that are no rate
-(`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the numbers it holds; the other numbers of
+(`factor`, `hours`, `days`, currency codes). The unit `percent points` (also `percentage points`) declares a
+source that writes the rate as percentage without percent sign, a rate table under a heading
+(`Tipos de cotización … 2,70` for `0.027`): the value is then also looked up as the plain number. A `sourceQuote` anchors the numbers it holds; the other numbers of
 the entry are looked up in all sources like without quote, so a bundle over several sources can anchor single
 values. A quote without a number of the entry locates the section that must hold the numbers. A quote missing in
 the source gives `QuoteNotFound`.

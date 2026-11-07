@@ -65,24 +65,40 @@ public class SourceVerifierTests
         new() { State = SourceState.Readable, Sections = texts.Select((x, i) => ($"Page {i + 1}", x)).ToList() };
 
     [Theory]
-    [InlineData(null, true)]
-    [InlineData("", true)]
-    [InlineData("mixed", true)]
-    [InlineData("%", true)]
-    [InlineData("rate", true)]
-    [InlineData("percent", true)]
-    [InlineData("coefficient", true)]
-    [InlineData("USD / rate", true)]
-    [InlineData("% of salary", true)]
-    [InlineData("factor", false)]
-    [InlineData("Factor", false)]
-    [InlineData("USD", false)]
-    [InlineData("EUR", false)]
-    [InlineData("hours", false)]
-    [InlineData("days", false)]
-    [InlineData("USD/hour", false)]
-    public void AllowsPercent(string unit, bool expected) =>
-        Assert.Equal(expected, SourceVerifier.AllowsPercent(unit));
+    [InlineData(null, "Sign")]
+    [InlineData("", "Sign")]
+    [InlineData("mixed", "Sign")]
+    [InlineData("%", "Sign")]
+    [InlineData("rate", "Sign")]
+    [InlineData("percent", "Sign")]
+    [InlineData("coefficient", "Sign")]
+    [InlineData("USD / rate", "Sign")]
+    [InlineData("% of salary", "Sign")]
+    [InlineData("points", "Sign")]
+    [InlineData("percent points", "Points")]
+    [InlineData("Percentage points", "Points")]
+    [InlineData("% points", "Points")]
+    [InlineData("factor", "None")]
+    [InlineData("Factor", "None")]
+    [InlineData("USD", "None")]
+    [InlineData("EUR", "None")]
+    [InlineData("hours", "None")]
+    [InlineData("days", "None")]
+    [InlineData("USD/hour", "None")]
+    public void Percent_OfUnit(string unit, string expected) =>
+        Assert.Equal(expected, SourceVerifier.Percent(unit).ToString());
+
+    private const string RateTable = """
+        Tipos de cotización
+        01 Agricultura 1,50 1,10 2,70
+        02 Silvicultura 1,00 1,00 2,00
+        """;
+
+    [Theory]
+    [InlineData("rate", SourceMatch.NotFound)]
+    [InlineData("percent points", SourceMatch.Found)]
+    public void PercentPoints_RateTableWithoutSign(string unit, SourceMatch expected) =>
+        Assert.Equal(expected, SourceVerifier.Verify(Entry("0.0270", unit), Sections(RateTable), "2026-01-01").Match);
 
     [Fact]
     public void FactorUnit_IsNotLookedUpAsPercentage() =>
@@ -203,7 +219,7 @@ public class SourceVerifierTests
     [InlineData("Rate 1.2% of wages", 0.012, 2)]
     [InlineData("Rate 0.012 or 1.2%", 0.012, 2)]
     public void WrittenDigits_CountsDigitsAsWritten(string text, double value, int expected) =>
-        Assert.Equal(expected, SourceNumbers.Scan(text).WrittenDigits((decimal)value, true));
+        Assert.Equal(expected, SourceNumbers.Scan(text).WrittenDigits((decimal)value, PercentLookup.Sign));
 
     [Fact]
     public void NumberInFewSections_IsFound() =>
