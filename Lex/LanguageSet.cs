@@ -246,10 +246,11 @@ public sealed class LanguageSet
             @"(?<![\p{L}.])" + gazette + @"\s?(?:(?:[IVX]{1,3}|[A-C])\s)?$", RegexOptions.Compiled);
 
         // an enactment or a gazette with its date, at most 40 characters before the connector: Gesetz vom 20. Dezember 2024,
-        // loi n° 2024-1234 du 29 décembre 2024, Real Decreto 1/2026, de 28 de noviembre de 2025, legge 30 dicembre 2024
+        // loi n° 2024-1234 du 29 décembre 2024, Real Decreto 1/2026, de 28 de noviembre de 2025, legge 30 dicembre 2024,
+        // Verordnung vom 20.12.2024
         EnactmentDateBefore = new(
             "(?:" + enactment + "|(?-i:" + gazette + @"))(?:[^\n;:]{0,40}?\s(?:" +
-            Words(p => p.DateLinks) + "))?\\s+" + dayMonthDate + "$",
+            Words(p => p.DateLinks) + "))?\\s+(?:" + dayMonthDate + "|" + SourceVerifier.NumericDate + ")$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // year groups --------------------------------------------------------

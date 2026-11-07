@@ -84,7 +84,8 @@ after `Notice`, `Pub.` or `Rev.` (also `Rev. Guide 2024`, `Rev. 12-2025`), in a 
 (`2024-40`, `2025/1234`, also ISO dates), in parentheses after a statute reference (`Bill 951 (2022)`) and in the
 citations listed in [Languages, Scripts and Periods](#languages-scripts-and-periods).
 Print and typesetting marks are ignored too, a date with a time (`15:14 - 3-Dec-2025`, `16:58 Oct 31, 2025`):
-a document is printed before the year it is valid for.
+a document is printed before the year it is valid for. A numeric date with dots (`17.09.2026`, `ab 01.01.2026`)
+counts with its year, also in a table row; after an enactment word it is a citation (`Verordnung vom 20.12.2024`).
 
 ### Languages, Scripts and Periods
 
@@ -161,7 +162,7 @@ keeps the original script. A four-digit amount with a currency sign is no year: 
 
 Limits: words of a language without language file (Arabic, Hindi, Chinese) are not recognized: add a language
 file, use the official English version of the source if there is one, otherwise a `sourceQuote` or `LexAttest`. Amendment
-histories ("Amendments 2025 — substituted $7,500") and bare years of a legislative session stay year context.
+histories ("Amendments 2025 — substituted $6,400") and bare years of a legislative session stay year context.
 
 Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion

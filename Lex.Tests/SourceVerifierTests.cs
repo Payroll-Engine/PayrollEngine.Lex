@@ -627,6 +627,24 @@ public class SourceVerifierTests
         Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
 
     [Theory]
+    [InlineData("Ceiling 4,800 till 16.09.2024", new[] { 2024 })]
+    [InlineData("from 1.4.2025 the rate", new[] { 2025 })]
+    [InlineData("Period 01.01.2024-31.12.2024", new[] { 2024 })]
+    [InlineData("16.09.2024 4,800 4,800", new[] { 2024 })]
+    [InlineData("Verordnung vom 20.12.2024, rate for 2025", new[] { 2025 })]
+    [InlineData("Amount 1.234.2024", new int[0])]
+    [InlineData("Version 12.31.2024", new int[0])]
+    public void Years_NumericDate(string text, int[] expected) =>
+        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
+    [Theory]
+    [InlineData("Ceiling 4,800 till 16.09.2025", SourceMatch.Ambiguous)]
+    [InlineData("Ceiling 4,800 from 01.01.2026", SourceMatch.Found)]
+    [InlineData("ab 01.01.2025: Grenze 4.800 EUR", SourceMatch.Found)]
+    public void NumericDate_RatesTheHit(string text, SourceMatch expected) =>
+        Assert.Equal(expected, SourceVerifier.Verify(Entry("4800"), Sections(text), "2026-01-01").Match);
+
+    [Theory]
     [InlineData("Finance Act, 2025", SourceMatch.Ambiguous)]
     [InlineData("Decree-Law No. 12 of 2025", SourceMatch.Ambiguous)]
     [InlineData("Law No. 57/2025", SourceMatch.Ambiguous)]

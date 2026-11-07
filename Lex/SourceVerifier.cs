@@ -713,11 +713,16 @@ public static class SourceVerifier
         text.Length == 4 && int.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out var year) &&
         year is >= MinYear and <= MaxYear;
 
+    /// <summary>Day and month of a numeric date before its year, with dots: 17.09.2026, 1.4.2025</summary>
+    internal const string NumericDate = @"(?<![\d.,])(?:0?[1-9]|[12]\d|3[01])\.(?:0?[1-9]|1[0-2])\.";
+
+    private static readonly Regex NumericDateBefore = new(NumericDate + "$", RegexOptions.Compiled);
+
     // four digits 1990–2100, not part of a longer number (12,025, 2025.5), an amount ($2000, Rs. 2000, CHF 2000,
-    // 2000 €) or a percentage
+    // 2000 €) or a percentage; the year of a numeric date with dots (17.09.2026) is a year
     private static readonly Regex YearToken = new(
-        @"(?<![\d.,$€£¥₹])(?<!(?:[$€£¥₹]|\bRs\.|\bCHF|\bFr\.|\bkr\.?)\s)(?:199\d|20\d\d|2100)" +
-        @"(?!\d|[.,]\d|\s?(?:%|€|₹|(?:EUR|CHF)\b))",
+        "(?:(?<=" + NumericDate + @")|(?<![\d.,$€£¥₹])(?<!(?:[$€£¥₹]|\bRs\.|\bCHF|\bFr\.|\bkr\.?)\s))" +
+        @"(?:199\d|20\d\d|2100)(?!\d|[.,]\d|\s?(?:%|€|₹|(?:EUR|CHF)\b))",
         RegexOptions.Compiled);
 
     // a number row (wage bracket table: 1965 1995 32.50): another number on both sides, no word, label colon
@@ -1004,7 +1009,8 @@ public static class SourceVerifier
     /// parenthesis in between
     /// (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
     /// </list>
-    /// A citation that is not recognized counts as year. A validity start (<c>effective January 1, 2025</c>,
+    /// A citation that is not recognized counts as year, as does the year of a numeric date
+    /// (<c>17.09.2026</c>, <c>01.01.2025-31.12.2025</c>), also within a number row. A validity start (<c>effective January 1, 2025</c>,
     /// <c>beginning on or after January 1, 2025</c>, <c>from 1 July 2025</c>, <c>2025 and after</c>,
     /// <c>ab dem 1. Januar 2025</c>) and the year of an unchanged value (<c>unchanged from 2024</c>,
     /// <c>same as 2024</c>, <c>unverändert seit 2024</c>) are kept but marked: up to the relevant year they rate a
@@ -1067,7 +1073,9 @@ public static class SourceVerifier
                 skipTo = period.Index + period.Length;
                 continue;
             }
-            if (IsDocumentNumber(after) || InNumberRow(text, match.Index, end, languages))
+            // a numeric date is no document number (01.01.2025-31.12.2025) and no number row (16.09.2026 ₹15,000)
+            if (!NumericDateBefore.IsMatch(before) &&
+                (IsDocumentNumber(after) || InNumberRow(text, match.Index, end, languages)))
             {
                 continue;
             }

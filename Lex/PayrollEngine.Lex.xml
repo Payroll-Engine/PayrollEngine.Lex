@@ -2260,6 +2260,9 @@
             <param name="referenceYear">Reference year of the entry</param>
             <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd)</param>
         </member>
+        <member name="F:PayrollEngine.Lex.SourceVerifier.NumericDate">
+            <summary>Day and month of a numeric date before its year, with dots: 17.09.2026, 1.4.2025</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.IsCitation(System.String,System.Int32,System.Int32,PayrollEngine.Lex.LanguageSet)">
             <summary>
             A year that names an enactment or a gazette issue (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)"/>); an enactment date that is
@@ -2365,7 +2368,8 @@
             parenthesis in between
             (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
             </list>
-            A citation that is not recognized counts as year. A validity start (<c>effective January 1, 2025</c>,
+            A citation that is not recognized counts as year, as does the year of a numeric date
+            (<c>17.09.2026</c>, <c>01.01.2025-31.12.2025</c>), also within a number row. A validity start (<c>effective January 1, 2025</c>,
             <c>beginning on or after January 1, 2025</c>, <c>from 1 July 2025</c>, <c>2025 and after</c>,
             <c>ab dem 1. Januar 2025</c>) and the year of an unchanged value (<c>unchanged from 2024</c>,
             <c>same as 2024</c>, <c>unverändert seit 2024</c>) are kept but marked: up to the relevant year they rate a
