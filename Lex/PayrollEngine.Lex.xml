@@ -208,6 +208,12 @@
         <member name="P:PayrollEngine.Lex.CheckResult.OtherReferenceYearSamples">
             <summary>Samples of entries with a reference year other than the validFrom year</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnusedEvidence">
+            <summary>Evidence files that back no entry (see <see cref="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)"/>); a finding only in the release mode</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UnusedEvidenceSamples">
+            <summary>Samples of evidence files that back no entry</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.MissingLegalReference">
             <summary>Lex entries without legalReference</summary>
         </member>
@@ -333,6 +339,17 @@
             Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
             by mistake would otherwise never be looked up in the source
             </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
+            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
+            without declaration in files[] is unused too (not frozen in the snapshot).
+            An unused file is never read by LexVerifySource: its entries count as without local evidence.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
         </member>
         <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
             <summary>

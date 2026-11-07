@@ -25,17 +25,21 @@ public class CheckerVerificationTests
         ReviewedOn = reviewedOn
     };
 
-    private static Entry Value(string key, string content, Verification verification) => new()
+    private static Entry Value(string key, string content, Verification verification, string documentRef = null) => new()
     {
         Key = key,
         Content = content,
         SourceUrls = ["https://example.org/doc"],
         SourceLocation = "p. 1",
         LegalReference = "Test Act s. 1",
+        DocumentRef = documentRef,
         Verification = verification
     };
 
-    private static Manifest Manifest(string review, params Entry[] values) => new()
+    private static Manifest Manifest(string review, params Entry[] values) =>
+        Manifest(review, new EvidenceFile { FileName = "rates.pdf", Description = "Rates" }, values);
+
+    private static Manifest Manifest(string review, EvidenceFile file, params Entry[] values) => new()
     {
         Authority = "XX",
         Regulation = "Data.Test",
@@ -43,7 +47,7 @@ public class CheckerVerificationTests
         Provider = "Test Authority",
         Sources = [new Source { Url = "https://example.org/doc", Description = "Test source", Review = review }],
         Values = [.. values],
-        Files = [new EvidenceFile { FileName = "rates.pdf", Description = "Rates" }]
+        Files = [file]
     };
 
     private static TestSatellite Satellite(string snapshotJson = "{ \"files\": [ { \"fileName\": \"rates.pdf\" } ] }")
@@ -177,7 +181,59 @@ public class CheckerVerificationTests
         Assert.Contains("| Data.Test.2026 | 3 | 1 | 1 | 1 | 0 | 0 |", markdown);
         Assert.EndsWith(";VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                         "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                        "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear", csv.Split('\n')[0].TrimEnd('\r'));
-        Assert.EndsWith(";1;1;1;0;0;0;0;False;0;0;0;0;0;0;0", csv.Split('\n')[1].TrimEnd('\r'));
+                        "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence", csv.Split('\n')[0].TrimEnd('\r'));
+        Assert.EndsWith(";1;1;1;0;0;0;0;False;0;0;0;0;0;0;0;0", csv.Split('\n')[1].TrimEnd('\r'));
+    }
+
+    // unused evidence ------------------------------------------------------------
+
+    [Fact]
+    public void UnusedEvidence_DeclaredWithoutReference_IsListed()
+    {
+        using var s = Satellite();
+        var manifest = Manifest(null,
+            Value("Rates.A", "7.5", Auto()), Value("Rates.B", "10", Auto()), Value("Rates.C", "12", Auto()));
+
+        Assert.Equal(["rates.pdf"], Checker.UnusedEvidence(manifest, s.LexDirectory));
+    }
+
+    [Fact]
+    public void UnusedEvidence_DocumentRefUrlOrVerification_IsUsed()
+    {
+        using var s = Satellite();
+        var byReference = Manifest(null, Value("Rates.A", "7.5", Auto(), "rates.pdf"));
+        var byUrl = Manifest(null, new EvidenceFile { FileName = "rates.pdf", SourceUrls = ["https://example.org/doc"] },
+            Value("Rates.A", "7.5", Auto()));
+        var byVerification = Manifest(null, Value("Rates.A", "7.5", Manual()));
+
+        Assert.Empty(Checker.UnusedEvidence(byReference, s.LexDirectory));
+        Assert.Empty(Checker.UnusedEvidence(byUrl, s.LexDirectory));
+        Assert.Empty(Checker.UnusedEvidence(byVerification, s.LexDirectory));
+    }
+
+    [Fact]
+    public void UnusedEvidence_FileNotDeclared_IsListed()
+    {
+        using var s = Satellite();
+        File.WriteAllText(Path.Combine(s.LexDirectory, "annex.pdf"), "annex");
+        var manifest = Manifest(null, Value("Rates.A", "7.5", Auto(), "rates.pdf"));
+
+        Assert.Equal(["annex.pdf (not in files[])"], Checker.UnusedEvidence(manifest, s.LexDirectory));
+    }
+
+    [Fact]
+    public void UnusedEvidence_IsFindingOnlyInRelease()
+    {
+        using var s = Satellite();
+        var manifest = Manifest(null,
+            Value("Rates.A", "7.5", Auto()), Value("Rates.B", "10", Auto()), Value("Rates.C", "12", Auto()));
+
+        var plain = Checker.Check(manifest, s.LexPath);
+        var release = Checker.Check(manifest, s.LexPath, release: true);
+
+        Assert.Equal(1, plain.UnusedEvidence);
+        Assert.False(plain.HasFindings);
+        Assert.Equal(["rates.pdf"], release.UnusedEvidenceSamples);
+        Assert.True(release.HasFindings);
     }
 }

@@ -126,6 +126,12 @@ public sealed class CheckResult
     /// <summary>Samples of entries with a reference year other than the validFrom year</summary>
     public List<string> OtherReferenceYearSamples { get; } = [];
 
+    /// <summary>Evidence files that back no entry (see <see cref="Checker.UnusedEvidence"/>); a finding only in the release mode</summary>
+    public int UnusedEvidence { get; internal set; }
+
+    /// <summary>Samples of evidence files that back no entry</summary>
+    public List<string> UnusedEvidenceSamples { get; } = [];
+
     /// <summary>Lex entries without legalReference</summary>
     public int MissingLegalReference { get; internal set; }
 
@@ -210,7 +216,7 @@ public sealed class CheckResult
         MissingLegalReference > 0 || FileProblems.Count > 0 || DeadUrls.Count > 0 || ChangedSources.Count > 0 ||
         (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null ||
         (RequireLocation && UnspecificLocations > 0) ||
-        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0));
+        (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0));
 }
 
 /// <summary>
@@ -689,6 +695,9 @@ public static class Checker
         }
 
         CheckVerificationEvidence(manifest, lexDirectory, result);
+        var unused = UnusedEvidence(manifest, lexDirectory);
+        result.UnusedEvidence = unused.Count;
+        result.UnusedEvidenceSamples.AddRange(unused.Take(MaxSamples));
 
         // git state of the evidence: untracked or ignored files are not part of the compliance record
         paths.Add(Path.Combine(lexDirectory, "lex.json"));
@@ -713,6 +722,58 @@ public static class Checker
         var distinct = result.FileProblems.Distinct(StringComparer.Ordinal).Take(MaxSamples).ToList();
         result.FileProblems.Clear();
         result.FileProblems.AddRange(distinct);
+    }
+
+    /// <summary>
+    /// Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
+    /// source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
+    /// without declaration in files[] is unused too (not frozen in the snapshot).
+    /// An unused file is never read by LexVerifySource: its entries count as without local evidence.
+    /// </summary>
+    /// <param name="manifest">Manifest</param>
+    /// <param name="lexDirectory">Folder of lex.json</param>
+    /// <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
+    public static List<string> UnusedEvidence(Manifest manifest, string lexDirectory)
+    {
+        var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        var urls = new HashSet<string>(StringComparer.Ordinal);
+        var contentFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var value in manifest.Values)
+        {
+            if (!string.IsNullOrWhiteSpace(value.DocumentRef)) referenced.Add(value.DocumentRef);
+            if (!string.IsNullOrWhiteSpace(value.Verification?.Evidence)) referenced.Add(value.Verification.Evidence);
+            if (value.HasContentFile) contentFiles.Add(Path.GetFullPath(ContentHash.ResolvePath(lexDirectory, value.ContentFile)));
+            urls.UnionWith(value.Urls);
+        }
+
+        var unused = new List<string>();
+        var declared = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in manifest.Files.Where(x => !string.IsNullOrWhiteSpace(x.FileName)))
+        {
+            declared.Add(file.FileName);
+            if (referenced.Contains(file.FileName) || file.Urls.Any(urls.Contains) ||
+                contentFiles.Contains(Path.GetFullPath(Path.Combine(lexDirectory, file.FileName))) ||
+                !File.Exists(Path.Combine(lexDirectory, file.FileName)))
+            {
+                continue;
+            }
+            unused.Add(file.FileName);
+        }
+        if (Directory.Exists(lexDirectory))
+        {
+            foreach (var path in Directory.EnumerateFiles(lexDirectory))
+            {
+                var name = Path.GetFileName(path);
+                if (name.StartsWith('.') || declared.Contains(name) || contentFiles.Contains(Path.GetFullPath(path)) ||
+                    string.Equals(name, "lex.json", StringComparison.OrdinalIgnoreCase) ||
+                    string.Equals(name, "snapshot.json", StringComparison.OrdinalIgnoreCase))
+                {
+                    continue;
+                }
+                unused.Add(name + " (not in files[])");
+            }
+        }
+        return unused;
     }
 
     /// <summary>

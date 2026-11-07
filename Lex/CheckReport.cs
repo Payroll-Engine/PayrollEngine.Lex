@@ -37,7 +37,7 @@ public static class CheckReport
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                        "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear");
+                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence");
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -47,7 +47,7 @@ public static class CheckReport
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
                 r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified, r.ExcludedDerived,
-                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear));
+                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear, r.UnusedEvidence));
         }
         return csv.ToString();
     }
@@ -86,6 +86,7 @@ public static class CheckReport
         text.AppendLine($"| Open entries (previous cycle, verify again) | {results.Sum(r => (long)r.Open)} |");
         text.AppendLine($"| Entries with zero values without justification | {results.Sum(r => (long)r.UnjustifiedZero)} |");
         text.AppendLine($"| Entries with a reference year other than the validFrom year | {results.Sum(r => (long)r.OtherReferenceYear)} |");
+        text.AppendLine($"| Evidence files that back no entry | {results.Sum(r => (long)r.UnusedEvidence)} |");
         if (release)
         {
             text.AppendLine($"| Ambiguous entries without manual verification | {results.Sum(r => (long)r.Ambiguous)} |");
@@ -146,6 +147,8 @@ public static class CheckReport
                 text.AppendLine($"- Manual verification required ({r.ManualVerificationRequired}): {Join(r.ManualVerificationSamples, r.ManualVerificationRequired)}");
             if (r.Release && r.UnjustifiedZero > 0)
                 text.AppendLine($"- Zero values without justification ({r.UnjustifiedZero}): {Join(r.UnjustifiedZeroSamples, r.UnjustifiedZero)}");
+            if (r.Release && r.UnusedEvidence > 0)
+                text.AppendLine($"- Evidence files that back no entry ({r.UnusedEvidence}): {Join(r.UnusedEvidenceSamples, r.UnusedEvidence)}");
             if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
             if (!r.ValidFromMatch) text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
             if (r.Note != null) text.AppendLine($"- Note: {r.Note}");

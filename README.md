@@ -177,6 +177,11 @@ holds no number to look up: `SourceResult.Zero` lists these properties. A `notAp
 set to 0 by mistake does not stay unnoticed (the checker reports it, a finding in the release mode).
 `SourceVerifier.VerifyManifest` checks
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
+The local evidence of an entry is its `documentRef`, otherwise the declared file with the same source URL.
+`Checker.UnusedEvidence` lists the evidence files that back no entry: a declared file without `documentRef`, source
+URL, `contentFile` or verification evidence pointing to it, and a file in `.lex` that is not declared in `files[]`.
+Such a file is never read, its entries count as without local evidence (the checker reports it, a finding in the
+release mode).
 
 `SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by
 the host when the document has no file name (live source): `XX-2026-guide.pdf: Sections "Page 24", "Page 25";
