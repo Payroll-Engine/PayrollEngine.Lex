@@ -49,8 +49,9 @@ public sealed class Entry
     public string SourceLocation { get; init; }
 
     /// <summary>
-    /// Verbatim quote from the source that holds the value; LexVerifySource looks up the numbers
-    /// in the section of the quote
+    /// Verbatim quote from the source that holds the value; LexVerifySource anchors the numbers of the
+    /// quote and looks up the other numbers in all sources, a quote without a number of the value
+    /// locates the section that must hold the numbers
     /// </summary>
     public string SourceQuote { get; init; }
 

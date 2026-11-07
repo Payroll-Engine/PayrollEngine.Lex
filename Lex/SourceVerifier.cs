@@ -76,11 +76,15 @@ internal sealed class YearHit(List<int> years, int index, int length, bool valid
     /// <summary>Text length up to the end of the last year</summary>
     internal int Length => length;
 
-    /// <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>)</summary>
+    /// <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or a value
+    /// unchanged from the year (<c>unchanged from 2024</c>)</summary>
     internal bool Validity => validity;
 
     /// <summary>Group with a further year that ends at the text position</summary>
     internal YearHit Join(int year, int end) => new([.. years, year], index, end - index, validity);
+
+    /// <summary>The year at the start of the section text (year of the section heading)</summary>
+    internal YearHit AtStart() => new(years, 0, 0, validity);
 }
 
 /// <summary>
@@ -461,17 +465,37 @@ public static class SourceVerifier
                 .Select(s => (Section: s, Found: numbers.Where(n => s.Numbers.Contains(n, percent) || quoteNumbers.Contains(n, percent)).ToList()))
                 .OrderByDescending(x => x.Found.Count)
                 .First();
-            var quoteMatch = Classify(best.Found.Count, numbers.Count);
-            if (quoteMatch == SourceMatch.Found && year != null)
+            var anchored = numbers.Where(n => quoteNumbers.Contains(n, percent)).ToList();
+            if (anchored.Count == 0)
             {
-                var quoteWeak = QuoteYearWeakness(numbers, quote, quoteNumbers, percent, year.Value);
-                if (quoteWeak != null)
+                // a quote without a number of the entry locates the section that holds the numbers
+                var sectionMatch = Classify(best.Found.Count, numbers.Count);
+                return Result(sectionMatch, best.Found,
+                    sectionMatch == SourceMatch.Found ? Location(sources, [best.Section]) : null);
+            }
+
+            // the quote anchors its numbers, the other numbers of the entry are looked up in all sources
+            var others = numbers.Except(anchored).ToList();
+            var quoteFound = anchored
+                .Concat(others.Where(n => sections.Any(s => s.Numbers.Contains(n, percent))))
+                .ToList();
+            var quoteMatch = Classify(quoteFound.Count, numbers.Count);
+            if (quoteMatch != SourceMatch.Found)
+            {
+                return Result(quoteMatch, quoteFound);
+            }
+            if (year != null)
+            {
+                var weakNumbers = QuoteYearWeakNumbers(anchored, quote, quoteNumbers, percent, year.Value)
+                    .Concat(YearWeakNumbers(others, sections, percent, year.Value))
+                    .ToHashSet();
+                if (weakNumbers.Count > 0)
                 {
-                    return Result(SourceMatch.Ambiguous, best.Found, ambiguity: quoteWeak);
+                    return Result(SourceMatch.Ambiguous, quoteFound,
+                        ambiguity: MultiYearReason(numbers, numbers.Where(weakNumbers.Contains).ToList()));
                 }
             }
-            return Result(quoteMatch, best.Found,
-                quoteMatch == SourceMatch.Found ? Location(sources, [best.Section]) : null);
+            return Result(quoteMatch, quoteFound, CoverLocation(sources, sections, others, percent, best.Section));
         }
 
         if (numbers.Count == 0)
@@ -485,29 +509,55 @@ public static class SourceVerifier
             return Result(match, found);
         }
 
-        var weak = Weakness(numbers, sections, percent) ?? YearWeakness(numbers, sections, percent, year);
+        var weak = Weakness(numbers, sections, percent);
+        if (weak == null && year != null)
+        {
+            var weakNumbers = YearWeakNumbers(numbers, sections, percent, year.Value);
+            weak = weakNumbers.Count > 0 ? MultiYearReason(numbers, weakNumbers) : null;
+        }
         if (weak != null)
         {
             return Result(SourceMatch.Ambiguous, found, ambiguity: weak);
         }
+        return Result(match, found, CoverLocation(sources, sections, found, percent));
+    }
 
-        // greedy cover: the sections that hold most of the numbers, at most MaxSectionsPerSource per source
-        var remaining = new HashSet<decimal>(found);
+    /// <summary>
+    /// Source location of the sections that hold the numbers (greedy cover: the sections with most of the numbers,
+    /// at most <see cref="MaxSectionsPerSource"/> per source), null when the numbers are not covered
+    /// </summary>
+    /// <param name="sources">Sources of the entry</param>
+    /// <param name="sections">Sections to search</param>
+    /// <param name="numbers">Numbers to cover</param>
+    /// <param name="percent">A value below 1 may be written as percentage</param>
+    /// <param name="first">Section that starts the cover (section of the source quote), null for none</param>
+    private static string CoverLocation(IReadOnlyList<(string Url, SourceDocument Document)> sources,
+        List<Section> sections, IEnumerable<decimal> numbers, bool percent, Section first = null)
+    {
+        var remaining = new HashSet<decimal>(numbers);
         var cover = new List<Section>();
         var perSource = new Dictionary<string, int>(StringComparer.Ordinal);
+        void AddToCover(Section section)
+        {
+            cover.Add(section);
+            perSource[section.Url ?? string.Empty] = perSource.GetValueOrDefault(section.Url ?? string.Empty) + 1;
+            remaining.RemoveWhere(n => section.Numbers.Contains(n, percent));
+        }
+
+        if (first != null)
+        {
+            AddToCover(first);
+        }
         while (remaining.Count > 0)
         {
             var best = sections
                 .Where(s => perSource.GetValueOrDefault(s.Url ?? string.Empty) < MaxSectionsPerSource)
-                .Select(s => (Section: s, Hits: remaining.Where(n => s.Numbers.Contains(n, percent)).ToList()))
-                .OrderByDescending(x => x.Hits.Count).FirstOrDefault();
-            if (best.Section == null || best.Hits.Count == 0) break;
-            cover.Add(best.Section);
-            perSource[best.Section.Url ?? string.Empty] = perSource.GetValueOrDefault(best.Section.Url ?? string.Empty) + 1;
-            remaining.ExceptWith(best.Hits);
+                .Select(s => (Section: s, Hits: remaining.Count(n => s.Numbers.Contains(n, percent))))
+                .OrderByDescending(x => x.Hits).FirstOrDefault();
+            if (best.Section == null || best.Hits == 0) break;
+            AddToCover(best.Section);
         }
-        var location = remaining.Count == 0 ? Location(sources, cover) : null;
-        return Result(match, found, location);
+        return remaining.Count == 0 ? Location(sources, cover) : null;
     }
 
     private static SourceMatch Classify(int found, int total) =>
@@ -537,52 +587,44 @@ public static class SourceVerifier
     }
 
     /// <summary>
-    /// Weak year context: numbers with at least one year-weak hit and no positive hit (see <see cref="YearContext"/>),
-    /// null without year or when no number is year-weak
+    /// Year-weak numbers: at least one year-weak hit and no positive hit (see <see cref="YearContext"/>)
     /// </summary>
-    /// <param name="numbers">Numbers of the entry</param>
+    /// <param name="numbers">Numbers to rate</param>
     /// <param name="sections">Sections to search</param>
     /// <param name="percent">A value below 1 may be written as percentage</param>
     /// <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
-    private static string YearWeakness(List<decimal> numbers, List<Section> sections, bool percent, int? year)
-    {
-        if (year == null)
-        {
-            return null;
-        }
-        var affected = numbers
+    private static List<decimal> YearWeakNumbers(List<decimal> numbers, List<Section> sections, bool percent, int year) =>
+        numbers
             .Where(n =>
             {
                 var contexts = sections
-                    .SelectMany(s => s.Numbers.Hits(n, percent).Select(h => s.YearContext(h, year.Value)))
+                    .SelectMany(s => s.Numbers.Hits(n, percent).Select(h => s.YearContext(h, year)))
                     .ToList();
                 return contexts.Contains(HitYear.Weak) && !contexts.Contains(HitYear.Positive);
             })
             .ToList();
-        return affected.Count == 0 ? null : MultiYearReason(numbers, affected);
-    }
 
     /// <summary>
-    /// Weak year context of a source quote, rated within the quote only: a quote with the relevant year (or a year
-    /// group that holds it) or without year anchors the value; a number of the quote whose closest year is another
+    /// Year-weak numbers of a source quote, rated within the quote only: a quote with the relevant year (or a year
+    /// group that holds it) or without year anchors its numbers; a number of the quote whose closest year is another
     /// year is year-weak
     /// </summary>
-    /// <param name="numbers">Numbers of the entry</param>
+    /// <param name="numbers">Numbers of the entry within the quote</param>
     /// <param name="quote">Source quote of the entry</param>
     /// <param name="quoteNumbers">Numbers of the quote</param>
     /// <param name="percent">A value below 1 may be written as percentage</param>
     /// <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
-    private static string QuoteYearWeakness(List<decimal> numbers, string quote, SourceNumbers quoteNumbers, bool percent, int year)
+    private static List<decimal> QuoteYearWeakNumbers(List<decimal> numbers, string quote, SourceNumbers quoteNumbers,
+        bool percent, int year)
     {
         var years = YearHits(quote);
         if (years.Any(x => x.Years.Contains(year)))
         {
-            return null;
+            return [];
         }
-        var affected = numbers
+        return numbers
             .Where(n => quoteNumbers.Hits(n, percent).Any(h => YearContext(h, years, year) == HitYear.Weak))
             .ToList();
-        return affected.Count == 0 ? null : MultiYearReason(numbers, affected);
     }
 
     /// <summary>
@@ -625,6 +667,11 @@ public static class SourceVerifier
     private static readonly Regex ValidityAfter = new(@"^\s+and\s+(?:after|later|thereafter|subsequent)\b",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    // a value unchanged from an earlier year: unchanged from 2024; unchanged since 2024; same as (in, for) 2024
+    private static readonly Regex UnchangedBefore = new(
+        @"\b(?:unchanged(?:\s+(?:from|since))?|same\s+as(?:\s+(?:in|for))?)\s+$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     // a reference prefix directly before the year: Notice 2024-1, Pub. 2025, Rev. 2024, Rev. Guide 2024,
     // revision with month: Rev. 12-2025, Rev. December 2025
     private static readonly Regex ReferencePrefix = new(
@@ -665,8 +712,10 @@ public static class SourceVerifier
     /// (at the same distance the relevant year wins)</item>
     /// <item><see cref="HitYear.Weak"/>: the closest year is another year</item>
     /// <item><see cref="HitYear.Neutral"/>: no year in the window, or the closest year starts a validity up to the
-    /// relevant year (<c>effective January 1, 2025</c>, <c>2025 and after</c>): the value may still apply</item>
+    /// relevant year (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or names the year a value is unchanged
+    /// from (<c>unchanged from 2024</c>, <c>same as 2024</c>): the value may still apply</item>
     /// </list>
+    /// A year of the section heading counts as a year at the start of the section text.
     /// A number is year-weak when at least one hit is weak and no hit is positive.
     /// </summary>
     /// <param name="hit">Text position of the hit</param>
@@ -731,11 +780,12 @@ public static class SourceVerifier
     /// (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
     /// </list>
     /// A validity start (<c>effective January 1, 2025</c>, <c>beginning on or after January 1, 2025</c>,
-    /// <c>2025 and after</c>) is kept but marked: up to the relevant year it rates a hit neutral.
+    /// <c>2025 and after</c>) and the year of an unchanged value (<c>unchanged from 2024</c>, <c>same as 2024</c>)
+    /// are kept but marked: up to the relevant year they rate a hit neutral.
     /// A year enumeration (<c>2024, 2025, or 2026</c>, <c>2024 and 2025</c>) and a year range (<c>2024-2026</c>,
     /// <c>2024 through 2026</c>) are one year group. A number with a year-weak hit and no positive hit is
     /// <see cref="SourceMatch.Ambiguous"/> (see <see cref="YearContext"/>); a source quote with the relevant year
-    /// anchors the value.
+    /// anchors the numbers it holds.
     /// </summary>
     internal static HashSet<int> Years(string text) =>
         YearHits(text).SelectMany(x => x.Years).ToHashSet();
@@ -764,7 +814,8 @@ public static class SourceVerifier
             {
                 continue;
             }
-            var validity = ValidityBefore.IsMatch(text[Math.Max(0, match.Index - ValidityWindow)..match.Index]) ||
+            var validityBefore = text[Math.Max(0, match.Index - ValidityWindow)..match.Index];
+            var validity = ValidityBefore.IsMatch(validityBefore) || UnchangedBefore.IsMatch(validityBefore) ||
                            ValidityAfter.IsMatch(text[end..Math.Min(text.Length, end + 24)]);
             var value = int.Parse(match.Value, CultureInfo.InvariantCulture);
             var previous = years.Count > 0 ? years[^1] : null;
@@ -901,7 +952,7 @@ public static class SourceVerifier
         internal string Heading => heading;
         internal SourceNumbers Numbers { get; } = SourceNumbers.Scan(text);
         internal string CanonicalText => field ??= Canonical(text);
-        private List<YearHit> TextYears => field ??= YearHits(text);
+        private List<YearHit> TextYears => field ??= [.. YearHits(heading).Select(x => x.AtStart()), .. YearHits(text)];
 
         /// <summary>Year context of a hit in the section text</summary>
         internal HitYear YearContext((int Index, int Length) hit, int year) => SourceVerifier.YearContext(hit, TextYears, year);

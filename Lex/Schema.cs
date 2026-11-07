@@ -237,7 +237,7 @@ public static class Schema
                 "sourceQuote": {
                   "type": "string",
                   "minLength": 1,
-                  "description": "Verbatim quote from the source that holds the value. LexVerifySource looks up the numbers of the value in the section of the quote; numbers in words within the quote count (e.g. 'one and one-half times')."
+                  "description": "Verbatim quote from the source that holds the value. LexVerifySource anchors the numbers of the value that the quote holds and looks up the other numbers in all sources; a quote without a number of the value locates the section that must hold the numbers. Numbers in words within the quote count (e.g. 'one and one-half times')."
                 },
                 "referenceYear": {
                   "type": "integer",

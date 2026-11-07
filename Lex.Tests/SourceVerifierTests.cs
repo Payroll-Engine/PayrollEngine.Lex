@@ -462,6 +462,85 @@ public class SourceVerifierTests
                 Sections("Effective January 1, 2026 the brackets are $2,400 and $4,600",
                          "Legislation of the 2025 session sets the brackets $2,400 and $4,600"), "2026-01-01").Match);
 
+    [Theory]
+    [InlineData("The employee rate is 1.85%, unchanged from 2024.", SourceMatch.Found)]
+    [InlineData("The employee rate is 1.85%, unchanged since 2024.", SourceMatch.Found)]
+    [InlineData("The employee rate is 1.85%, the same as in 2024.", SourceMatch.Found)]
+    [InlineData("Same as 2024: employee rate 1.85%.", SourceMatch.Found)]
+    [InlineData("The employee rate is 1.85%, unchanged from 2026.", SourceMatch.Ambiguous)]
+    [InlineData("The employee rate is 1.85%, up from 2024.", SourceMatch.Ambiguous)]
+    public void UnchangedFromYear_UpToValidYear_IsNeutral(string text, SourceMatch expected) =>
+        Assert.Equal(expected, SourceVerifier.Verify(Entry("0.0185"), Sections(text), ValidFrom).Match);
+
+    // section heading ---------------------------------------------------------
+
+    private static SourceDocument Headed(string heading, string text) =>
+        new() { State = SourceState.Readable, Sections = [(heading, text)] };
+
+    [Theory]
+    [InlineData("2024 Rates", SourceMatch.Ambiguous)]
+    [InlineData("Rates 2024 and 2025", SourceMatch.Found)]
+    [InlineData("2025 Rates", SourceMatch.Found)]
+    [InlineData("Rates", SourceMatch.Found)]
+    public void HeadingYear_RatesHit(string heading, SourceMatch expected) =>
+        Assert.Equal(expected,
+            SourceVerifier.Verify(Entry("52400"), Headed(heading, "Taxable wage base $52,400"), ValidFrom).Match);
+
+    [Fact]
+    public void HeadingYear_FarFromHit_IsIgnored() =>
+        Assert.Equal(SourceMatch.Found,
+            SourceVerifier.Verify(Entry("52400"),
+                Headed("2024 Rates", string.Concat(Enumerable.Repeat("filler text ", 12)) + "Taxable wage base $52,400"),
+                ValidFrom).Match);
+
+    // source quote in a bundle over several sources ---------------------------
+
+    private const string LawUrl = "https://law.example.org/limit";
+    private const string RatesUrl = "https://rates.example.org/2026";
+    private const string LawText = "(A) In general. The amount shall not exceed $6,400. " +
+                                   "Amendments 2025—Act 12 substituted $6,400 for $4,800.";
+
+    private static SourceResult VerifyBundle(string quote, string ratesText) =>
+        SourceVerifier.Verify(new Entry
+            {
+                Key = "Parameters.2026", Content = "{\"Limit\":6400,\"WageBase\":61300}", Unit = "mixed",
+                SourceQuote = quote, SourceUrls = [LawUrl, RatesUrl]
+            },
+            [(LawUrl, Sections(LawText)), (RatesUrl, Sections(ratesText))], validFrom: "2026-01-01");
+
+    [Fact]
+    public void BundleQuote_AnchorsQuotedNumber_OthersFoundInOtherSource()
+    {
+        var result = VerifyBundle("shall not exceed $6,400", "The wage base for 2026 is $61,300.");
+
+        Assert.Equal(SourceMatch.Found, result.Match);
+        Assert.Equal("law.example.org: Section \"Page 1\"; rates.example.org: Section \"Page 1\"", result.Location);
+        Assert.True(result.CanWrite);
+    }
+
+    [Fact]
+    public void BundleWithoutQuote_AmendmentYear_IsAmbiguous() =>
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (6400)",
+            VerifyBundle(null, "The wage base for 2026 is $61,300.").Ambiguity);
+
+    [Fact]
+    public void BundleQuote_OtherNumberOfOtherYear_IsAmbiguous()
+    {
+        var result = VerifyBundle("shall not exceed $6,400", "The wage base for 2024 was $61,300.");
+
+        Assert.Equal(SourceMatch.Ambiguous, result.Match);
+        Assert.Equal(SourceVerifier.MultiYearAmbiguity + " (61300)", result.Ambiguity);
+    }
+
+    [Fact]
+    public void BundleQuote_OtherNumberMissing_IsPartial()
+    {
+        var result = VerifyBundle("shall not exceed $6,400", "The wage base for 2026 is $64,000.");
+
+        Assert.Equal(SourceMatch.Partial, result.Match);
+        Assert.Equal(["61300"], result.Missing);
+    }
+
     [Fact]
     public void NumberAlsoNextToValidYear_IsFound() =>
         Assert.Equal(SourceMatch.Found,

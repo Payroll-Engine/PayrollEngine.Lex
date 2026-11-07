@@ -48,8 +48,9 @@ source it is reported by the checker (a finding in the release mode).
 source writes it with at most two digits (`22%`, `1.5`), writes it with at most three digits in more than three
 sections, or holds it in words only (`$1 million`, `one and one-half`, `2.5 lakh`). A value below 1 is also looked
 up as percentage when the source writes `%`, `percent`, `per cent` or `per centum` after the number, except for units that are no rate
-(`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the
-entry: the numbers must be in the section of the quote (`Found`), otherwise in the quote itself; a quote missing in
+(`factor`, `hours`, `days`, currency codes). A `sourceQuote` anchors the numbers it holds; the other numbers of
+the entry are looked up in all sources like without quote, so a bundle over several sources can anchor single
+values. A quote without a number of the entry locates the section that must hold the numbers. A quote missing in
 the source gives `QuoteNotFound`.
 
 Sources often hold tables over several years, so a number of another year may be "found". With the year of the
@@ -63,14 +64,17 @@ to plus 1. An enumeration or range of years counts as one year group: `2024, 202
 - **weak** when the closest year is another year (`$52,400 in 2024` for validFrom 2025),
 - **neutral** without a year in the window; other years elsewhere on the page (`forms filed for 2019 or earlier`)
   do not matter. A validity start up to the entry year is neutral too, it neither weakens nor confirms:
-  `effective January 1, 2025`, `beginning on or after January 1, 2025`, `2025 and after`.
+  `effective January 1, 2025`, `beginning on or after January 1, 2025`, `2025 and after`; as is the year a value is
+  unchanged from: `unchanged from 2024`, `same as 2024`.
+
+A year of the section heading (`2024 Rates`) counts as a year at the start of the section text.
 
 A number with a weak and without a positive hit rates the entry `Ambiguous` with
 `multi-year section: add sourceQuote with the year` — a neutral hit does not confirm it, a value of a wrong year
 is the greater risk. For a bundle the reason lists the affected numbers, e.g. `(0.0031, 148200)`. With a
-`sourceQuote` only the quote is rated: a quote with the entry year or a year group holding it
-(`2025: employee rate 0.19%`) or without any year (statute text) anchors the value, a quote whose number stands
-next to another year is year-weak. A four-digit number within a number row is no year: another number within
+`sourceQuote` only the quote is rated for the numbers it holds: a quote with the entry year or a year group holding it
+(`2025: employee rate 0.19%`) or without any year (statute text) anchors them, a quote whose number stands
+next to another year is year-weak; the other numbers of the entry are rated in the sources. A four-digit number within a number row is no year: another number within
 12 characters on both sides without a word, colon or parenthesis in between (wage bracket table
 `1965 1995 32.50`), as is a number after a currency sign (`$ 2025`). A value that legally belongs to another year than the cycle (a
 surcharge `for 2025` in the 2026 satellite) sets `referenceYear` (e.g. `2025`): it replaces the validFrom year in
