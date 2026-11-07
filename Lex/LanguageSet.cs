@@ -23,7 +23,7 @@ namespace PayrollEngine.Lex;
 public sealed class LanguageSet
 {
     /// <summary>Folder of the language files next to the library</summary>
-    public const string FolderName = "Languages";
+    public const string FolderName = "LexVocabulary";
 
     private const int HashLength = 8;
 

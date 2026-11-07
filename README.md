@@ -91,9 +91,9 @@ counts with its year, also in a table row; after an enactment word it is a citat
 
 The year rating and the number lookup read the words of a language from a language file `{language}.json`
 (`LanguageSet`). The package ships English, German, French, Spanish, Italian, Dutch and Portuguese in the folder
-`Languages` next to the library. A folder of additional language files, given by the caller
+`LexVocabulary` next to the library. A folder of additional language files, given by the caller
 (`SourceVerifier.VerifyManifest(…, languageDirectory)`, `LanguageSet.Get(languages, additionalDirectory)`; in
-pecmd `LexVerifySource Languages:<folder>` or the environment variable `PAYROLL_ENGINE_LEX_LANGUAGES`), adds a
+pecmd `LexVerifySource Vocabulary:<folder>` or the environment variable `PAYROLL_ENGINE_LEX_VOCABULARY`), adds a
 language or replaces a package file with the same language code, so a new language needs no new library
 version. The library reads no environment variable or configuration of its own. A manifest selects the languages of its sources with `languages` (`["de", "fr"]`); without it all
 available languages apply as one union, so a source mixing languages (an English summary of a Dutch decree) is
