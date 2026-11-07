@@ -1,0 +1,25 @@
+{
+  "language": "it",
+  "name": "Italian",
+  "percentWords": ["per cento"],
+  "scaleWords": [
+    { "word": "milione", "factor": 1000000 },
+    { "word": "milioni", "factor": 1000000 },
+    { "word": "miliardo", "factor": 1000000000 },
+    { "word": "miliardi", "factor": 1000000000 }
+  ],
+  "halfWords": ["la metà"],
+  "oneAndHalfWords": ["una volta e mezza"],
+  "enumerationWords": ["e", "ed", "o"],
+  "rangeWords": ["a", "al", "fino al"],
+  "validityBefore": ["a partire dal", "a decorrere dal", "dal", "con decorrenza dal", "con decorrenza", "in vigore dal"],
+  "validityAfter": ["e successivi", "e seguenti"],
+  "unchanged": ["invariato", "invariata", "invariato rispetto al", "uguale a", "uguale al"],
+  "enactmentWords": ["legge", "decreto", "decreto-legge", "decreto legislativo", "D.L.", "D.Lgs.", "D.P.R."],
+  "gazettes": ["GU", "G.U."],
+  "dateLinks": ["del"],
+  "months": [
+    "gennaio", "febbraio", "marzo", "aprile", "maggio", "giugno", "luglio", "agosto", "settembre",
+    "ottobre", "novembre", "dicembre"
+  ]
+}

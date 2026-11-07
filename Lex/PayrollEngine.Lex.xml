@@ -311,7 +311,7 @@
         <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
             <summary>
             Release gate: verify the entries without manual verification against their local evidence
-            (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})"/>); an ambiguous entry and an entry whose quote is not found
+            (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/>); an ambiguous entry and an entry whose quote is not found
             need a manual verification
             </summary>
             <param name="manifest">Manifest (lex.json)</param>
@@ -931,6 +931,171 @@
             <param name="pattern">Key, name or prefix with trailing *</param>
             <param name="key">Entry key</param>
         </member>
+        <member name="T:PayrollEngine.Lex.LanguageProfile">
+            <summary>
+            Words of one language for the number and year rules of the source verification, loaded from a language file
+            <c>{language}.json</c> (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>). Short words are used in a narrow position only:
+            enumeration and range words between two years, validity words directly before a year or a date.
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.Language">
+            <summary>Language code (ISO 639-1 or 639-3, lower case), equals the file name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.Name">
+            <summary>Language name (information only)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.PercentWords">
+            <summary>Percent words after a numeral (<c>percent</c>, <c>Prozent</c>, <c>pour cent</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.ScaleWords">
+            <summary>Scale words after a numeral with their factor (<c>million</c>, <c>Mio.</c>, <c>lakh</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.HalfWords">
+            <summary>Words for one half (<c>one-half</c>, <c>die Hälfte</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.OneAndHalfWords">
+            <summary>Words for one and a half (<c>time and a half</c>, <c>anderthalb</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.DoubleWords">
+            <summary>Words for two times (<c>double time</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.EnumerationWords">
+            <summary>Connectors of a year enumeration (and, or), only between two years</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.RangeWords">
+            <summary>Connectors of a year range (<c>through</c>, <c>bis</c>), only between two years</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.ValidityBefore">
+            <summary>Validity start directly before a year or a date (<c>effective</c>, <c>ab dem</c>, <c>à compter du</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.DatedValidityBefore">
+            <summary>Validity start directly before a full date only (<c>from 1 July 2025</c>; <c>from 2024</c> is no validity)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.ValidityAfter">
+            <summary>Validity start directly after the year (<c>and after</c>, <c>und folgende</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.Unchanged">
+            <summary>A value unchanged from the year directly after (<c>unchanged from</c>, <c>unverändert seit</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.EnactmentWords">
+            <summary>Words of an enactment before its number or its date (<c>Act</c>, <c>Gesetz</c>, <c>loi</c>, <c>Real Decreto</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.EnactmentEndings">
+            <summary>Endings of compound enactment words (<c>Einkommensteuergesetz</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.TitleWords">
+            <summary>Title words of an enactment followed by its year (<c>Finance Act, 2025</c>), case-sensitive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.Gazettes">
+            <summary>Official gazettes followed by the year of the issue (<c>BGBl. I 2025</c>), case-sensitive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.DateLinks">
+            <summary>Connectors between an enactment and its date (<c>Gesetz vom</c>, <c>loi du</c>, <c>Real Decreto … de</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageProfile.Months">
+            <summary>Month names and abbreviations</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageProfile.IsLanguageCode(System.String)">
+            <summary>Test if a text is a language code: two or three lower-case letters (ISO 639-1 or 639-3)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageProfile.Parse(System.String,System.String,System.String)">
+            <summary>
+            Parse and validate a language file; an unknown property, a language other than the file name, an empty word
+            or a scale factor below 1 is an error
+            </summary>
+            <param name="json">Text of the language file</param>
+            <param name="language">Language code of the file name</param>
+            <param name="path">Path of the file, for the error message</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageProfile.Canonical">
+            <summary>Canonical text of the profile, input of the hash of a language set</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageProfile.Alternation(System.Collections.Generic.IEnumerable{PayrollEngine.Lex.LanguageProfile},System.Func{PayrollEngine.Lex.LanguageProfile,System.Collections.Generic.IEnumerable{System.String}},System.Boolean)">
+            <summary>
+            Regex alternation of the words of profiles: longest first, regex characters escaped,
+            a space matches any whitespace
+            </summary>
+            <param name="profiles">Language profiles</param>
+            <param name="words">Words of a profile</param>
+            <param name="ignoreCase">Words that differ in case only are one word</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageProfile.Alternation(System.Collections.Generic.IEnumerable{System.String},System.Boolean)">
+            <summary>
+            Regex alternation of words: longest first, regex characters escaped, a space matches any whitespace;
+            without words an alternation that never matches
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LanguageScale">
+            <summary>Scale word of a language with its factor (<c>Mio.</c> = 1,000,000)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageScale.Word">
+            <summary>Scale word</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageScale.Factor">
+            <summary>Factor of the scale word</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LanguageSet">
+            <summary>
+            Languages of the source verification: the words for percentages, scales, fractions, year groups, validity
+            starts, unchanged values and citations, read from language files <c>{language}.json</c>.
+            The language files of the package lie in the folder <see cref="F:PayrollEngine.Lex.LanguageSet.FolderName"/> next to the library; a file of
+            an additional folder, given by the caller, adds a language or replaces the package file with the same language
+            code, so a new language needs no new library version. A manifest selects its languages with <c>languages</c>;
+            without it all available languages apply as one union. <see cref="P:PayrollEngine.Lex.LanguageSet.Label"/> names the languages and the hash of
+            their profiles and is part of the automatic verification method.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LanguageSet.FolderName">
+            <summary>Folder of the language files next to the library</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.PackageDirectory">
+            <summary>Folder of the language files of the package, next to the library</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.Available(System.String)">
+            <summary>Codes of the available languages, sorted</summary>
+            <param name="additionalDirectory">Folder of additional language files, null for the package languages only</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.All">
+            <summary>Union of all package languages</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.Get(System.Collections.Generic.IEnumerable{System.String},System.String)">
+            <summary>
+            Language set of language codes; null or empty for all available languages
+            </summary>
+            <param name="languages">Language codes (ISO 639-1 or 639-3, lower case)</param>
+            <param name="additionalDirectory">Folder of additional language files: a file adds a language or replaces the
+            package file with the same language code; null for the package languages only</param>
+            <exception cref="T:System.ArgumentException">A language without language file</exception>
+            <exception cref="T:System.InvalidOperationException">Missing or invalid language files</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.Get(System.Collections.Generic.IEnumerable{System.String},System.String,System.String)">
+            <summary>
+            Language set of language codes from the language files of a package folder and an additional folder
+            </summary>
+            <param name="languages">Language codes, null or empty for all available languages</param>
+            <param name="packageDirectory">Folder of the package language files</param>
+            <param name="additional">Folder of additional language files, null for none</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.Create(System.Collections.Generic.IEnumerable{PayrollEngine.Lex.LanguageProfile})">
+            <summary>Language set of profiles, without language files</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.LoadProfiles(System.String,System.String)">
+            <summary>
+            Load the language files of the package folder and the additional folder; loaded once per folder pair
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.Languages">
+            <summary>Codes of the languages, sorted</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.Hash">
+            <summary>Hash of the language profiles (first 8 hex digits of SHA-256): changes with any word</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.Label">
+            <summary>Languages and hash, e.g. <c>de,en 3f2a9c1b</c></summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.LanguageSet.ToString">
+            <inheritdoc />
+        </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
             Live state of a source URL in the snapshot: hash of the normalized text, used to detect source changes
@@ -990,6 +1155,12 @@
         <member name="P:PayrollEngine.Lex.Manifest.Provider">
             <summary>
             Issuing authority (e.g. Tax authority)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Manifest.Languages">
+            <summary>
+            Languages of the sources (ISO 639-1 or 639-3 codes, e.g. de, fr) for the number and year words of
+            LexVerifySource; null or empty for all available languages (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>)
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Manifest.Sources">
@@ -1676,17 +1847,19 @@
         <member name="T:PayrollEngine.Lex.SourceNumbers">
             <summary>
             Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
-            (<c>%</c>, <c>percent</c>, <c>per cent</c>, <c>per centum</c>) and numbers in words (English and Indian scales, fractions)
+            (<c>%</c> or a percent word of a language: <c>percent</c>, <c>per centum</c>, <c>Prozent</c>,
+            <c>pour cent</c>) and numbers in words (scales and fractions of the languages, see
+            <see cref="T:PayrollEngine.Lex.LanguageSet"/>). Digits of other scripts are read as ASCII digits (see <see cref="T:PayrollEngine.Lex.SourceScript"/>).
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Numerals">
             <summary>Numerals as normalized decimal values</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Percents">
-            <summary>Numerals followed by <c>%</c>, <c>percent</c>, <c>per cent</c> or <c>per centum</c></summary>
+            <summary>Numerals followed by <c>%</c> or a percent word (<c>percent</c>, <c>Prozent</c>, <c>por ciento</c>)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceNumbers.Words">
-            <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
+            <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>1,5 Mio.</c>, <c>one-half</c>, <c>time and a half</c></summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceNumbers.Hits(System.Decimal,System.Boolean)">
             <summary>
@@ -1718,9 +1891,24 @@
             holds no numeral of it
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceNumbers.Scan(System.String)">
+        <member name="M:PayrollEngine.Lex.SourceNumbers.Scan(System.String,PayrollEngine.Lex.LanguageSet)">
             <summary>
-            Scan a text
+            Scan a text; digits of other scripts are normalized first (positions remain valid)
+            </summary>
+            <param name="text">Source text</param>
+            <param name="languages">Languages of the percent, scale and fraction words, default: all languages</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceScript">
+            <summary>
+            Script normalization of a source text for the number and year search: digits of other scripts (Arabic-Indic,
+            Persian, Devanagari, Bengali, Gujarati, Tamil, Kannada, full width) become ASCII digits, the Arabic decimal and
+            thousands separators become <c>.</c> and <c>,</c>, the Arabic and the full width percent sign become <c>%</c>.
+            Every replacement is one character for one character, so text positions remain valid.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceScript.Normalize(System.String)">
+            <summary>
+            Normalize the script of a text; a text without such characters is returned unchanged
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceMatch">
@@ -1761,7 +1949,7 @@
         </member>
         <member name="T:PayrollEngine.Lex.HitYear">
             <summary>
-            Year context of a number hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>)
+            Year context of a number hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
             </summary>
         </member>
         <member name="F:PayrollEngine.Lex.HitYear.Neutral">
@@ -1773,18 +1961,40 @@
         <member name="F:PayrollEngine.Lex.HitYear.Weak">
             <summary>The closest year is another year</summary>
         </member>
+        <member name="T:PayrollEngine.Lex.RelevantPeriod">
+            <summary>
+            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
+            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
+            </summary>
+            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
+            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+        </member>
+        <member name="M:PayrollEngine.Lex.RelevantPeriod.#ctor(System.Int32,System.Boolean)">
+            <summary>
+            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
+            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
+            </summary>
+            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
+            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.Year">
+            <summary>Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.Fiscal">
+            <summary>The period is a tax year starting in <paramref name="Year"/></summary>
+        </member>
         <member name="T:PayrollEngine.Lex.YearHit">
             <summary>
-            Year or year group (enumeration, range) of a text with its position
+            Year, year group (enumeration, range) or tax year period of a text with its position
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Nullable{System.Int32},System.Boolean)">
             <summary>
-            Year or year group (enumeration, range) of a text with its position
+            Year, year group (enumeration, range) or tax year period of a text with its position
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.YearHit.Years">
-            <summary>Years of the hit, one year or the years of a group</summary>
+            <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
         </member>
         <member name="P:PayrollEngine.Lex.YearHit.Index">
             <summary>Text position of the first year</summary>
@@ -1795,6 +2005,14 @@
         <member name="P:PayrollEngine.Lex.YearHit.Validity">
             <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or a value
             unchanged from the year (<c>unchanged from 2024</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.PeriodStart">
+            <summary>Start year of a tax year period (<c>2025-26</c>, <c>FY 2025-26</c>, <c>AY 2026-27</c>: 2025),
+            null for a year or a year group</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Plain">
+            <summary>A period of two full consecutive years without prefix (<c>2025-2026</c>, <c>2025/2026</c>,
+            <c>2025 to 2026</c>): a year group for a calendar year</summary>
         </member>
         <member name="M:PayrollEngine.Lex.YearHit.Join(System.Int32,System.Int32)">
             <summary>Group with a further year that ends at the text position</summary>
@@ -1846,6 +2064,9 @@
         <member name="P:PayrollEngine.Lex.SourceResult.Evidence">
             <summary>Local evidence file of the entry (first source with a local file), null for a live verification</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.Languages">
+            <summary>Languages of the verification with the hash of their profiles (<see cref="P:PayrollEngine.Lex.LanguageSet.Label"/>)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceResult.ExcludedReason">
             <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
         </member>
@@ -1883,7 +2104,7 @@
             <summary>A single number that occurs in more sections is weak evidence</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.MultiYearAmbiguity">
-            <summary>Ambiguity of a year-weak number (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>)</summary>
+            <summary>Ambiguity of a year-weak number (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)</summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.AllDerivedNote">
             <summary>Note of an entry whose numbers are all derived</summary>
@@ -1899,13 +2120,15 @@
             Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.AutoVerification(System.DateOnly,System.String,System.Collections.Generic.IEnumerable{System.String})">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.AutoVerification(System.DateOnly,System.String,System.Collections.Generic.IEnumerable{System.String},System.String)">
             <summary>
             Automatic verification record for an entry whose numbers were all found
             </summary>
             <param name="verifiedOn">Verification date</param>
             <param name="evidence">Local evidence file name (declared in files[]), null for a live verification</param>
             <param name="derived">Derived properties of the entry, not taken from the source</param>
+            <param name="languages">Languages of the verification (<see cref="P:PayrollEngine.Lex.SourceResult.Languages"/>), part of the
+            method: <c>LexVerifySource 1.3.0; languages de,en 3f2a9c1b</c></param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ContentNumbers(System.String)">
             <summary>
@@ -1954,15 +2177,16 @@
             by <c>; </c>: <c>guide.pdf: Section "Page 24"; limits.pdf: Section "Page 1"</c>)
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument,System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,PayrollEngine.Lex.SourceDocument,System.String,PayrollEngine.Lex.LanguageSet)">
             <summary>
             Verify one entry against the document of its single source
             </summary>
             <param name="entry">Lex entry</param>
             <param name="document">Source document</param>
             <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd), null without year context</param>
+            <param name="languages">Languages of the number and year words, default: all available languages</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion},System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Verify(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion},System.String,PayrollEngine.Lex.LanguageSet)">
             <summary>
             Verify one entry against the documents of its sources: a number is found when any readable
             document holds it. With a source quote, the numbers must be in the section that holds the quote.
@@ -1973,8 +2197,10 @@
             <param name="exclusions">Exclusions of the manifest; the numbers of the properties addressed by a derived
             exclusion of the entry are not looked up, a notApplicable exclusion justifies a zero property</param>
             <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd); its year, or the reference year of
-            the entry, rates a year-weak number as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>),
+            the entry, rates a year-weak number as <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>);
+            a validFrom not on the 1st of January starts a tax year with this start year (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Period(System.Nullable{System.Int32},System.String)"/>),
             null without year context</param>
+            <param name="languages">Languages of the number and year words, default: all available languages</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.CoverLocation(System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Collections.Generic.IEnumerable{System.Decimal},System.Boolean,PayrollEngine.Lex.SourceVerifier.Section)">
             <summary>
@@ -1992,26 +2218,27 @@
             Weak evidence of a single number, null for an entry with several numbers or a distinctive number
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean,System.Int32)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceVerifier.Section},System.Boolean,PayrollEngine.Lex.RelevantPeriod)">
             <summary>
-            Year-weak numbers: at least one year-weak hit and no positive hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>)
+            Year-weak numbers: at least one year-weak hit and no positive hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
             </summary>
             <param name="numbers">Numbers to rate</param>
             <param name="sections">Sections to search</param>
             <param name="percent">A value below 1 may be written as percentage</param>
-            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+            <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.QuoteYearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.String,PayrollEngine.Lex.SourceNumbers,System.Boolean,System.Int32)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.QuoteYearWeakNumbers(System.Collections.Generic.List{System.Decimal},System.String,PayrollEngine.Lex.SourceNumbers,System.Boolean,PayrollEngine.Lex.RelevantPeriod,PayrollEngine.Lex.LanguageSet)">
             <summary>
             Year-weak numbers of a source quote, rated within the quote only: a quote with the relevant year (or a year
-            group that holds it) or without year anchors its numbers; a number of the quote whose closest year is another
-            year is year-weak
+            group that holds it; for a tax year the period starting in the year) or without year anchors its numbers;
+            a number of the quote whose closest year is another year is year-weak
             </summary>
             <param name="numbers">Numbers of the entry within the quote</param>
             <param name="quote">Source quote of the entry</param>
             <param name="quoteNumbers">Numbers of the quote</param>
             <param name="percent">A value below 1 may be written as percentage</param>
-            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+            <param name="period">Relevant period: the reference year of the entry or the year of validFrom</param>
+            <param name="languages">Languages</param>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.MultiYearReason(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{System.Decimal})">
             <summary>
@@ -2020,7 +2247,42 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.ValidYear(System.String)">
             <summary>
-            Year of a validFrom date (yyyy-MM-dd), null when the date has no year in the range of <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>
+            Year of a validFrom date (yyyy-MM-dd), null when the date has no year in the range of <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Period(System.Nullable{System.Int32},System.String)">
+            <summary>
+            Relevant period of an entry: the reference year of the entry, otherwise the year of validFrom. A validFrom
+            on the 1st of January gives a calendar year; another day starts a tax year with the year of validFrom as start
+            year (IN 2026-04-01: 2026-27, AU 2025-07-01: 2025-26, UK 2026-04-06: 2026-27); the reference year is then the
+            start year of the period. Null without year.
+            </summary>
+            <param name="referenceYear">Reference year of the entry</param>
+            <param name="validFrom">Start of the validity of the manifest (yyyy-MM-dd)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.IsCitation(System.String,System.Int32,System.Int32,PayrollEngine.Lex.LanguageSet)">
+            <summary>
+            A year that names an enactment or a gazette issue (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)"/>); an enactment date that is
+            a validity start (<c>mit Wirkung vom 1. Januar 2026</c>) is no citation
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.IsDocumentNumber(System.String)">
+            <summary>
+            A document number after the year (<see cref="F:PayrollEngine.Lex.SourceVerifier.DocumentNumberSuffix"/>); a full year after the hyphen or slash
+            is no document number
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.PeriodHit(System.String,System.Int32,System.Int32,System.Int32,System.Boolean)">
+            <summary>
+            Tax year period that starts with the year at the text position, null for a year: a short form
+            (<c>2025-26</c>, <c>2025/26</c>) or a long form (<c>2025-2026</c>, <c>2025/2026</c>, <c>2025 to 2026</c>) of two
+            consecutive years, optionally with a tax year prefix (<c>FY 2025-26</c>); an assessment year prefix rates the
+            income period before (<c>AY 2026-27</c> and <c>YA 2027</c>: start year 2025 and 2026)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.ShortTaxYears(System.String)">
+            <summary>
+            Tax years in two-digit form (<c>FY26</c>: 2025-26, <c>FY 25-26</c>)
             </summary>
         </member>
         <member name="F:PayrollEngine.Lex.SourceVerifier.YearWindow">
@@ -2032,11 +2294,11 @@
         <member name="F:PayrollEngine.Lex.SourceVerifier.YearsAfter">
             <summary>Years considered for the year context: up to the relevant year plus this offset</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)">
             <summary>
-            Year context of a number hit, rated by the closest year (or year group, see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)"/>) within
+            Year context of a number hit, rated by the closest year (or year group, see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String,PayrollEngine.Lex.LanguageSet)"/>) within
             <see cref="F:PayrollEngine.Lex.SourceVerifier.YearWindow"/> characters in both directions. Only years from the relevant year minus 3 to plus 1
-            are considered; years of legal source references are ignored (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>).
+            are considered; years of legal source references are ignored (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)"/>).
             <list type="bullet">
             <item><see cref="F:PayrollEngine.Lex.HitYear.Positive"/>: the closest year is the relevant year, or a group that holds it
             (at the same distance the relevant year wins)</item>
@@ -2047,44 +2309,87 @@
             </list>
             A year of the section heading counts as a year at the start of the section text.
             A number is year-weak when at least one hit is weak and no hit is positive.
+            For a calendar year a tax year period is ignored, except a plain period of two full years
+            (<c>2025-2026</c>), which is a year group. For a tax year starting in the relevant year Y:
+            <list type="bullet">
+            <item>a period starting in Y is <see cref="F:PayrollEngine.Lex.HitYear.Positive"/>, a period with another start year is
+            <see cref="F:PayrollEngine.Lex.HitYear.Weak"/></item>
+            <item>a year (or a group) holding Y or Y+1 is <see cref="F:PayrollEngine.Lex.HitYear.Neutral"/>: it lies in the period, but may
+            also belong to the neighbouring period; a validity start up to Y is neutral too</item>
+            <item>another year from Y−3 to Y+1 is <see cref="F:PayrollEngine.Lex.HitYear.Weak"/></item>
+            </list>
             </summary>
             <param name="hit">Text position of the hit</param>
-            <param name="years">Years and year groups of the text with their position (<see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)"/>)</param>
-            <param name="year">Relevant year: the reference year of the entry or the year of validFrom</param>
+            <param name="years">Years, year groups and periods of the text with their position (<see cref="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String,PayrollEngine.Lex.LanguageSet)"/>)</param>
+            <param name="period">Relevant period</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Considered(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">
+            <summary>
+            A year hit within the considered years: from the relevant year minus 3 to plus 1, for a tax year period its
+            start year; a period for a calendar year only as plain period
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Holds(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">
+            <summary>
+            The year hit holds the relevant period: a calendar year within the year or group, a tax year as period start
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Rate(PayrollEngine.Lex.YearHit,PayrollEngine.Lex.RelevantPeriod)">
+            <summary>
+            Rating of the closest year hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)">
             <summary>
             Years of a text, used for the year context of a number hit and a source quote. A year is a four-digit
-            number from 1990 to 2100 that is not part of a longer number, an amount or a percentage. Years that
-            are part of a legal source reference are ignored, because they name the document, not the year of a value:
+            number from 1990 to 2100 that is not part of a longer number, an amount (<c>$2000</c>, <c>Rs. 2000</c>,
+            <c>2000 €</c>) or a percentage; digits of other scripts are read as ASCII digits (see <see cref="T:PayrollEngine.Lex.SourceScript"/>).
+            Years that are part of a legal source reference are ignored, because they name the document, not the year of
+            a value:
             <list type="bullet">
             <item>directly after <c>Notice</c>, <c>Pub.</c> or <c>Rev.</c>, also with a word (<c>Rev. Guide 2024</c>)
             or a revision with month (<c>Rev. 12-2025</c>, <c>Rev. December 2025</c>)</item>
-            <item>in a document number with hyphen (<c>2024-40</c>); this also skips ISO dates and short year
-            ranges (<c>2025-01-01</c>, <c>2025-26</c>), a range of full years (<c>2024-2025</c>) is kept</item>
+            <item>in a document number with hyphen or slash (<c>2024-40</c>, <c>décret n° 2024-1234</c>,
+            <c>Regulation (EU) 2016/679</c>); this also skips ISO dates (<c>2025-01-01</c>), a range of full years
+            (<c>2024-2026</c>) is kept</item>
             <item>in parentheses after a statute reference (<c>Bill 951 (2022)</c>, <c>Act 32 (2020)</c>)</item>
+            <item>after a number with slash (<c>No. 57/2023</c>, <c>BGBl. II Nr. 123/2025</c>, <c>Ley 35/2006</c>,
+            <c>Real Decreto 1/2026</c>) or a number of a year (<c>Decree-Law No. 33 of 2021</c>)</item>
+            <item>after an enactment title (<c>Finance Act, 2025</c>, <c>Income-tax Rules, 1962</c>,
+            <c>Social Security Act 1991</c>) or an official gazette (<c>BGBl. I 2025 Nr. 12</c>, <c>Stb. 2024, 123</c>)</item>
+            <item>in the date of an enactment (<c>Gesetz vom 20. Dezember 2024</c>, <c>loi du 23 décembre 2024</c>,
+            <c>legge 30 dicembre 2024</c>), unless the date starts a validity</item>
             <item>in a print or typesetting mark, a date with a time (<c>15:14 - 3-Dec-2025</c>,
             <c>16:58 Oct 31, 2025</c>, <c>Sep 11 2014 16:58</c>): a document is printed before the year it is valid for</item>
             <item>in a number row, another number within 12 characters on both sides without a word, colon or
             parenthesis in between
             (wage bracket table <c>1965 1995 32.50</c>); years of an enumeration or range are no such number</item>
             </list>
-            A validity start (<c>effective January 1, 2025</c>, <c>beginning on or after January 1, 2025</c>,
-            <c>2025 and after</c>) and the year of an unchanged value (<c>unchanged from 2024</c>, <c>same as 2024</c>)
-            are kept but marked: up to the relevant year they rate a hit neutral.
-            A year enumeration (<c>2024, 2025, or 2026</c>, <c>2024 and 2025</c>) and a year range (<c>2024-2026</c>,
-            <c>2024 through 2026</c>) are one year group. A number with a year-weak hit and no positive hit is
-            <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},System.Int32)"/>); a source quote with the relevant year
-            anchors the numbers it holds.
+            A citation that is not recognized counts as year. A validity start (<c>effective January 1, 2025</c>,
+            <c>beginning on or after January 1, 2025</c>, <c>from 1 July 2025</c>, <c>2025 and after</c>,
+            <c>ab dem 1. Januar 2025</c>) and the year of an unchanged value (<c>unchanged from 2024</c>,
+            <c>same as 2024</c>, <c>unverändert seit 2024</c>) are kept but marked: up to the relevant year they rate a
+            hit neutral. A year enumeration (<c>2024, 2025, or 2026</c>, <c>2024 and 2025</c>, <c>2024 und 2025</c>) and a
+            year range (<c>2024-2026</c>, <c>2024 through 2026</c>, <c>2024 bis 2026</c>) are one year group.
+            A tax year period (<c>2025-26</c>, <c>FY 2025-26</c>, <c>FY26</c>, <c>AY 2026-27</c>, <c>YA 2027</c>) is one
+            hit with its income years (see <see cref="M:PayrollEngine.Lex.SourceVerifier.PeriodHit(System.String,System.Int32,System.Int32,System.Int32,System.Boolean)"/>). The words of the languages apply
+            (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>). A number with a year-weak hit and no positive hit is
+            <see cref="F:PayrollEngine.Lex.SourceMatch.Ambiguous"/> (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>);
+            a source quote with the relevant year anchors the numbers it holds.
             </summary>
+            <param name="text">Source text</param>
+            <param name="languages">Languages, default: all languages</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.YearHits(System.String,PayrollEngine.Lex.LanguageSet)">
             <summary>
-            Years of a text with their position, without the years of legal source references (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String)"/>);
-            an enumeration or a range of years is one group with all its years
+            Years of a text with their position, without the years of legal source references (see <see cref="M:PayrollEngine.Lex.SourceVerifier.Years(System.String,PayrollEngine.Lex.LanguageSet)"/>);
+            an enumeration or a range of years is one group with all its years, a tax year period one hit with its
+            start year
             </summary>
+            <param name="text">Source text</param>
+            <param name="languages">Languages, default: all languages</param>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.InNumberRow(System.String,System.Int32,System.Int32)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.InNumberRow(System.String,System.Int32,System.Int32,PayrollEngine.Lex.LanguageSet)">
             <summary>
             A year candidate within a number row: another number within <see cref="F:PayrollEngine.Lex.SourceVerifier.RowWindow"/> characters on both
             sides without a word, colon or parenthesis in between; a year of an enumeration or range
@@ -2109,24 +2414,29 @@
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Canonical(System.String)">
             <summary>
-            Canonical text for the quote comparison: typographic quotes and apostrophes unified, hyphenation at
-            a line break joined (<c>supple- mental</c>), hyphens within words dropped and whitespace collapsed
+            Canonical text for the quote comparison: script normalized (see <see cref="T:PayrollEngine.Lex.SourceScript"/>), typographic
+            quotes and apostrophes unified, hyphenation at a line break joined (<c>supple- mental</c>), hyphens within
+            words dropped and whitespace collapsed
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.Section.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Int32)">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.Section.YearContext(System.ValueTuple{System.Int32,System.Int32},PayrollEngine.Lex.RelevantPeriod)">
             <summary>Year context of a hit in the section text</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})">
+        <member name="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)">
             <summary>
             Verify the entries of a manifest with source URLs (inline content and JSON content files) against the local
             evidence files or, with a live loader, against the source URLs. Per source URL the local evidence is the
             documentRef for the first URL, otherwise the declared file with the same URL.
-            Entries that reference an official calculator are skipped.
+            Entries that reference an official calculator are skipped. The languages of the manifest
+            (<see cref="P:PayrollEngine.Lex.Manifest.Languages"/>, default: all available languages) read the number and year words.
             </summary>
             <param name="manifest">Manifest</param>
             <param name="lexDirectory">Folder of lex.json</param>
             <param name="loadLive">Loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>), null for the local evidence</param>
             <param name="documents">Loaded documents by URL (live) or local path, shared over several manifests</param>
+            <param name="languageDirectory">Folder of additional language files (see <see cref="M:PayrollEngine.Lex.LanguageSet.Get(System.Collections.Generic.IEnumerable{System.String},System.String)"/>),
+            null for the package languages only</param>
+            <exception cref="T:System.ArgumentException">A language of the manifest without language file</exception>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.LocalEvidence(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.Entry,System.String,System.Boolean,System.String)">
             <summary>
@@ -2220,6 +2530,12 @@
             </summary>
             <param name="manifest">Manifest to validate</param>
             <param name="manifestDirectory">Directory containing lex.json (used to resolve relative ContentFile paths)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Validator.ValidateLanguages(System.Collections.Generic.List{System.String},System.Collections.Generic.List{System.String})">
+            <summary>
+            Languages of the manifest: language codes without duplicates; the language files are resolved by
+            LexVerifySource (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>), the folder of additional language files is given there
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Verification">
             <summary>

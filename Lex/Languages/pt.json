@@ -1,0 +1,25 @@
+{
+  "language": "pt",
+  "name": "Portuguese",
+  "percentWords": ["por cento"],
+  "scaleWords": [
+    { "word": "milhão", "factor": 1000000 },
+    { "word": "milhões", "factor": 1000000 },
+    { "word": "bilhão", "factor": 1000000000 },
+    { "word": "bilhões", "factor": 1000000000 }
+  ],
+  "halfWords": ["metade"],
+  "oneAndHalfWords": ["uma vez e meia"],
+  "enumerationWords": ["e", "ou"],
+  "rangeWords": ["a", "até"],
+  "validityBefore": ["a partir de", "com efeitos a partir de", "com efeitos desde", "a contar de", "desde"],
+  "validityAfter": ["e seguintes", "e posteriores"],
+  "unchanged": ["inalterado", "inalterado desde", "inalterada", "sem alteração", "igual a", "igual ao"],
+  "enactmentWords": ["lei", "lei complementar", "decreto-lei", "decreto", "portaria", "instrução normativa"],
+  "gazettes": ["DR", "DOU", "D.O.U."],
+  "dateLinks": ["de"],
+  "months": [
+    "janeiro", "fevereiro", "março", "marco", "abril", "maio", "junho", "julho", "agosto", "setembro",
+    "outubro", "novembro", "dezembro"
+  ]
+}

@@ -37,6 +37,8 @@ public static class Validator
             errors.Add($"Invalid validFrom format '{manifest.ValidFrom}' — expected YYYY-MM-DD");
         }
 
+        ValidateLanguages(errors, manifest.Languages);
+
         // values
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
         foreach (var value in manifest.Values)
@@ -219,6 +221,30 @@ public static class Validator
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// Languages of the manifest: language codes without duplicates; the language files are resolved by
+    /// LexVerifySource (see <see cref="LanguageSet"/>), the folder of additional language files is given there
+    /// </summary>
+    private static void ValidateLanguages(List<string> errors, List<string> languages)
+    {
+        if (languages == null)
+        {
+            return;
+        }
+        var invalid = languages.Where(x => !LanguageProfile.IsLanguageCode(x)).ToList();
+        if (invalid.Count > 0)
+        {
+            errors.Add($"Invalid language code(s) {string.Join(", ", invalid.Select(x => $"'{x}'"))} — " +
+                       "expected two or three lower-case letters (e.g. de, fr)");
+            return;
+        }
+        var duplicates = languages.GroupBy(x => x, StringComparer.Ordinal).Where(x => x.Count() > 1).Select(x => x.Key).ToList();
+        if (duplicates.Count > 0)
+        {
+            errors.Add($"Duplicate language(s): {string.Join(", ", duplicates)}");
+        }
     }
 
     private static void ValidateVerification(List<string> errors, string key, Verification verification,

@@ -1,0 +1,26 @@
+{
+  "language": "es",
+  "name": "Spanish",
+  "percentWords": ["por ciento", "por 100"],
+  "scaleWords": [
+    { "word": "millón", "factor": 1000000 },
+    { "word": "millones", "factor": 1000000 }
+  ],
+  "halfWords": ["la mitad"],
+  "oneAndHalfWords": ["una vez y media"],
+  "enumerationWords": ["y", "e", "o", "u"],
+  "rangeWords": ["a", "al", "hasta"],
+  "validityBefore": [
+    "a partir de", "a partir del", "desde el", "desde", "con efectos desde", "con efectos a partir de",
+    "con efectos de"
+  ],
+  "validityAfter": ["y siguientes", "y posteriores"],
+  "unchanged": ["sin cambios", "sin cambios desde", "sin cambios respecto a", "igual que", "igual que en"],
+  "enactmentWords": ["ley", "ley orgánica", "real decreto", "real decreto-ley", "decreto", "decreto-ley", "orden"],
+  "gazettes": ["BOE"],
+  "dateLinks": ["de"],
+  "months": [
+    "enero", "febrero", "marzo", "abril", "mayo", "junio", "julio", "agosto", "septiembre", "setiembre",
+    "octubre", "noviembre", "diciembre"
+  ]
+}

@@ -71,6 +71,7 @@ public sealed class SourceDocument
     /// HTTP client for source requests
     /// </summary>
     /// <param name="timeout">Request timeout (default: 60 seconds)</param>
+    // ReSharper disable once UnusedMember.Global
     public static HttpClient CreateHttpClient(TimeSpan? timeout = null)
     {
         var client = new HttpClient { Timeout = timeout ?? TimeSpan.FromSeconds(60) };

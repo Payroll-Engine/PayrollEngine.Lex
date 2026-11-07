@@ -1,0 +1,5 @@
+# Compiler-generated C# documentation (DocumentationFile)
+[*.xml]
+generated_code = true
+resharper_markup_attribute_typo_highlighting = none
+resharper_markup_text_typo_highlighting = none

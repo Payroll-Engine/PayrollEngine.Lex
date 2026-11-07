@@ -36,6 +36,13 @@ public sealed class Manifest
     /// </summary>
     public string Provider { get; init; }
 
+    // ReSharper disable once GrammarMistakeInComment
+    /// <summary>
+    /// Languages of the sources (ISO 639-1 or 639-3 codes, e.g. de, fr) for the number and year words of
+    /// LexVerifySource; null or empty for all available languages (see <see cref="LanguageSet"/>)
+    /// </summary>
+    public List<string> Languages { get; init; }
+
     /// <summary>
     /// Document-level source references
     /// </summary>

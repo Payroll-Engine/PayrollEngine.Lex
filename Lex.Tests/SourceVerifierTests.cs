@@ -1,4 +1,5 @@
 using Xunit;
+// ReSharper disable StringLiteralTypo
 
 namespace PayrollEngine.Lex.Tests;
 
@@ -579,6 +580,65 @@ public class SourceVerifierTests
     [InlineData("Valid 1989 to 2101", new int[0])]
     public void Years_IgnoreReferenceYears(string text, int[] expected) =>
         Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
+    // citations ----------------------------------------------------------------
+
+    [Theory]
+    [InlineData("Federal Decree-Law No. 57/2023 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("BGBl. II Nr. 123/2024 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Lei n.º 133/2024 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Ley 35/2006 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Real Decreto 1/2024 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Regulation (EU) 2016/679 applies in 2025", new[] { 2025 })]
+    [InlineData("Directive 2023/2631 applies in 2025", new[] { 2025 })]
+    [InlineData("Loi n° 2024-1234 applies in 2025", new[] { 2025 })]
+    [InlineData("Decree-Law No. 33 of 2021 applies in 2025", new[] { 2025 })]
+    [InlineData("Act No. 5 of 2020 applies in 2025", new[] { 2025 })]
+    [InlineData("Income-tax Act 43 of 1991 applies in 2025", new[] { 2025 })]
+    [InlineData("Income-tax Act, 2024 (30 of 2024) applies in 2025", new[] { 2025 })]
+    [InlineData("INCOME-TAX UNDER THE INCOME-TAX ACT, 2024 applies in 2025", new[] { 2025 })]
+    [InlineData("in those Acts. 43 of 1991. 22 of 2015; rate for 2025", new[] { 2025 })]
+    [InlineData("Finance Act, 2024 applies in 2025", new[] { 2025 })]
+    [InlineData("Finance (No. 2) Act, 2024 applies in 2025", new[] { 2025 })]
+    [InlineData("Income-tax Rules, 1992 apply in 2025", new[] { 2025 })]
+    [InlineData("Social Security Act 1991 applies in 2025", new[] { 2025 })]
+    [InlineData("BGBl. I 2024 Nr. 12 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("BGBl. 2024 I S. 123 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Stb. 2024, 123 sets the rate for 2025", new[] { 2025 })]
+    [InlineData("Gesetz vom 20. Dezember 2024, rate for 2025", new[] { 2025 })]
+    [InlineData("Einkommensteuergesetz vom 8. Oktober 2009, rate for 2025", new[] { 2025 })]
+    [InlineData("loi du 23 décembre 2024, rate for 2025", new[] { 2025 })]
+    [InlineData("loi n° 2024-1234 du 29 décembre 2024, rate for 2025", new[] { 2025 })]
+    [InlineData("legge 30 dicembre 2024, n. 207, rate for 2025", new[] { 2025 })]
+    [InlineData("Real Decreto 1234/2024, de 28 de noviembre de 2024, rate for 2025", new[] { 2025 })]
+    [InlineData("wet van 20 december 2024, rate for 2025", new[] { 2025 })]
+    [InlineData("Decreto-Lei de 29 de dezembro de 2024, rate for 2025", new[] { 2025 })]
+    public void Years_IgnoreCitations(string text, int[] expected) =>
+        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
+    [Theory]
+    [InlineData("Valid until 12/31/2024; rate for 2025", new[] { 2024, 2025 })]
+    [InlineData("Gesetz mit Wirkung vom 1. Januar 2025", new[] { 2025 })]
+    [InlineData("Under the Act the 2024 rates apply in 2025", new[] { 2024, 2025 })]
+    [InlineData("Valid 2024/2025", new[] { 2024, 2025 })]
+    [InlineData("In Q1 of 2024. Rate 3 of 2025 rates", new[] { 2024, 2025 })]
+    [InlineData("Valid 2024-2026", new[] { 2024, 2025, 2026 })]
+    public void Years_NoCitation_IsKept(string text, int[] expected) =>
+        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+
+    [Theory]
+    [InlineData("Finance Act, 2025", SourceMatch.Ambiguous)]
+    [InlineData("Decree-Law No. 12 of 2025", SourceMatch.Ambiguous)]
+    [InlineData("Law No. 57/2025", SourceMatch.Ambiguous)]
+    [InlineData("Regulation (EU) 2025/123", SourceMatch.Ambiguous)]
+    [InlineData("décret n° 2025-1234", SourceMatch.Ambiguous)]
+    [InlineData("BGBl. I 2025", SourceMatch.Ambiguous)]
+    [InlineData("Gesetz vom 20. Dezember 2025", SourceMatch.Ambiguous)]
+    [InlineData("valid in 2025", SourceMatch.Found)]
+    public void CitationYear_IsNoYearContext(string citation, SourceMatch expected) =>
+        Assert.Equal(expected,
+            SourceVerifier.Verify(Entry("75000"),
+                Sections($"Rates of the year 2024 are in the archive. Limit of 75,000 ({citation})."), ValidFrom).Match);
 
     [Theory]
     [InlineData("Section \"Page 24\"", true)]

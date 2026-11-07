@@ -67,6 +67,7 @@ public static class EntryRules
     /// <summary>
     /// Today in the format yyyy-MM-dd
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     public static string Today() =>
         DateTime.Today.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture);
 }

@@ -3,22 +3,25 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
+// ReSharper disable CommentTypo
 
 namespace PayrollEngine.Lex;
 
 /// <summary>
 /// Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
-/// (<c>%</c>, <c>percent</c>, <c>per cent</c>, <c>per centum</c>) and numbers in words (English and Indian scales, fractions)
+/// (<c>%</c> or a percent word of a language: <c>percent</c>, <c>per centum</c>, <c>Prozent</c>,
+/// <c>pour cent</c>) and numbers in words (scales and fractions of the languages, see
+/// <see cref="LanguageSet"/>). Digits of other scripts are read as ASCII digits (see <see cref="SourceScript"/>).
 /// </summary>
 internal sealed class SourceNumbers
 {
     /// <summary>Numerals as normalized decimal values</summary>
     internal HashSet<decimal> Numerals { get; } = [];
 
-    /// <summary>Numerals followed by <c>%</c>, <c>percent</c>, <c>per cent</c> or <c>per centum</c></summary>
+    /// <summary>Numerals followed by <c>%</c> or a percent word (<c>percent</c>, <c>Prozent</c>, <c>por ciento</c>)</summary>
     internal HashSet<decimal> Percents { get; } = [];
 
-    /// <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>one-half</c>, <c>time and a half</c></summary>
+    /// <summary>Numbers in words: <c>$1 million</c>, <c>2.5 lakh</c>, <c>1,5 Mio.</c>, <c>one-half</c>, <c>time and a half</c></summary>
     internal HashSet<decimal> Words { get; } = [];
 
     // fewest digits of a numeral as written in the text, without separators: 4,300 has 4, 1.2% has 2
@@ -94,18 +97,22 @@ internal sealed class SourceNumbers
         digits[value] = digits.TryGetValue(value, out var existing) ? Math.Min(existing, count) : count;
 
     /// <summary>
-    /// Scan a text
+    /// Scan a text; digits of other scripts are normalized first (positions remain valid)
     /// </summary>
-    internal static SourceNumbers Scan(string text)
+    /// <param name="text">Source text</param>
+    /// <param name="languages">Languages of the percent, scale and fraction words, default: all languages</param>
+    internal static SourceNumbers Scan(string text, LanguageSet languages = null)
     {
         var numbers = new SourceNumbers();
         if (string.IsNullOrEmpty(text))
         {
             return numbers;
         }
+        languages ??= LanguageSet.All;
+        text = SourceScript.Normalize(text);
         foreach (Match match in NumberToken.Matches(text))
         {
-            var percent = PercentSign.IsMatch(text, match.Index + match.Length);
+            var percent = languages.PercentSign.IsMatch(text, match.Index + match.Length);
             var digits = match.Value.Count(char.IsDigit);
             foreach (var value in Interpretations(match))
             {
@@ -120,17 +127,18 @@ internal sealed class SourceNumbers
                 }
             }
         }
-        foreach (Match match in ScaleWord.Matches(text))
+        foreach (Match match in languages.ScaleWord.Matches(text))
         {
-            if (decimal.TryParse(match.Groups["number"].Value, NumberStyles.AllowDecimalPoint,
-                    CultureInfo.InvariantCulture, out var number))
+            if (decimal.TryParse(match.Groups["number"].Value.Replace(',', '.'), NumberStyles.AllowDecimalPoint,
+                    CultureInfo.InvariantCulture, out var number) &&
+                languages.Scales.TryGetValue(match.Groups["scale"].Value.ToLowerInvariant(), out var scale))
             {
-                var value = Math.Round(number * Scale(match.Groups["scale"].Value), 6);
+                var value = Math.Round(number * scale, 6);
                 numbers.Words.Add(value);
                 AddHit(numbers.wordHits, value, match);
             }
         }
-        foreach (Match match in FractionWord.Matches(text))
+        foreach (Match match in languages.FractionWord.Matches(text))
         {
             var value = match.Groups["half"].Success ? 0.5m : match.Groups["double"].Success ? 2m : 1.5m;
             numbers.Words.Add(value);
@@ -144,29 +152,6 @@ internal sealed class SourceNumbers
     private static readonly Regex NumberToken = new(
         @"(?<lakh>\d{1,2}(?:,\d{2})+,\d{3}(?:\.\d+)?)(?!\d|,\d)|\d{1,3}(?:[ \u00a0\u202f.,'’]\d{3})+(?!\d)(?:[.,]\d+)?|\d+(?:[.,]\d+)?",
         RegexOptions.Compiled);
-
-    private static readonly Regex PercentSign = new(
-        @"\G[ \u00a0\u202f]?(?:%|percent\b|per cent\b|per centum\b)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    // a numeral directly before the scale word: "a million" holds no number
-    private static readonly Regex ScaleWord = new(
-        @"(?<![\d.,])(?<number>\d+(?:\.\d+)?)[ \u00a0]?(?<scale>million|billion|lakhs?|crores?)\b",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    // the longer phrases come first: "one and one-half" is 1.5, not 0.5
-    private static readonly Regex FractionWord = new(
-        @"\bone and (?:one[- ]|a )half\b|\btime and (?:one[- ]|a )half\b|(?<![\d.,])1 ?½|(?<half>\bone[- ]half\b|½)|(?<double>\bdouble time\b)",
-        RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-    private static decimal Scale(string word) =>
-        word.ToLowerInvariant() switch
-        {
-            "million" => 1_000_000m,
-            "billion" => 1_000_000_000m,
-            "lakh" or "lakhs" => 100_000m,
-            _ => 10_000_000m
-        };
 
     private static IEnumerable<decimal> Interpretations(Match match)
     {

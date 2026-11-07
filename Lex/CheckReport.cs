@@ -17,6 +17,7 @@ public static class CheckReport
     /// </summary>
     /// <param name="results">Check results</param>
     /// <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
+    // ReSharper disable once UnusedMember.Global
     public static void Write(IReadOnlyList<CheckResult> results, string reportPath)
     {
         var directory = Path.GetDirectoryName(Path.GetFullPath(reportPath));

@@ -1,0 +1,28 @@
+{
+  "language": "fr",
+  "name": "French",
+  "percentWords": ["pour cent", "p. cent", "p. 100"],
+  "scaleWords": [
+    { "word": "million", "factor": 1000000 },
+    { "word": "millions", "factor": 1000000 },
+    { "word": "milliard", "factor": 1000000000 },
+    { "word": "milliards", "factor": 1000000000 }
+  ],
+  "halfWords": ["la moitié"],
+  "oneAndHalfWords": ["une fois et demie"],
+  "enumerationWords": ["et", "ou"],
+  "rangeWords": ["à", "au"],
+  "validityBefore": [
+    "à compter du", "à compter de", "à partir du", "à partir de", "dès le", "en vigueur le",
+    "en vigueur depuis le", "depuis le"
+  ],
+  "validityAfter": ["et suivantes", "et suivants"],
+  "unchanged": ["inchangé", "inchangée", "inchangé depuis", "inchangé par rapport à", "identique à"],
+  "enactmentWords": ["loi", "décret", "arrêté", "ordonnance", "règlement", "circulaire"],
+  "gazettes": ["JO", "JORF", "Mémorial"],
+  "dateLinks": ["du"],
+  "months": [
+    "janvier", "février", "fevrier", "mars", "avril", "mai", "juin", "juillet", "août", "aout", "septembre",
+    "octobre", "novembre", "décembre", "decembre"
+  ]
+}

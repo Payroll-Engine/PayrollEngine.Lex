@@ -80,10 +80,88 @@ next to another year is year-weak; the other numbers of the entry are rated in t
 surcharge `for 2025` in the 2026 satellite) sets `referenceYear` (e.g. `2025`): it replaces the validFrom year in
 the year rating and for the quote, and `LexCheck` lists such entries as information. `referenceYear` is part of
 the snapshot hash and is kept by `LexRollover`. Years of a legal source reference are ignored: directly
-after `Notice`, `Pub.` or `Rev.` (also `Rev. Guide 2024`, `Rev. 12-2025`), in a document number with hyphen (`2024-40`,
-also ISO dates and short ranges like `2025-26`) and in parentheses after a statute reference (`Bill 951 (2022)`).
+after `Notice`, `Pub.` or `Rev.` (also `Rev. Guide 2024`, `Rev. 12-2025`), in a document number with hyphen or slash
+(`2024-40`, `2025/1234`, also ISO dates), in parentheses after a statute reference (`Bill 951 (2022)`) and in the
+citations listed in [Languages, Scripts and Periods](#languages-scripts-and-periods).
 Print and typesetting marks are ignored too, a date with a time (`15:14 - 3-Dec-2025`, `16:58 Oct 31, 2025`):
 a document is printed before the year it is valid for.
+
+### Languages, Scripts and Periods
+
+The year rating and the number lookup read the words of a language from a language file `{language}.json`
+(`LanguageSet`). The package ships English, German, French, Spanish, Italian, Dutch and Portuguese in the folder
+`Languages` next to the library. A folder of additional language files, given by the caller
+(`SourceVerifier.VerifyManifest(…, languageDirectory)`, `LanguageSet.Get(languages, additionalDirectory)`; in
+pecmd `LexVerifySource Languages:<folder>` or the environment variable `PAYROLL_ENGINE_LEX_LANGUAGES`), adds a
+language or replaces a package file with the same language code, so a new language needs no new library
+version. The library reads no environment variable or configuration of its own. A manifest selects the languages of its sources with `languages` (`["de", "fr"]`); without it all
+available languages apply as one union, so a source mixing languages (an English summary of a Dutch decree) is
+read the same way. Words of a language apply only in their position (a connector between two years, a validity
+phrase before a year), so a short word of one language does not change a text of another language.
+
+A language file lists word arrays; every array is optional, an unknown property is an error:
+
+```json
+{
+  "language": "da",
+  "name": "Danish",
+  "percentWords": ["procent"],
+  "scaleWords": [{ "word": "mio.", "factor": 1000000 }],
+  "halfWords": [], "oneAndHalfWords": [], "doubleWords": [],
+  "enumerationWords": ["og", "eller"],
+  "rangeWords": ["til"],
+  "validityBefore": ["med virkning fra"], "datedValidityBefore": [], "validityAfter": [],
+  "unchanged": ["uændret"],
+  "enactmentWords": ["lov", "bekendtgørelse"], "enactmentEndings": ["loven"],
+  "titleWords": [], "gazettes": [], "dateLinks": ["af"],
+  "months": ["januar", "februar", "marts"]
+}
+```
+
+`titleWords` and `gazettes` are case-sensitive, all other words are not. Each result names the languages and
+the hash of their words (`SourceResult.Languages`, e.g. `de,en 3f2a9c1b`); the automatic verification record
+writes them into its method (`LexVerifySource 1.2.0; languages de,en 3f2a9c1b`), so a changed word list
+renews the record on the next run and every result can be reproduced with the same language files.
+The manifest validation (`LexCheck`, `LexSnapshot`, `LexApply`) reports an invalid or duplicate language code;
+a language without language file stops `LexVerifySource` for the manifest.
+
+| Topic | Examples |
+|:--|:--|
+| Percent words | `percent`, `Prozent`, `pour cent`, `por ciento`, `per cento`, `procent`, `por cento` |
+| Scale words | `million`, `Mio.`, `Mrd.`, `millions`, `millones`, `milioni`, `miljoen`, `milhões`, `lakh`, `crore` |
+| Year groups | `2024 und 2025`, `2024 et 2025`, `2024 bis 2026`, `de 2024 a 2026`, `2024 t/m 2026`, `2024 até 2026` |
+| Validity starts | `ab 2025`, `gültig ab 1. Januar 2025`, `à compter du 1er janvier 2025`, `a partir de 2025`, `a decorrere dal 2025`, `met ingang van 2025`, `with effect from 1 April 2025`, `w.e.f.`, `from 1 April 2025` |
+| Unchanged values | `unverändert seit 2024`, `inchangé depuis 2024`, `sin cambios desde 2024`, `invariato dal 2024`, `ongewijzigd sinds 2024`, `inalterado desde 2024` |
+
+Citations whose year is the year of the enactment, not of the value, are ignored:
+
+- numbers with a slash after a number mark or enactment word: `Gesetz Nr. 12/2025`, `Loi n° 2024-1234`, `Real Decreto 1/2025`
+- `No. 30 of 2025`, `Act 43 of 1991`, `(30 of 2025)` and margin notes `30 of 2025.`
+- enactment titles with their year: `Finance Act, 2025`, `Income-tax Rules, 1962`, `INCOME-TAX ACT, 2025`
+- gazettes: `BGBl. I 2025`, `BOE 2025`, `Stb. 2025`, `G.U. 2025`
+- enactments with their date: `Gesetz vom 23. Dezember 2024`, `Lei nº 15.191, de 11 de agosto de 2025`, `décret du 30 décembre 2024`
+
+A date after a validity phrase stays a validity start, not a citation.
+
+**Tax years.** A manifest whose `validFrom` is not 1 January covers a tax year with the start year of `validFrom`
+(`2025-04-01` → tax year 2025, India, Australia, United Kingdom); `referenceYear` is the start year too. In such a
+manifest periods are rated: `2025-26`, `2025/26`, `2025-2026`, `2025 to 2026`, `FY 2025-26`, `FY26`,
+`financial year 2025-26`, `income year 2025–26`, and the assessment year as the following year
+(`AY 2026-27`, `YA 2026`, `assessment year 2026-27` = tax year 2025). A period starting in the entry year is
+positive, a period of another start year is weak. A single year or a year group with the start year or the year
+after it is neutral (a tax year 2025-26 ends in 2026), any other year is weak. A validity start up to the start
+year is neutral as for calendar years. In a manifest from 1 January periods are no years, except two full
+consecutive years without prefix (`2024-2025`) which count as a year group.
+
+**Scripts.** Digits of other scripts (Devanagari, Arabic-Indic, Bengali, fullwidth) and the Arabic decimal and
+thousands separators and percent signs are mapped to ASCII before the lookup. The mapping keeps the length of
+the text, so the hit positions and the section names refer to the original text; the normalized text of a source
+keeps the original script. A four-digit amount with a currency sign is no year: before (`$`, `€`, `£`, `¥`, `₹`,
+`Rs.`, `R$`, `CHF`, `Fr.`, `kr`) or after it (`2025 €`, `2025 EUR`, `2025 CHF`, `2025 ₹`).
+
+Limits: words of a language without language file (Arabic, Hindi, Chinese) are not recognized: add a language
+file, use the official English version of the source if there is one, otherwise a `sourceQuote` or `LexAttest`. Amendment
+histories ("Amendments 2025 — substituted $7,500") and bare years of a legislative session stay year context.
 
 Tables with more than 40 numbers are sampled evenly. Entries with an
 `autoVerification` exclusion are never written (`SourceResult.CanWrite`). A `derived` exclusion

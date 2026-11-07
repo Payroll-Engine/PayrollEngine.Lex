@@ -22,6 +22,12 @@
 		<PackageReference Include="PdfPig" Version="0.1.16" />
 	</ItemGroup>
 
+	<!-- language files: next to the library in the build output and in the output of the package consumers -->
+	<ItemGroup>
+		<None Include="Languages\*.json" CopyToOutputDirectory="PreserveNewest" Pack="true"
+		      PackagePath="contentFiles\any\any\Languages\" PackageCopyToOutput="true" PackageFlatten="false" />
+	</ItemGroup>
+
 	<!-- include xml documention files to the nuget package -->
 	<ItemGroup>
 		<None Include="$(OutputDir)*.xml" Pack="true">

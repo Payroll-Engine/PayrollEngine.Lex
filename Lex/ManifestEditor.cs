@@ -368,6 +368,7 @@ public sealed class ManifestEditor
     /// Write the document (UTF-8 without BOM)
     /// </summary>
     /// <param name="path">Target path</param>
+    // ReSharper disable once UnusedMember.Global
     public Task SaveAsync(string path) =>
         File.WriteAllTextAsync(path, ToJson(), new UTF8Encoding(false));
 

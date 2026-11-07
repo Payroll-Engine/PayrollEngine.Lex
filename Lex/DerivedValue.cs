@@ -185,6 +185,7 @@ internal static class DerivedProperties
     /// <summary>
     /// Test if a property path exists in a JSON content
     /// </summary>
+    // ReSharper disable once UnusedMember.Global
     internal static bool Exists(string content, string path) =>
         TryGetValue(content, path, out _);
 

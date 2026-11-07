@@ -1,0 +1,38 @@
+{
+  "language": "en",
+  "name": "English",
+  "percentWords": ["percent", "per cent", "per centum"],
+  "scaleWords": [
+    { "word": "million", "factor": 1000000 },
+    { "word": "billion", "factor": 1000000000 },
+    { "word": "lakh", "factor": 100000 },
+    { "word": "lakhs", "factor": 100000 },
+    { "word": "crore", "factor": 10000000 },
+    { "word": "crores", "factor": 10000000 }
+  ],
+  "halfWords": ["one-half", "one half"],
+  "oneAndHalfWords": [
+    "one and one-half", "one and one half", "one and a half",
+    "time and one-half", "time and one half", "time and a half"
+  ],
+  "doubleWords": ["double time"],
+  "enumerationWords": ["and", "or"],
+  "rangeWords": ["through"],
+  "validityBefore": [
+    "effective", "effective on", "effective from", "effective as of",
+    "beginning", "beginning on or after", "beginning on", "beginning after", "beginning in", "beginning with",
+    "with effect from", "w.e.f.", "applicable from"
+  ],
+  "datedValidityBefore": ["from"],
+  "validityAfter": ["and after", "and later", "and thereafter", "and subsequent"],
+  "unchanged": ["unchanged", "unchanged from", "unchanged since", "same as", "same as in", "same as for"],
+  "enactmentWords": ["Act", "Law", "Decree", "Decree-Law", "Ordinance", "Regulation", "Rules", "Notification", "Circular"],
+  "titleWords": [
+    "Act", "Acts", "Rules", "Regulations", "Ordinance", "Code",
+    "ACT", "ACTS", "RULES", "REGULATIONS", "ORDINANCE", "CODE"
+  ],
+  "months": [
+    "January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+    "November", "December", "Jan", "Feb", "Mar", "Apr", "Jun", "Jul", "Aug", "Sep", "Sept", "Oct", "Nov", "Dec"
+  ]
+}

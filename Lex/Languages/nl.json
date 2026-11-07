@@ -1,0 +1,23 @@
+{
+  "language": "nl",
+  "name": "Dutch",
+  "percentWords": ["procent"],
+  "scaleWords": [
+    { "word": "miljoen", "factor": 1000000 },
+    { "word": "miljard", "factor": 1000000000 }
+  ],
+  "halfWords": ["de helft"],
+  "oneAndHalfWords": ["anderhalf", "anderhalve"],
+  "enumerationWords": ["en", "of"],
+  "rangeWords": ["tot", "t/m", "tot en met"],
+  "validityBefore": ["met ingang van", "m.i.v.", "vanaf", "per", "sinds"],
+  "validityAfter": ["en later", "en verder"],
+  "unchanged": ["ongewijzigd", "ongewijzigd ten opzichte van", "gelijk aan"],
+  "enactmentWords": ["wet", "besluit", "regeling"],
+  "gazettes": ["Stb.", "Stcrt."],
+  "dateLinks": ["van"],
+  "months": [
+    "januari", "februari", "maart", "april", "mei", "juni", "juli", "augustus", "september", "oktober",
+    "november", "december"
+  ]
+}

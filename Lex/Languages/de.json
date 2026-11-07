@@ -1,0 +1,28 @@
+{
+  "language": "de",
+  "name": "German",
+  "percentWords": ["Prozent", "vom Hundert", "v. H.", "v.H."],
+  "scaleWords": [
+    { "word": "Mio.", "factor": 1000000 },
+    { "word": "Million", "factor": 1000000 },
+    { "word": "Millionen", "factor": 1000000 },
+    { "word": "Mrd.", "factor": 1000000000 },
+    { "word": "Milliarde", "factor": 1000000000 },
+    { "word": "Milliarden", "factor": 1000000000 }
+  ],
+  "halfWords": ["die Hälfte"],
+  "oneAndHalfWords": ["eineinhalb", "anderthalb"],
+  "enumerationWords": ["und", "oder"],
+  "rangeWords": ["bis"],
+  "validityBefore": ["gültig ab", "ab dem", "ab", "mit Wirkung vom", "mit Wirkung ab", "seit", "seit dem"],
+  "validityAfter": ["und folgende", "und später"],
+  "unchanged": ["unverändert", "unverändert seit", "unverändert gegenüber", "gleich wie", "wie im Jahr"],
+  "enactmentWords": ["Gesetz", "Verordnung", "Erlass", "Bekanntmachung", "Richtlinie"],
+  "enactmentEndings": ["gesetz", "gesetzes", "verordnung", "erlass", "bekanntmachung"],
+  "gazettes": ["BGBl.", "GBl.", "BStBl."],
+  "dateLinks": ["vom"],
+  "months": [
+    "Januar", "Jänner", "Februar", "Feber", "März", "April", "Mai", "Juni", "Juli", "August", "September",
+    "Oktober", "November", "Dezember"
+  ]
+}
