@@ -1,7 +1,7 @@
 {
   "language": "nl",
   "name": "Dutch",
-  "percentWords": ["procent"],
+  "percentWords": ["procent", "pct"],
   "scaleWords": [
     { "word": "miljoen", "factor": 1000000 },
     { "word": "miljard", "factor": 1000000000 }

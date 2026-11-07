@@ -29,6 +29,7 @@ public class LanguageProfileTests
     [InlineData("El tipo es del 4,25 por ciento.")]
     [InlineData("L'aliquota è pari al 4,25 per cento.")]
     [InlineData("Het percentage bedraagt 4,25 procent.")]
+    [InlineData("De bedrijfsvoorheffing bedraagt 4,25 pct. van de bezoldigingen.")]
     [InlineData("A taxa é de 4,25 por cento.")]
     public void PercentWord_IsPercentage(string text) =>
         Assert.Equal(1, SourceVerifier.Verify(Entry("0.0425", "rate"), Sections(text)).NumbersFound);
