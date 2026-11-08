@@ -16,8 +16,11 @@ public sealed class SourceDocument
 {
     private const int MinimumTextLength = 400;
 
+    /// <summary>Load state of the document</summary>
     internal SourceState State { get; init; }
+    /// <summary>Reason of a failed load</summary>
     internal string Reason { get; init; }
+    /// <summary>Text sections by heading</summary>
     internal List<(string Heading, string Text)> Sections { get; init; } = [];
 
     /// <summary>

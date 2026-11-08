@@ -28,6 +28,11 @@
 		      PackagePath="contentFiles\any\$(TargetFramework)\LexVocabulary\" PackageCopyToOutput="true" PackageFlatten="false" />
 	</ItemGroup>
 
+	<!-- lex.json schema, read by Schema.Json -->
+	<ItemGroup>
+		<EmbeddedResource Include="lex.schema.json" LogicalName="PayrollEngine.Lex.lex.schema.json" />
+	</ItemGroup>
+
 	<!-- include xml documention files to the nuget package -->
 	<ItemGroup>
 		<None Include="$(OutputDir)*.xml" Pack="true">

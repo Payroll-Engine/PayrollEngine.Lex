@@ -24,18 +24,22 @@ internal static class OfficeXmlReader
     /// <summary>Maximum repetitions of a repeated row or cell with a value</summary>
     private const int MaxRepeat = 100;
 
+    /// <summary>Maximum length of a section heading; longer heading paragraphs are cut</summary>
     private const int MaxHeadingLength = 200;
+    /// <summary>Maximum depth of the basedOn chain of a Word style (protects against cycles)</summary>
     private const int MaxStyleDepth = 10;
 
     /// <summary>Heading of the text before the first heading</summary>
     internal const string StartHeading = "(start of document)";
 
+    // XML namespaces of OpenDocument (office, table, text) and Office Open XML (Word, markup compatibility)
     private const string OfficeNs = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
     private const string TableNs = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
     private const string TextNs = "urn:oasis:names:tc:opendocument:xmlns:text:1.0";
     private const string WordNs = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
     private const string CompatibilityNs = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
+    /// <summary>Safe XML settings: no DTD and no external resolver (XXE protection)</summary>
     private static readonly XmlReaderSettings Settings = new()
     {
         DtdProcessing = DtdProcessing.Prohibit,
@@ -62,6 +66,7 @@ internal static class OfficeXmlReader
         var rowRepeat = 1;
         var rows = 0;
 
+        // a repeated row (number-rows-repeated) is written once per repetition, limited by MaxRepeat and MaxRows
         void EndRow()
         {
             if (row is { Length: > 0 } && sheet != null)
@@ -81,6 +86,7 @@ internal static class OfficeXmlReader
             {
                 switch (xml.LocalName)
                 {
+                    // a new sheet; sheets without name are numbered
                     case "table":
                         sheetName = xml.GetAttribute("name", TableNs) ?? $"Sheet {sections.Count + 1}";
                         sheet = new StringBuilder();
@@ -91,6 +97,7 @@ internal static class OfficeXmlReader
                             sheet = null;
                         }
                         break;
+                    // an empty row element ends the row at once
                     case "table-row":
                         row = new StringBuilder();
                         rowRepeat = Repeat(xml, "number-rows-repeated");
@@ -100,6 +107,7 @@ internal static class OfficeXmlReader
                         }
                         break;
                     case "table-cell":
+                    // covered cells (part of a merged range) are read like normal cells
                     case "covered-table-cell":
                         var repeat = Repeat(xml, "number-columns-repeated");
                         // reads the cell content
@@ -111,9 +119,11 @@ internal static class OfficeXmlReader
                                 row.Append(value).Append(' ');
                             }
                         }
+                        // CellValue positioned the reader after the cell: do not read again
                         continue;
                 }
             }
+            // end of a row or sheet: flush the collected text
             else if (xml.NamespaceURI == TableNs && xml.NodeType == XmlNodeType.EndElement)
             {
                 if (xml.LocalName == "table-row")
@@ -131,6 +141,9 @@ internal static class OfficeXmlReader
         return sections;
     }
 
+    /// <summary>
+    /// Repeat count of a row or cell attribute, 1 if missing or invalid
+    /// </summary>
     private static int Repeat(XmlReader xml, string name) =>
         int.TryParse(xml.GetAttribute(name, TableNs), NumberStyles.None, CultureInfo.InvariantCulture, out var count) && count > 1
             ? count
@@ -142,6 +155,7 @@ internal static class OfficeXmlReader
     /// </summary>
     private static string CellValue(XmlReader xml)
     {
+        // typed values are written in invariant format so that "1.234,50" in a localized sheet matches 1234.5
         var type = xml.GetAttribute("value-type", OfficeNs);
         var value = type switch
         {
@@ -150,6 +164,7 @@ internal static class OfficeXmlReader
             "time" => Time(xml.GetAttribute("time-value", OfficeNs)),
             _ => null
         };
+        // the text is read in any case: it positions the reader after the cell
         var text = CellText(xml);
         // boolean values hold no text
         if (type == "boolean")
@@ -159,6 +174,10 @@ internal static class OfficeXmlReader
         return value ?? (text.Length > 0 ? text : null);
     }
 
+    /// <summary>
+    /// Display text of a cell without annotations; paragraphs and spacing elements become spaces.
+    /// Positions the reader after the cell.
+    /// </summary>
     private static string CellText(XmlReader xml)
     {
         if (xml.IsEmptyElement)
@@ -169,6 +188,7 @@ internal static class OfficeXmlReader
         var text = new StringBuilder();
         using (var cell = xml.ReadSubtree())
         {
+            // first Read: the cell element itself, second Read: its first child
             cell.Read();
             cell.Read();
             while (!cell.EOF)
@@ -196,15 +216,27 @@ internal static class OfficeXmlReader
         return HtmlReader.CleanLines(text.ToString().Replace('\t', ' ')).Replace('\n', ' ');
     }
 
+    /// <summary>
+    /// Invariant number text of an attribute value, null if no number
+    /// </summary>
     private static string Number(string value) =>
         double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var number) ? Number(number) : null;
 
+    /// <summary>
+    /// Number with at most six decimals, without exponent
+    /// </summary>
     private static string Number(double value) =>
         value.ToString("0.######", CultureInfo.InvariantCulture);
 
+    /// <summary>
+    /// Date as OLE automation serial number, like a spreadsheet stores it
+    /// </summary>
     private static string Date(string value) =>
         DateTime.TryParse(value, CultureInfo.InvariantCulture, DateTimeStyles.None, out var date) ? Number(date.ToOADate()) : null;
 
+    /// <summary>
+    /// Time (ISO 8601 duration) as fraction of a day, null if invalid
+    /// </summary>
     private static string Time(string value)
     {
         try
@@ -229,6 +261,7 @@ internal static class OfficeXmlReader
     {
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
         using var xml = OpenPart(archive, "content.xml");
+        // the flow builder turns paragraphs, headings and table rows into sections
         var flow = new FlowBuilder();
         xml.Read();
         while (!xml.EOF)
@@ -245,6 +278,7 @@ internal static class OfficeXmlReader
                 {
                     switch (xml.LocalName)
                     {
+                        // outline level 1 is the top heading: the flow builder counts levels from 0
                         case "h":
                             var level = int.TryParse(xml.GetAttribute("outline-level", TextNs), NumberStyles.None,
                                 CultureInfo.InvariantCulture, out var outline) ? outline : 1;
@@ -265,6 +299,7 @@ internal static class OfficeXmlReader
                         case "tab":
                             flow.Append(" ");
                             break;
+                        // a manual line break keeps the line structure outside tables
                         case "line-break":
                             flow.LineBreak();
                             break;
@@ -303,6 +338,7 @@ internal static class OfficeXmlReader
                     flow.EndTable();
                 }
             }
+            // text outside paragraphs (e.g. in frames without paragraph) is ignored
             else if (flow.InParagraph && xml.NodeType is XmlNodeType.Text or XmlNodeType.SignificantWhitespace or XmlNodeType.Whitespace)
             {
                 flow.AppendText(xml.Value);
@@ -324,15 +360,18 @@ internal static class OfficeXmlReader
     internal static List<(string Heading, string Text)> ReadDocx(Stream stream)
     {
         using var archive = new ZipArchive(stream, ZipArchiveMode.Read, leaveOpen: true);
+        // headings in Word are usually styles: their outline levels are resolved before reading the body
         var styles = StyleOutlineLevels(archive);
         using var xml = OpenPart(archive, "word/document.xml");
         var flow = new FlowBuilder();
+        // text nodes count only inside w:t elements (field codes are in w:instrText)
         var inText = false;
         xml.Read();
         while (!xml.EOF)
         {
             if (xml.NodeType == XmlNodeType.Element)
             {
+                // fallback content repeats the main content for old readers; change records hold the previous formatting
                 if (xml.NamespaceURI == CompatibilityNs && xml.LocalName == "Fallback" ||
                     xml.NamespaceURI == WordNs && xml.LocalName is "pPrChange" or "rPrChange")
                 {
@@ -350,6 +389,7 @@ internal static class OfficeXmlReader
                                 flow.EndParagraph();
                             }
                             break;
+                        // the style of the paragraph gives its outline level, a direct outlineLvl overrides it
                         case "pStyle":
                             if (styles.TryGetValue(xml.GetAttribute("val", WordNs) ?? string.Empty, out var styleLevel))
                             {
@@ -372,6 +412,7 @@ internal static class OfficeXmlReader
                         case "cr":
                             flow.LineBreak();
                             break;
+                        // a non-breaking hyphen is a character element, not text
                         case "noBreakHyphen":
                             flow.Append("-");
                             break;
@@ -422,6 +463,7 @@ internal static class OfficeXmlReader
         {
             return levels;
         }
+        // first pass: direct level and base style of each paragraph style
         var styles = new Dictionary<string, (string BasedOn, int? Level)>(StringComparer.Ordinal);
         using (var xml = OpenPart(archive, "word/styles.xml"))
         {
@@ -438,11 +480,13 @@ internal static class OfficeXmlReader
                 {
                     switch (xml.LocalName)
                     {
+                        // only paragraph styles carry outline levels (character and table styles are ignored)
                         case "style":
                             id = xml.GetAttribute("type", WordNs) is null or "paragraph" ? xml.GetAttribute("styleId", WordNs) : null;
                             basedOn = null;
                             level = null;
                             break;
+                        // built-in heading styles are recognized by their name, even without outlineLvl
                         case "name" when id != null && level == null:
                             var name = xml.GetAttribute("val", WordNs) ?? string.Empty;
                             if (name.StartsWith("heading ", StringComparison.OrdinalIgnoreCase) &&
@@ -469,6 +513,7 @@ internal static class OfficeXmlReader
                 }
             }
         }
+        // second pass: inherit the level from the basedOn chain
         foreach (var styleId in styles.Keys)
         {
             var current = styleId;
@@ -504,6 +549,7 @@ internal static class OfficeXmlReader
             throw new InvalidDataException(error);
         }
         // the declared size may be wrong: count the uncompressed bytes
+        // the part is copied into memory: protects against zip bombs with a wrong declared size
         var buffer = new MemoryStream();
         using (var source = entry.Open())
         {
@@ -528,25 +574,37 @@ internal static class OfficeXmlReader
     /// </summary>
     private sealed class FlowBuilder
     {
+        /// <summary>Open paragraph: its text and outline level (null: body text)</summary>
         private sealed class Paragraph
         {
+            /// <summary>Text of the paragraph</summary>
             internal StringBuilder Text { get; } = new();
+            /// <summary>Outline level 0-8, null for body text</summary>
             internal int? Level { get; set; }
         }
 
+        /// <summary>Completed sections</summary>
         private readonly List<(string Heading, string Text)> sections = [];
+        /// <summary>Text of the current section</summary>
         private readonly StringBuilder text = new();
+        /// <summary>Open paragraphs: a table cell can contain paragraphs inside a paragraph</summary>
         private readonly Stack<Paragraph> paragraphs = new();
+        /// <summary>Heading of the current section</summary>
         private string heading = StartHeading;
+        /// <summary>Depth of nested tables</summary>
         private int tables;
 
+        /// <summary>True while a paragraph is open</summary>
         internal bool InParagraph => paragraphs.Count > 0;
 
+        /// <summary>Text of the open paragraph, else the section text</summary>
         private StringBuilder Target => InParagraph ? paragraphs.Peek().Text : text;
 
+        /// <summary>Opens a paragraph, optionally with an outline level</summary>
         internal void StartParagraph(int? outlineLevel = null) =>
             paragraphs.Push(new Paragraph { Level = outlineLevel });
 
+        /// <summary>Sets the outline level of the open paragraph</summary>
         internal void SetOutlineLevel(int level)
         {
             if (InParagraph)
@@ -556,15 +614,22 @@ internal static class OfficeXmlReader
         }
 
         // line breaks in the source are layout, not structure
+        /// <summary>Appends document text; line breaks and tabs become spaces</summary>
         internal void AppendText(string value) =>
             Target.Append(value.Replace('\r', ' ').Replace('\n', ' ').Replace('\t', ' '));
 
+        /// <summary>Appends a structural character (space, hyphen) as is</summary>
         internal void Append(string value) =>
             Target.Append(value);
 
+        /// <summary>Manual line break: a space inside tables (the row stays one line), else a new line</summary>
         internal void LineBreak() =>
             Target.Append(tables > 0 ? ' ' : '\n');
 
+        /// <summary>
+        /// Closes the open paragraph: a heading level 0-3 outside tables starts a new section, other paragraphs
+        /// are appended as a line (or a space inside tables and nested paragraphs)
+        /// </summary>
         internal void EndParagraph()
         {
             if (!InParagraph)
@@ -585,12 +650,14 @@ internal static class OfficeXmlReader
             Target.Append(paragraph.Text).Append(tables > 0 || InParagraph ? ' ' : '\n');
         }
 
+        /// <summary>Opens a table on a new line</summary>
         internal void StartTable()
         {
             tables++;
             Target.Append('\n');
         }
 
+        /// <summary>Closes a table</summary>
         internal void EndTable()
         {
             if (tables > 0)
@@ -600,12 +667,15 @@ internal static class OfficeXmlReader
             Target.Append('\n');
         }
 
+        /// <summary>Starts a cell: cells are separated by tabs</summary>
         internal void StartCell() =>
             Target.Append('\t');
 
+        /// <summary>Ends a row: one line per row</summary>
         internal void EndRow() =>
             Target.Append('\n');
 
+        /// <summary>Closes all open paragraphs and returns the sections</summary>
         internal List<(string Heading, string Text)> Finish()
         {
             while (InParagraph)
@@ -616,6 +686,7 @@ internal static class OfficeXmlReader
             return sections;
         }
 
+        /// <summary>Adds the current section if it holds text</summary>
         private void AddSection()
         {
             var value = HtmlReader.CleanLines(text.ToString());

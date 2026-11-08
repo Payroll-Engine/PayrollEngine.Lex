@@ -19,6 +19,7 @@ namespace PayrollEngine.Lex;
 /// </summary>
 public sealed class SnapshotWriter
 {
+    /// <summary>Indented camel-case output without null properties, as written by hand in lex.json</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
         WriteIndented = true,
@@ -26,11 +27,14 @@ public sealed class SnapshotWriter
         PropertyNamingPolicy = JsonNamingPolicy.CamelCase
     };
 
+    /// <summary>Library version recorded in the snapshot (tool field)</summary>
     private static readonly string ToolVersion =
         Assembly.GetExecutingAssembly().GetName().Version?.ToString(3) ?? "1.0";
 
+    /// <summary>Shared HTTP client for the downloads of source files</summary>
     private static readonly HttpClient HttpClient = new();
 
+    /// <summary>Maximum number of live source URLs loaded at the same time</summary>
     private const int MaxParallelLiveSources = 6;
 
     /// <summary>
@@ -57,6 +61,7 @@ public sealed class SnapshotWriter
         Func<string, Task<SourceDocument>> loadLiveSource = null)
     {
         var snapshotFiles = new List<SnapshotFile>();
+        // all content, file hashes and verification data are concatenated into the source hash
         var hashInput = new StringBuilder();
 
         // process values with contentFile
@@ -70,6 +75,7 @@ public sealed class SnapshotWriter
             }
             else
             {
+                // a content file is copied flat into the target directory
                 var sourcePath = ResolvePath(manifestDirectory, value.ContentFile);
                 var localName = Path.GetFileName(sourcePath);
                 var targetPath = Path.Combine(targetDirectory, localName);
@@ -110,6 +116,7 @@ public sealed class SnapshotWriter
                 });
             }
 
+            // quote, reference year, verification and open state change the source hash: LexCheck detects edits
             hashInput.Append(value.QuoteHashInput());
             hashInput.Append(value.ReferenceYearHashInput());
             if (value.Verification != null)
@@ -125,6 +132,7 @@ public sealed class SnapshotWriter
         // process explicit files[]
         foreach (var file in manifest.Files)
         {
+            // a file comes from its source path, a kept local copy, a download or the .lex folder (in this order)
             var localName = file.FileName;
             var targetPath = Path.Combine(targetDirectory, localName);
 
@@ -155,6 +163,7 @@ public sealed class SnapshotWriter
                 writeFile?.Invoke(localName, dryRun);
                 if (!dryRun)
                 {
+                    // the download is stored in the manifest directory and becomes the evidence copy
                     var bytes = await DownloadAsync(file.Urls.ToList());
                     await File.WriteAllBytesAsync(localPath, bytes);
 
@@ -167,6 +176,7 @@ public sealed class SnapshotWriter
                 }
                 else
                 {
+                    // dry run: an existing copy is hashed, a missing file is listed without hash
                     if (File.Exists(localPath))
                     {
                         AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
@@ -194,6 +204,7 @@ public sealed class SnapshotWriter
         }
 
         var sourceHash = "sha256:" + ComputeStringHash(hashInput.ToString());
+        // text hashes of the live sources, used by LexCheck to detect changed publications
         var liveSources = !dryRun && loadLiveSource != null
             ? await LoadLiveSources(LiveSource.Urls(manifest), loadLiveSource)
             : null;
@@ -215,6 +226,7 @@ public sealed class SnapshotWriter
 
         if (!dryRun)
         {
+            // written last: a failed download leaves the previous snapshot unchanged
             var snapshotPath = Path.Combine(targetDirectory, "snapshot.json");
             var json = JsonSerializer.Serialize(snapshot, JsonOptions);
             await File.WriteAllTextAsync(snapshotPath, json, Encoding.UTF8);
@@ -241,6 +253,9 @@ public sealed class SnapshotWriter
         }
     }
 
+    /// <summary>
+    /// Loads all live sources in parallel, limited by <see cref="MaxParallelLiveSources"/>
+    /// </summary>
     private static async Task<List<LiveSource>> LoadLiveSources(List<string> urls,
         Func<string, Task<SourceDocument>> loadLiveSource)
     {
@@ -253,6 +268,9 @@ public sealed class SnapshotWriter
         return [.. await Task.WhenAll(tasks)];
     }
 
+    /// <summary>
+    /// Loads one live source; a failure is recorded as reason instead of aborting the snapshot
+    /// </summary>
     private static async Task<LiveSource> LoadLiveSource(string url,
         Func<string, Task<SourceDocument>> loadLiveSource, SemaphoreSlim gate)
     {
@@ -271,6 +289,9 @@ public sealed class SnapshotWriter
         }
     }
 
+    /// <summary>
+    /// Adds a file with hash and size to the snapshot and to the source hash
+    /// </summary>
     private static void AddFileToSnapshot(
         List<SnapshotFile> snapshotFiles,
         StringBuilder hashInput,
@@ -293,6 +314,9 @@ public sealed class SnapshotWriter
         });
     }
 
+    /// <summary>
+    /// SHA-256 of a file as lower-case hex
+    /// </summary>
     private static string ComputeFileHash(string filePath)
     {
         using var sha256 = SHA256.Create();
@@ -301,6 +325,9 @@ public sealed class SnapshotWriter
         return Convert.ToHexStringLower(hash);
     }
 
+    /// <summary>
+    /// SHA-256 of the UTF-8 text as lower-case hex
+    /// </summary>
     private static string ComputeStringHash(string input)
     {
         using var sha256 = SHA256.Create();
@@ -309,6 +336,9 @@ public sealed class SnapshotWriter
         return Convert.ToHexStringLower(hash);
     }
 
+    /// <summary>
+    /// Relative paths are resolved against the manifest directory, absolute paths are kept
+    /// </summary>
     private static string ResolvePath(string baseDirectory, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))
@@ -318,6 +348,9 @@ public sealed class SnapshotWriter
         return Path.GetFullPath(Path.Combine(baseDirectory, relativePath));
     }
 
+    /// <summary>
+    /// MIME type by file extension, octet-stream for unknown types
+    /// </summary>
     private static string GetContentType(string fileName)
     {
         return Path.GetExtension(fileName).ToLowerInvariant() switch

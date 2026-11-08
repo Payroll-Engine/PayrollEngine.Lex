@@ -10,6 +10,42 @@
             Only differing values are replaced in place; descriptions and the formatting of the file are kept.
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Applier.StringOptions">
+            <summary>String escaping as written by hand: umlauts, accents and symbols stay readable</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.Applier.Edit">
+            <summary>Replacement of a byte range of a regulation file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.File">
+            <summary>File of the replaced range</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.Offset">
+            <summary>Byte offset of the range (file content without byte order mark)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.Length">
+            <summary>Byte length of the range, 0 for an insertion</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.Text">
+            <summary>New JSON text of the range</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.EntryKey">
+            <summary>Lex entry that caused the edit, named in conflict messages</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Edit.End">
+            <summary>Byte offset after the range</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.Applier.Addition">
+            <summary>New lookup value for a lex entry without regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Addition.Key">
+            <summary>Key of the new lookup value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Addition.Content">
+            <summary>Lex content of the new value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Applier.Addition.Structured">
+            <summary>True: JSON content written as valueObject, false: text written as value</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Applier.Apply(PayrollEngine.Lex.Manifest,System.String,System.Boolean)">
             <summary>
             Apply one manifest
@@ -17,6 +53,16 @@
             <param name="manifest">Manifest (lex.json)</param>
             <param name="lexPath">Full path of lex.json</param>
             <param name="dryRun">Report the changes without writing</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Replace(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Edit},System.String,PayrollEngine.Lex.RegulationValue,System.String,System.String)">
+            <summary>
+            Replaces the value token (or the property of a split key) when the lex content differs
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Add(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.Dictionary{PayrollEngine.Lex.RegulationLookup,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Addition}},System.String,PayrollEngine.Lex.RegulationLookup,System.String,System.String)">
+            <summary>
+            Registers a new lookup value; its form (value or valueObject) must match the existing values of the lookup
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Applier.Locate(System.Byte[],System.Int32,System.Int32,System.String)">
             <summary>
@@ -28,9 +74,39 @@
             JSON text of the new value token, in the form of the existing token
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Applier.Literal(System.String)">
+            <summary>
+            JSON kind of literal content (number, boolean, ...), null if the content is no JSON literal
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.AdditionText(PayrollEngine.Lex.RegulationLookup,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Addition})">
+            <summary>
+            JSON text of new lookup values, indented like the existing values
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Splice(PayrollEngine.Lex.RegulationFile,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Edit})">
+            <summary>
+            Content of the file with all edits applied; the edits are sorted by offset and do not overlap
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.JsonString(System.String)">
+            <summary>
+            JSON string literal of a text
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Applier.Reindent(System.String,System.String,System.String)">
             <summary>
             Continuation lines of a multi-line value are indented like the line of the token
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.LineIndent(System.Byte[],System.Int32)">
+            <summary>
+            Leading whitespace of the line that contains the offset
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.NewLine(System.Byte[])">
+            <summary>
+            Line break of the file: CRLF if the file contains one, else LF
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.ApplyChange">
@@ -163,9 +239,26 @@
             <param name="results">Check results</param>
             <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
         </member>
+        <member name="M:PayrollEngine.Lex.CheckReport.BuildCsv(System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.CheckResult})">
+            <summary>
+            CSV with one row per manifest; the column order is stable, new columns are appended at the end
+            </summary>
+            <param name="results">Check results</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.CheckReport.BuildMarkdown(System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.CheckResult})">
+            <summary>
+            Markdown report: summary over all manifests, findings per manifest, verification table and documented exclusions
+            </summary>
+            <param name="results">Check results</param>
+        </member>
         <member name="M:PayrollEngine.Lex.CheckReport.SatelliteLabel(PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String})">
             <summary>
             Satellite name, prefixed with the parent folder when several results share the name (e.g. a check over a root folder)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CheckReport.Join(System.Collections.Generic.IReadOnlyCollection{System.String},System.Int32)">
+            <summary>
+            Samples as code spans; "..." marks that the total exceeds the samples
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.CheckResult">
@@ -179,17 +272,29 @@
         <member name="P:PayrollEngine.Lex.CheckResult.Satellite">
             <summary>Name of the data regulation satellite folder</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Regulation">
+            <summary>Name of the regulation of the satellite</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.ValidationErrors">
             <summary>Structural errors of the manifest</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.HasSnapshot">
             <summary>snapshot.json exists next to lex.json</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.RegulationLookups">
+            <summary>Number of regulation lookups</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.RegulationValues">
             <summary>Number of regulation lookup values</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.LexEntries">
             <summary>Number of lex entries</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.CoveredDirect">
+            <summary>Regulation values covered by a lex entry of their own</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.CoveredByLookup">
+            <summary>Regulation values covered by a lex entry of the whole lookup</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.Uncovered">
             <summary>Regulation values without lex entry</summary>
@@ -206,6 +311,9 @@
         <member name="P:PayrollEngine.Lex.CheckResult.OrphanSamples">
             <summary>Samples of lex entries without regulation value</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Compared">
+            <summary>Regulation values compared with the lex content</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.Drift">
             <summary>Value differences between lex and regulation</summary>
         </member>
@@ -218,11 +326,26 @@
         <member name="P:PayrollEngine.Lex.CheckResult.MissingSourceLocation">
             <summary>Lex entries without sourceLocation</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.UrlsChecked">
+            <summary>The source URLs were checked (CheckUrls)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.DeadUrls">
             <summary>Source URLs that do not exist</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.BlockedUrls">
+            <summary>Source URLs that refuse automated access (no finding)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.ChangedSources">
             <summary>Source URLs whose normalized text differs from the snapshot: check the values</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SourcesCompared">
+            <summary>Source URLs compared with the text hash of the snapshot</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SourcesNotComparable">
+            <summary>Source URLs whose text could not be loaded for the comparison</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.SourcesWithoutBaseline">
+            <summary>Source URLs without text hash in the snapshot</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.RequireLocation">
             <summary>A missing sourceLocation is a finding only in the mode Required</summary>
@@ -241,11 +364,26 @@
         <member name="P:PayrollEngine.Lex.CheckResult.SecondaryMainSourceSamples">
             <summary>Samples of lex entries with a secondary main source</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedCoverage">
+            <summary>Regulation values without lex entry, documented by a coverage exclusion</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedSourceLocation">
+            <summary>Lex entries without sourceLocation, documented by a sourceLocation exclusion</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedOrphans">
+            <summary>Lex entries without regulation value, documented by an orphan exclusion</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExcludedAutoVerification">
+            <summary>Lex entries excluded from the automatic verification</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.ExcludedDerived">
             <summary>Entry properties documented as derived (exclusion kind derived)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.ExcludedNotApplicable">
             <summary>Zero entry properties documented as not applicable (exclusion kind notApplicable)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.ExclusionNotes">
+            <summary>Notes on the exclusions for the report</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.UnjustifiedZero">
             <summary>Bundle entries with zero properties without justification (neither notApplicable nor derived);
@@ -348,6 +486,12 @@
             Any finding that needs action
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.CheckResult.MaxSamples">
+            <summary>Maximum number of samples per finding in the report</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CheckResult.AddSample(System.Collections.Generic.List{System.String},System.String)">
+            <summary>Adds a sample unless <see cref="F:PayrollEngine.Lex.CheckResult.MaxSamples"/> is reached</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.ContentHash">
             <summary>
             Hash helpers shared by LexSnapshot, LexVerify and LexCheck.
@@ -374,12 +518,22 @@
             Coverage of the regulation lookup values by lex entries, exclusions, zero values and reference years
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CheckCoverage(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,PayrollEngine.Lex.RegulationData)">
+            <summary>
+            Maps the entries to the regulation values and counts covered, excluded and uncovered values and orphan entries
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.CoverageCheck.MapEntries(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,PayrollEngine.Lex.RegulationData,System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
             <summary>
             Maps the lex entries to the regulation values: marks covered values, compares their contents and counts
             the entries without regulation value
             </summary>
             <returns>Lookups covered as a whole by an entry with content file</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CountOrphan(System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
+            <summary>
+            An entry without regulation value is an orphan, unless excluded
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.CoverageCheck.CountCoverage(System.Collections.Generic.IEnumerable{PayrollEngine.Lex.RegulationValue},PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
             <summary>
@@ -699,6 +853,21 @@
             Regulation target of a lex entry
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.EntryTarget.Kind">
+            <summary>What the entry key addresses</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryTarget.BaseKey">
+            <summary>Matched part of the entry key (Lookup.Key or Lookup)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryTarget.Remainder">
+            <summary>Property path after the base key, empty for the whole value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryTarget.Values">
+            <summary>Addressed regulation values (kind Values)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryTarget.Lookup">
+            <summary>Addressed regulation lookup (kind Lookup)</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.EntryTargetKind">
             <summary>
             Kind of the regulation target of a lex entry
@@ -719,6 +888,11 @@
         <member name="T:PayrollEngine.Lex.EvidenceCheck">
             <summary>
             Evidence files of a lex manifest: declaration, snapshot, git tracking and usage
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Checks the evidence files: declared and present, frozen in the snapshot, used and tracked in git
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckDeclaredFiles(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{System.String})">
@@ -994,8 +1168,23 @@
             table cells are separated by tabs, so that the numbers of one table row stay on one line.
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.HtmlReader.MaxHeadingLength">
+            <summary>Longer headings are cut (e.g. a heading element wrapped around a whole block)</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.HtmlReader.StartHeading">
             <summary>Heading of the text before the first heading</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HtmlReader.SkippedElements">
+            <summary>Elements whose content is no page text</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HtmlReader.BlockElements">
+            <summary>Elements that start a new line; h5 and h6 are text, not sections</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HtmlReader.CellElements">
+            <summary>Table cells, separated by tabs</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HtmlReader.Spaces">
+            <summary>Horizontal white space including non-breaking and zero-width spaces</summary>
         </member>
         <member name="M:PayrollEngine.Lex.HtmlReader.Read(System.String)">
             <summary>
@@ -1007,9 +1196,34 @@
             Normalize extracted text: decoded entities, one space between words, tabs between cells, one line per block
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.HtmlReader.IsSectionHeading(System.String)">
+            <summary>
+            Headings h1 to h4 start a new section
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.HtmlReader.HeadingOf(System.Text.StringBuilder,System.String)">
+            <summary>
+            Single-line heading text; an empty heading keeps the previous one
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.HtmlReader.AddSection(System.Collections.Generic.List{System.ValueTuple{System.String,System.String}},System.String,System.Text.StringBuilder)">
+            <summary>
+            Adds the collected text as section and clears it; empty sections are dropped
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.HtmlReader.AppendText(System.Text.StringBuilder,System.String)">
+            <summary>
+            Appends text between tags with decoded entities
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.HtmlReader.TagEnd(System.String,System.Int32)">
             <summary>
             Position of the closing '&gt;' of a tag, quoted attribute values may contain '&gt;'
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.HtmlReader.TagName(System.String,System.Int32,System.Int32)">
+            <summary>
+            Element name of a tag and whether it is an end tag
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.KeyPattern">
@@ -1196,6 +1410,9 @@
         <member name="M:PayrollEngine.Lex.LanguageSet.ToString">
             <inheritdoc />
         </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.Profiles">
+            <summary>Language profiles of the set</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.LanguageSet.MonthNumbers">
             <summary>Month number (1–12) of a month name or abbreviation</summary>
         </member>
@@ -1211,10 +1428,58 @@
             <param name="before">Text before the year</param>
             <param name="start">Text position of the date in <paramref name="before"/></param>
         </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.Scales">
+            <summary>Factor of a scale word (e.g. million, Mio.)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.PercentSign">
+            <summary>Percent sign or word after a number</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.ScaleWord">
+            <summary>Scale word after a number</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.FractionWord">
+            <summary>Fraction word after a number (e.g. half)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.ValidityBefore">
+            <summary>Validity words before a year (e.g. from, ab): the year is a validity year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.ValidityAfter">
+            <summary>Validity words after a year (e.g. onwards)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.UnchangedBefore">
+            <summary>Words before a year that mark a value as unchanged since that year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.SlashNumberBefore">
+            <summary>Document number with slash before a year (e.g. No. 153/2023): no validity year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.NumberOfBefore">
+            <summary>Number-of phrase before a year (e.g. Act No. 12 of 2024): no validity year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.TitleBefore">
+            <summary>Title words before a year (act, regulation): the year is part of a title</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.GazetteBefore">
+            <summary>Gazette words before a year (e.g. BGBl.): the year is a publication year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.EnactmentDateBefore">
+            <summary>Enactment words before a date (e.g. dated, vom): the year is an enactment year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.YearEnumeration">
+            <summary>Enumeration of years (e.g. 2025 and 2026)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LanguageSet.YearRange">
+            <summary>Range of years (e.g. 2025-2026, 2025/26)</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LexJson">
             <summary>
             JSON options shared by the lex checks
             </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexJson.DocumentOptions">
+            <summary>Tolerant parsing of JSON content (comments, trailing commas)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexJson.SnapshotOptions">
+            <summary>Reading of snapshot.json</summary>
         </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
@@ -1479,8 +1744,17 @@
         <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxRepeat">
             <summary>Maximum repetitions of a repeated row or cell with a value</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxHeadingLength">
+            <summary>Maximum length of a section heading; longer heading paragraphs are cut</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.MaxStyleDepth">
+            <summary>Maximum depth of the basedOn chain of a Word style (protects against cycles)</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.OfficeXmlReader.StartHeading">
             <summary>Heading of the text before the first heading</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.Settings">
+            <summary>Safe XML settings: no DTD and no external resolver (XXE protection)</summary>
         </member>
         <member name="M:PayrollEngine.Lex.OfficeXmlReader.ReadOds(System.IO.Stream)">
             <summary>
@@ -1488,10 +1762,41 @@
             numbers in invariant format, dates as serial number (same as the spreadsheet reader)
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.Repeat(System.Xml.XmlReader,System.String)">
+            <summary>
+            Repeat count of a row or cell attribute, 1 if missing or invalid
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.OfficeXmlReader.CellValue(System.Xml.XmlReader)">
             <summary>
             Value of a cell: numbers, dates and times from the typed value, other cells by their text.
             Positions the reader after the cell.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.CellText(System.Xml.XmlReader)">
+            <summary>
+            Display text of a cell without annotations; paragraphs and spacing elements become spaces.
+            Positions the reader after the cell.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.Number(System.String)">
+            <summary>
+            Invariant number text of an attribute value, null if no number
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.Number(System.Double)">
+            <summary>
+            Number with at most six decimals, without exponent
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.Date(System.String)">
+            <summary>
+            Date as OLE automation serial number, like a spreadsheet stores it
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.Time(System.String)">
+            <summary>
+            Time (ISO 8601 duration) as fraction of a day, null if invalid
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.OfficeXmlReader.ReadOdt(System.IO.Stream)">
@@ -1523,6 +1828,75 @@
             Collects the text flow of a document into sections: paragraphs with outline level 0-3 outside tables
             are headings, paragraphs in table cells stay on the row line
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Paragraph">
+            <summary>Open paragraph: its text and outline level (null: body text)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Paragraph.Text">
+            <summary>Text of the paragraph</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Paragraph.Level">
+            <summary>Outline level 0-8, null for body text</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.sections">
+            <summary>Completed sections</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.text">
+            <summary>Text of the current section</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.paragraphs">
+            <summary>Open paragraphs: a table cell can contain paragraphs inside a paragraph</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.heading">
+            <summary>Heading of the current section</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.tables">
+            <summary>Depth of nested tables</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.InParagraph">
+            <summary>True while a paragraph is open</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Target">
+            <summary>Text of the open paragraph, else the section text</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.StartParagraph(System.Nullable{System.Int32})">
+            <summary>Opens a paragraph, optionally with an outline level</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.SetOutlineLevel(System.Int32)">
+            <summary>Sets the outline level of the open paragraph</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.AppendText(System.String)">
+            <summary>Appends document text; line breaks and tabs become spaces</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Append(System.String)">
+            <summary>Appends a structural character (space, hyphen) as is</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.LineBreak">
+            <summary>Manual line break: a space inside tables (the row stays one line), else a new line</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.EndParagraph">
+            <summary>
+            Closes the open paragraph: a heading level 0-3 outside tables starts a new section, other paragraphs
+            are appended as a line (or a space inside tables and nested paragraphs)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.StartTable">
+            <summary>Opens a table on a new line</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.EndTable">
+            <summary>Closes a table</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.StartCell">
+            <summary>Starts a cell: cells are separated by tabs</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.EndRow">
+            <summary>Ends a row: one line per row</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.Finish">
+            <summary>Closes all open paragraphs and returns the sections</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.OfficeXmlReader.FlowBuilder.AddSection">
+            <summary>Adds the current section if it holds text</summary>
         </member>
         <member name="T:PayrollEngine.Lex.PdfReader">
             <summary>
@@ -1566,6 +1940,21 @@
             Lookup values of the Regulation folder of a satellite
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.Name">
+            <summary>Name of the regulation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.ValidFrom">
+            <summary>validFrom of the regulation</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.LookupCount">
+            <summary>Number of lookups</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.Values">
+            <summary>Values of all lookups</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.Lookups">
+            <summary>All lookups</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.RegulationData.LookupNames">
             <summary>Lookup names including the names without satellite namespace</summary>
         </member>
@@ -1577,15 +1966,62 @@
             Regulation JSON file with its content (without byte order mark)
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.Path">
+            <summary>Full path of the file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.Bom">
+            <summary>Byte order mark of the file, empty without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.Content">
+            <summary>File content without byte order mark; token offsets refer to it</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationIndex">
             <summary>
             Lookup values by lex key: Lookup.Key, Alias.Key and the bare value key
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationIndex.byFullKey">
+            <summary>Values by Lookup.Key and Alias.Key; a key can address values of several regulation files</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationIndex.byShortKey">
+            <summary>Values by bare value key, used when the lex key has no lookup prefix</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationIndex.lookups">
+            <summary>Lookups by name and alias; the first lookup of a name wins</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationIndex.#ctor(PayrollEngine.Lex.RegulationData)">
+            <summary>
+            Indexes the values and lookups of the regulation
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationIndex.TryGetValues(System.String,System.Collections.Generic.List{PayrollEngine.Lex.RegulationValue}@)">
+            <summary>
+            Values of a lex key: the full key first, then the bare value key
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationIndex.TryGetLookup(System.String,PayrollEngine.Lex.RegulationLookup@)">
+            <summary>
+            Lookup by name or alias
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationIndex.Add(System.Collections.Generic.Dictionary{System.String,System.Collections.Generic.List{PayrollEngine.Lex.RegulationValue}},System.String,PayrollEngine.Lex.RegulationValue)">
+            <summary>
+            Adds a value to the list of its key
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationLookup">
             <summary>
             Lookup of a regulation file
             </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.Name">
+            <summary>Lookup name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.Alias">
+            <summary>Alternative lookup name, null without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.File">
+            <summary>File of the lookup</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationLookup.HasValues">
             <summary>Lookup has a values array</summary>
@@ -1599,20 +2035,114 @@
         <member name="P:PayrollEngine.Lex.RegulationLookup.LastValueOffset">
             <summary>Offset of the last value object</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.Values">
+            <summary>Values of the lookup</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationReader">
             <summary>
             Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
             </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationReader.ReaderOptions">
+            <summary>Reader options: regulation files may contain comments and trailing commas</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationReader.Context">
+            <summary>State of reading one regulation file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.Context.Data">
+            <summary>Collected lookups and values of all files of the satellite</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.Context.File">
+            <summary>File being read, owner of the byte offsets</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.Context.Namespace">
+            <summary>First namespace declared by a regulation of the file</summary>
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
             <summary>
             Read all regulation files (*.json) of the Regulation folder below the satellite directory
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ReadRoot(System.Text.Json.Utf8JsonReader@,PayrollEngine.Lex.RegulationReader.Context)">
+            <summary>
+            Root object: reads the tenants array, skips all other properties
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ReadTenant(System.Text.Json.Utf8JsonReader@,PayrollEngine.Lex.RegulationReader.Context)">
+            <summary>
+            Tenant object: reads the regulations array, skips all other properties
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ReadRegulation(System.Text.Json.Utf8JsonReader@,PayrollEngine.Lex.RegulationReader.Context)">
+            <summary>
+            Regulation object: reads its lookups, name, validFrom and namespace; the first regulation with a
+            name or validFrom sets the satellite values
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationReader.PendingValue">
+            <summary>
+            Lookup value read before its lookup name is known (the name may follow the values array)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.Key">
+            <summary>Lookup value key, null without key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.RangeValue">
+            <summary>Range value, used as key of range lookups without key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.Value">
+            <summary>Scalar or JSON text value of the "value" property</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.ValueOffset">
+            <summary>Byte offset of the "value" token in the file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.ValueLength">
+            <summary>Byte length of the "value" token</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.ValueObject">
+            <summary>Structured value of the "valueObject" property</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.ValueObjectOffset">
+            <summary>Byte offset of the "valueObject" token in the file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.ValueObjectLength">
+            <summary>Byte length of the "valueObject" token</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ReadLookup(System.Text.Json.Utf8JsonReader@,PayrollEngine.Lex.RegulationReader.Context)">
+            <summary>
+            Lookup object: reads its name and values with the byte locations needed to replace or append values
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ReadValue(System.Text.Json.Utf8JsonReader@)">
+            <summary>
+            Lookup value object: reads key, rangeValue, value and valueObject with their token locations
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.Text(System.Text.Json.Utf8JsonReader@)">
+            <summary>
+            Text of the current token, null for a JSON null
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ScalarText(System.Text.Json.JsonElement,System.Boolean)">
+            <summary>
+            Text of a scalar element: strings unquoted, numbers and booleans in their JSON spelling
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.Is(System.String,System.String)">
+            <summary>
+            Property names are compared ignoring case (regulation files are written by hand)
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationToken">
             <summary>
             Location of a string token in a regulation file
             </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationToken.File">
+            <summary>File of the token</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationToken.Value">
+            <summary>Token value</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationToken.Offset">
             <summary>Offset of the opening quote</summary>
@@ -1625,8 +2155,35 @@
             Lookup value of a regulation file with the location of its value token
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Lookup">
+            <summary>Lookup name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.LookupAlias">
+            <summary>Alternative lookup name, null without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Key">
+            <summary>Value key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Scalar">
+            <summary>Scalar value, null for a structured value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Object">
+            <summary>Structured value (object or array), null for a scalar</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Covered">
+            <summary>Covered by a lex entry (set by the coverage check)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.Owner">
+            <summary>Lookup of the value</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.RegulationValue.Token">
             <summary>Value token (value or valueObject), null without value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.TokenOffset">
+            <summary>Byte offset of the value token in the file, -1 without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.TokenLength">
+            <summary>Byte length of the value token</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RelevantPeriod">
             <summary>
@@ -1673,6 +2230,24 @@
             Values, descriptions and lookup keys are not changed.
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Rollover.MaxMentionLength">
+            <summary>Maximum length of a reported year mention line</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Rollover.ExcludedDirectories">
+            <summary>Build output and IDE folders are not copied</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Rollover.TextExtensions">
+            <summary>Text files whose content is updated (year tag, version, file references); other files are copied</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Rollover.StrictUtf8">
+            <summary>UTF-8 that fails on invalid bytes: such a file is copied unchanged instead of corrupted</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Rollover.ReadOptions">
+            <summary>Tolerant reading of handwritten lex.json files</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Rollover.WriteOptions">
+            <summary>Readable string escaping for the new validFrom tokens</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Rollover.Run(System.String,System.DateTime,System.Boolean)">
             <summary>
             Roll a satellite to the cycle starting at the given date
@@ -1693,9 +2268,29 @@
             of the folder (e.g. 2026b) is dropped in the new cycle
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Rollover.RenamePath(System.String,System.Func{System.String,System.String})">
+            <summary>
+            Renames every segment of a relative path (forward slashes, as written in lex.json)
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">
             <summary>
             Replace the date part of the validFrom tokens, the time part is kept
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.SetVersion(System.String,System.String,System.String,System.String)">
+            <summary>
+            Year-based package version in Directory.Build.props and regulation-package.json; other files unchanged
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.AddMentions(PayrollEngine.Lex.RolloverResult,System.String,System.String,System.Text.RegularExpressions.Regex)">
+            <summary>
+            Lines of a file that still mention the old year
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.TryDelete(System.String)">
+            <summary>
+            Removes a partially written satellite folder
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.RolloverResult">
@@ -1741,9 +2336,20 @@
             JSON Schema for lex.json (https://payrollengine.org/schemas/lex/v1.json)
             </summary>
         </member>
-        <member name="F:PayrollEngine.Lex.Schema.Json">
+        <member name="F:PayrollEngine.Lex.Schema.ResourceName">
+            <summary>Manifest resource name of lex.schema.json (LogicalName in the project file)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Schema.Text">
+            <summary>The schema is read once on first access</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Schema.Json">
             <summary>
             Schema text
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Schema.Load">
+            <summary>
+            Reads the embedded schema resource
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Snapshot">
@@ -1848,6 +2454,18 @@
             Downloads files from their sourceUrls when no local sourcePath is provided.
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.SnapshotWriter.JsonOptions">
+            <summary>Indented camel-case output without null properties, as written by hand in lex.json</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotWriter.ToolVersion">
+            <summary>Library version recorded in the snapshot (tool field)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotWriter.HttpClient">
+            <summary>Shared HTTP client for the downloads of source files</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotWriter.MaxParallelLiveSources">
+            <summary>Maximum number of live source URLs loaded at the same time</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.SnapshotWriter.WriteAsync(PayrollEngine.Lex.Manifest,System.String,System.String,System.Boolean,System.Action{System.String,System.Boolean},System.Boolean,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}})">
             <summary>
             Creates the snapshot: downloads/copies files and writes snapshot.json
@@ -1867,6 +2485,41 @@
         <member name="M:PayrollEngine.Lex.SnapshotWriter.DownloadAsync(System.Collections.Generic.List{System.String})">
             <summary>
             Download from the first URL that answers; the error of the last URL when none answers
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.LoadLiveSources(System.Collections.Generic.List{System.String},System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}})">
+            <summary>
+            Loads all live sources in parallel, limited by <see cref="F:PayrollEngine.Lex.SnapshotWriter.MaxParallelLiveSources"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.LoadLiveSource(System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Threading.SemaphoreSlim)">
+            <summary>
+            Loads one live source; a failure is recorded as reason instead of aborting the snapshot
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.AddFileToSnapshot(System.Collections.Generic.List{PayrollEngine.Lex.SnapshotFile},System.Text.StringBuilder,System.String,System.String,System.String)">
+            <summary>
+            Adds a file with hash and size to the snapshot and to the source hash
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.ComputeFileHash(System.String)">
+            <summary>
+            SHA-256 of a file as lower-case hex
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.ComputeStringHash(System.String)">
+            <summary>
+            SHA-256 of the UTF-8 text as lower-case hex
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.ResolvePath(System.String,System.String)">
+            <summary>
+            Relative paths are resolved against the manifest directory, absolute paths are kept
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotWriter.GetContentType(System.String)">
+            <summary>
+            MIME type by file extension, octet-stream for unknown types
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Source">
@@ -1925,6 +2578,15 @@
             <summary>
             Text of a source document, split into sections (document headings, spreadsheet sheets, PDF pages)
             </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceDocument.State">
+            <summary>Load state of the document</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceDocument.Reason">
+            <summary>Reason of a failed load</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceDocument.Sections">
+            <summary>Text sections by heading</summary>
         </member>
         <member name="P:PayrollEngine.Lex.SourceDocument.Name">
             <summary>
@@ -2237,6 +2899,27 @@
             Normalize the script of a text; a text without such characters is returned unchanged
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.SourceSection">
+            <summary>Text section of a source document with its numbers</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceSection.#ctor(System.String,System.String,System.String,System.String,PayrollEngine.Lex.LanguageSet)">
+            <summary>Text section of a source document with its numbers</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceSection.Url">
+            <summary>URL of the source</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceSection.Name">
+            <summary>Document name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceSection.Heading">
+            <summary>Section heading</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceSection.Numbers">
+            <summary>Numbers of the section text</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceSection.CanonicalText">
+            <summary>Normalized text for quote matching, built on first use</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.SourceSection.YearContext(System.ValueTuple{System.Int32,System.Int32},PayrollEngine.Lex.RelevantPeriod)">
             <summary>Year context of a hit in the section text</summary>
         </member>
@@ -2342,8 +3025,38 @@
             Input of the verification of one entry: numbers, readable sections and the result builder
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.EntryContext.#ctor(PayrollEngine.Lex.Entry,System.Collections.Generic.IReadOnlyList{System.ValueTuple{System.String,PayrollEngine.Lex.SourceDocument}},System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.Exclusion},System.String,PayrollEngine.Lex.LanguageSet)">
+            <summary>Entry with its readable sources, numbers and exclusions</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Sources">
+            <summary>Loaded sources of the entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Languages">
+            <summary>Languages of the sources</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Period">
+            <summary>Period of the reference year, null without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Numbers">
+            <summary>Sample of the content numbers to find</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Percent">
+            <summary>How percent values are looked up</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Quote">
+            <summary>Source quote, null without</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceVerifier.EntryContext.Sections">
             <summary>Sections of the readable sources, null without readable source</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.EntryContext.InSections(System.Decimal)">
+            <summary>The number occurs in a section</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.EntryContext.Unreadable">
+            <summary>Result without readable source</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceVerifier.EntryContext.Result(PayrollEngine.Lex.SourceMatch,System.Collections.Generic.List{System.Decimal},System.String,System.String)">
+            <summary>Result with match, found numbers and location</summary>
         </member>
         <member name="M:PayrollEngine.Lex.SourceVerifier.Weakness(System.Collections.Generic.List{System.Decimal},System.Collections.Generic.List{PayrollEngine.Lex.SourceSection},PayrollEngine.Lex.PercentLookup)">
             <summary>
@@ -2397,6 +3110,20 @@
             Traceability fields of lex entries: sources, legal reference, location, verification and validFrom
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.TraceabilityCheck.SharedLocationEntries">
+            <summary>Minimum number of entries sharing a location to treat it as not entry-specific</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TraceabilityCheck.SharedLocationLength">
+            <summary>Minimum length of a shared location; short shared locations (e.g. a table name) are fine</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TraceabilityCheck.MaxLocationLength">
+            <summary>A longer source location is a pasted text, not a location</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CheckTraceability(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Counts entries without source URL, legal reference or specific source location
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.TraceabilityCheck.SharedLocations(PayrollEngine.Lex.Manifest)">
             <summary>
             Long source locations repeated by several entries (not entry-specific)
@@ -2412,10 +3139,25 @@
             An entry needs an entry-specific source location, unless excluded
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CheckVerification(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Counts the verification records of the entries: open, auto, manual and unverified
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.TraceabilityCheck.CountVerification(PayrollEngine.Lex.Entry,PayrollEngine.Lex.CheckResult,System.Boolean,System.Collections.Generic.HashSet{System.String})">
             <summary>
             Counts the verification record of an entry: auto (not allowed when excluded), manual (four-eyes review
             when a source requires it) or without
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CheckValidFrom(PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Compares the date part of validFrom in lex.json and in the regulation
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.Left10(System.String)">
+            <summary>
+            Date part (yyyy-MM-dd) of a date or date-time
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.UnitKind">
@@ -2510,6 +3252,21 @@
             LexVerifySource (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>), the folder of additional language files is given there
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Validator.ValidateVerification(System.Collections.Generic.List{System.String},System.String,PayrollEngine.Lex.Verification,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            Verification record of an entry: manual records need person and evidence, automatic records a method
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Validator.ValidateDate(System.Collections.Generic.List{System.String},System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Optional or required ISO date (yyyy-MM-dd) of a verification field
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Validator.ResolvePath(System.String,System.String)">
+            <summary>
+            Relative paths are resolved against the .lex folder, absolute paths are kept
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.ValueComparer">
             <summary>
             Comparison of regulation lookup values with lex entry contents
@@ -2518,6 +3275,12 @@
         <member name="M:PayrollEngine.Lex.ValueComparer.CompareContent(PayrollEngine.Lex.Entry,System.String)">
             <summary>
             Content to compare: inline content, or the text of a JSON content file (null without comparable content)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.Compare(PayrollEngine.Lex.CheckResult,System.String,System.String,PayrollEngine.Lex.RegulationValue,System.String)">
+            <summary>
+            Compares a lex content with a regulation value: an unknown property path is an unresolved split,
+            a different value is a drift
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.ValueComparer.Resolve(PayrollEngine.Lex.RegulationValue,System.String,System.Nullable{System.Text.Json.JsonElement}@,System.String@,System.String@)">
@@ -2544,9 +3307,20 @@
             Single difference as is, several as count with the first ones, null without difference
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.DeepDifference(System.Text.Json.JsonElement,System.Text.Json.JsonElement,System.String,System.Collections.Generic.List{System.String})">
+            <summary>
+            Collects the differences of two JSON elements: properties by name ignoring case, arrays by position,
+            scalars by <see cref="M:PayrollEngine.Lex.ValueComparer.ScalarEquals(System.String,System.String)"/>
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.ValueComparer.ScalarEquals(System.String,System.String)">
             <summary>
             Numbers are compared numerically, text ignoring case
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.Shorten(System.String)">
+            <summary>
+            Shortens a value for the report to 60 characters
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Verification">
@@ -2628,10 +3402,25 @@
             <param name="snapshot">Snapshot (snapshot.json)</param>
             <param name="lexDirectory">Directory containing lex.json and snapshot.json</param>
         </member>
+        <member name="M:PayrollEngine.Lex.Verifier.VerifyVerification(System.Collections.Generic.List{System.String},PayrollEngine.Lex.Entry,PayrollEngine.Lex.Entry,PayrollEngine.Lex.Snapshot)">
+            <summary>
+            The verification record of an entry must be the same in lex.json and in the snapshot
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Verifier.Compare(System.Collections.Generic.List{System.String},System.String,System.String,System.String)">
+            <summary>
+            Header fields must match exactly
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Verifier.ComputeSourceHash(PayrollEngine.Lex.Manifest,System.String,System.Collections.Generic.List{System.String})">
             <summary>
             Recompute the source hash. Returns null when a file needed for the hash is missing (reported in errors).
             Evidence copies in the .lex folder are the reference; an original outside .lex that differs from its copy is reported.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Verifier.CheckOriginal(System.Collections.Generic.List{System.String},System.String,System.String,System.String,System.String)">
+            <summary>
+            An original outside .lex that changed after the snapshot is reported; a missing original is fine
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.YearAnalyzer">

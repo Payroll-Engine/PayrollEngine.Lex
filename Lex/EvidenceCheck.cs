@@ -12,8 +12,12 @@ namespace PayrollEngine.Lex;
 /// </summary>
 public static class EvidenceCheck
 {
+    /// <summary>
+    /// Checks the evidence files: declared and present, frozen in the snapshot, used and tracked in git
+    /// </summary>
     internal static void CheckEvidence(Manifest manifest, string lexDirectory, CheckResult result)
     {
+        // existing evidence files, checked for their git state at the end
         var paths = new List<string>();
         var declared = CheckDeclaredFiles(manifest, lexDirectory, result, paths);
         CheckEntryFiles(manifest, lexDirectory, result, declared, paths);
@@ -25,6 +29,7 @@ public static class EvidenceCheck
 
         CheckRepositoryState(lexDirectory, result, paths);
 
+        // a file can be reported by several checks: once is enough
         var distinct = result.FileProblems.Distinct(StringComparer.Ordinal).Take(CheckResult.MaxSamples).ToList();
         result.FileProblems.Clear();
         result.FileProblems.AddRange(distinct);
@@ -96,6 +101,7 @@ public static class EvidenceCheck
     /// </summary>
     private static void CheckRepositoryState(string lexDirectory, CheckResult result, List<string> paths)
     {
+        // the manifest and the snapshot are part of the compliance record too
         paths.Add(Path.Combine(lexDirectory, "lex.json"));
         if (result.HasSnapshot)
         {
@@ -127,6 +133,7 @@ public static class EvidenceCheck
     /// <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
     public static List<string> UnusedEvidence(Manifest manifest, string lexDirectory)
     {
+        // collect all uses of evidence files from the entries
         var referenced = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         var urls = new HashSet<string>(StringComparer.Ordinal);
         var contentFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
@@ -154,6 +161,7 @@ public static class EvidenceCheck
             declared.Add(file.FileName);
             if (referenced.Contains(file.FileName) || file.Urls.Any(urls.Contains) ||
                 contentFiles.Contains(Path.GetFullPath(Path.Combine(lexDirectory, file.FileName))) ||
+                // a missing declared file is reported by CheckDeclaredFiles, not as unused
                 !File.Exists(Path.Combine(lexDirectory, file.FileName)))
             {
                 continue;
@@ -165,6 +173,7 @@ public static class EvidenceCheck
             foreach (var path in Directory.EnumerateFiles(lexDirectory))
             {
                 var name = Path.GetFileName(path);
+                // hidden files, the manifest and the snapshot are no evidence
                 if (name.StartsWith('.') || declared.Contains(name) || contentFiles.Contains(Path.GetFullPath(path)) ||
                     string.Equals(name, "lex.json", StringComparison.OrdinalIgnoreCase) ||
                     string.Equals(name, "snapshot.json", StringComparison.OrdinalIgnoreCase))
@@ -203,6 +212,7 @@ public static class EvidenceCheck
             result.FileProblems.Add("snapshot.json could not be read: " + exception.Message);
             return;
         }
+        // file names frozen by LexSnapshot
         var frozen = (snapshot?.Files ?? [])
             .Select(x => x.FileName)
             .Where(x => x != null)
@@ -228,6 +238,7 @@ public static class EvidenceCheck
                 RedirectStandardError = true,
                 UseShellExecute = false
             };
+            // git ls-files -o [-i] --exclude-standard: untracked (or ignored) files below the folder
             info.ArgumentList.Add("ls-files");
             info.ArgumentList.Add("-o");
             if (ignored)
@@ -259,6 +270,4 @@ public static class EvidenceCheck
         }
         return set;
     }
-
-    // value comparison -------------------------------------------------------
 }

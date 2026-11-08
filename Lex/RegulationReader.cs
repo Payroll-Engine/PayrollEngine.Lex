@@ -11,16 +11,21 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal static class RegulationReader
 {
+    /// <summary>Reader options: regulation files may contain comments and trailing commas</summary>
     internal static readonly JsonReaderOptions ReaderOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
 
+    /// <summary>State of reading one regulation file</summary>
     private sealed class Context
     {
+        /// <summary>Collected lookups and values of all files of the satellite</summary>
         internal RegulationData Data { get; init; }
+        /// <summary>File being read, owner of the byte offsets</summary>
         internal RegulationFile File { get; init; }
+        /// <summary>First namespace declared by a regulation of the file</summary>
         internal string Namespace { get; set; }
     }
 
@@ -36,10 +41,12 @@ internal static class RegulationReader
             return data;
         }
 
+        // the first declared namespace applies to all files of the satellite
         string satelliteNamespace = null;
         foreach (var path in Directory.GetFiles(regulationDirectory, "*.json").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
         {
             var bytes = File.ReadAllBytes(path);
+            // offsets are counted without the byte order mark; it is kept to write the file back unchanged
             var bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
             var file = new RegulationFile
             {
@@ -60,6 +67,7 @@ internal static class RegulationReader
         }
         if (!string.IsNullOrEmpty(satelliteNamespace))
         {
+            // a lookup named with the namespace prefix is also found by its short name (alias)
             var prefix = satelliteNamespace + ".";
             foreach (var lookup in data.Lookups.Where(x => x.Name.StartsWith(prefix, StringComparison.Ordinal)))
             {
@@ -74,8 +82,12 @@ internal static class RegulationReader
         return data;
     }
 
+    /// <summary>
+    /// Root object: reads the tenants array, skips all other properties
+    /// </summary>
     private static void ReadRoot(ref Utf8JsonReader reader, Context context)
     {
+        // a file without root object (e.g. an array) holds no regulation
         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
         {
             return;
@@ -105,6 +117,9 @@ internal static class RegulationReader
         }
     }
 
+    /// <summary>
+    /// Tenant object: reads the regulations array, skips all other properties
+    /// </summary>
     private static void ReadTenant(ref Utf8JsonReader reader, Context context)
     {
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
@@ -132,6 +147,10 @@ internal static class RegulationReader
         }
     }
 
+    /// <summary>
+    /// Regulation object: reads its lookups, name, validFrom and namespace; the first regulation with a
+    /// name or validFrom sets the satellite values
+    /// </summary>
     private static void ReadRegulation(ref Utf8JsonReader reader, Context context)
     {
         string regulationName = null;
@@ -160,6 +179,7 @@ internal static class RegulationReader
             }
             else if (Is(name, "validFrom"))
             {
+                // the validFrom token location allows LexApply/Rollover to replace the date in place
                 var offset = (int)reader.TokenStartIndex;
                 var isString = reader.TokenType == JsonTokenType.String;
                 validFrom = Text(ref reader);
@@ -179,6 +199,7 @@ internal static class RegulationReader
                 var ns = Text(ref reader);
                 if (!string.IsNullOrEmpty(ns))
                 {
+                    // several regulations in one file: the first namespace wins
                     context.Namespace ??= ns;
                 }
             }
@@ -191,22 +212,37 @@ internal static class RegulationReader
         context.Data.ValidFrom ??= validFrom;
     }
 
+    /// <summary>
+    /// Lookup value read before its lookup name is known (the name may follow the values array)
+    /// </summary>
     private sealed class PendingValue
     {
+        /// <summary>Lookup value key, null without key</summary>
         internal string Key { get; set; }
+        /// <summary>Range value, used as key of range lookups without key</summary>
         internal string RangeValue { get; set; }
+        /// <summary>Scalar or JSON text value of the "value" property</summary>
         internal JsonElement? Value { get; set; }
+        /// <summary>Byte offset of the "value" token in the file</summary>
         internal int ValueOffset { get; set; }
+        /// <summary>Byte length of the "value" token</summary>
         internal int ValueLength { get; set; }
+        /// <summary>Structured value of the "valueObject" property</summary>
         internal JsonElement? ValueObject { get; set; }
+        /// <summary>Byte offset of the "valueObject" token in the file</summary>
         internal int ValueObjectOffset { get; set; }
+        /// <summary>Byte length of the "valueObject" token</summary>
         internal int ValueObjectLength { get; set; }
     }
 
+    /// <summary>
+    /// Lookup object: reads its name and values with the byte locations needed to replace or append values
+    /// </summary>
     private static void ReadLookup(ref Utf8JsonReader reader, Context context)
     {
         string lookupName = null;
         var hasValues = false;
+        // insertOffset: end of the last value (or of the opening bracket), where LexApply appends a new value
         var insertOffset = 0;
         var valuesOffset = 0;
         var lastValueOffset = -1;
@@ -244,6 +280,7 @@ internal static class RegulationReader
                 reader.Skip();
             }
         }
+        // a lookup without name cannot be addressed by a lex key
         if (lookupName == null)
         {
             return;
@@ -262,10 +299,12 @@ internal static class RegulationReader
         context.Data.LookupCount++;
         foreach (var item in pending)
         {
+            // valueObject takes precedence over value; the token of the used property is the one to replace
             var useObject = item.ValueObject is { ValueKind: not JsonValueKind.Null };
             var value = new RegulationValue
             {
                 Lookup = lookupName,
+                // range lookups may have no key: the range value identifies the entry
                 Key = item.Key ?? item.RangeValue ?? string.Empty,
                 Object = useObject ? item.ValueObject : null,
                 Scalar = useObject || item.Value == null ? null : ScalarText(item.Value.Value),
@@ -279,6 +318,9 @@ internal static class RegulationReader
         }
     }
 
+    /// <summary>
+    /// Lookup value object: reads key, rangeValue, value and valueObject with their token locations
+    /// </summary>
     private static PendingValue ReadValue(ref Utf8JsonReader reader)
     {
         var value = new PendingValue();
@@ -286,6 +328,7 @@ internal static class RegulationReader
         {
             var name = reader.GetString();
             reader.Read();
+            // the token starts after reading the property name; its length is known after parsing
             var offset = (int)reader.TokenStartIndex;
             if (Is(name, "key"))
             {
@@ -315,12 +358,18 @@ internal static class RegulationReader
         return value;
     }
 
+    /// <summary>
+    /// Text of the current token, null for a JSON null
+    /// </summary>
     private static string Text(ref Utf8JsonReader reader)
     {
         var element = JsonElement.ParseValue(ref reader);
         return ScalarText(element, nullAsNull: true);
     }
 
+    /// <summary>
+    /// Text of a scalar element: strings unquoted, numbers and booleans in their JSON spelling
+    /// </summary>
     private static string ScalarText(JsonElement element, bool nullAsNull = false) =>
         element.ValueKind switch
         {
@@ -329,6 +378,9 @@ internal static class RegulationReader
             _ => element.ToString()
         };
 
+    /// <summary>
+    /// Property names are compared ignoring case (regulation files are written by hand)
+    /// </summary>
     private static bool Is(string name, string expected) =>
         string.Equals(name, expected, StringComparison.OrdinalIgnoreCase);
 }

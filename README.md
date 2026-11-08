@@ -15,10 +15,10 @@ The library provides:
 - Download of source documents into the `.lex` folder (`Fetcher`)
 - Snapshot creation (`SnapshotWriter`) and verification against the manifest and the evidence files (`Verifier`)
 - Check of a manifest against the lookup values of its regulation: coverage, value differences, traceability fields,
-  evidence files, `validFrom`, verification records and open entries (`Checker`, `CheckReport`)
+  evidence files, `validFrom`, verification records and open entries (`Checker`, `EvidenceCheck`, `CheckReport`)
 - Availability check of the source URLs and detection of changed sources (`UrlChecker`, `LiveSource`)
 - Lookup of the entry numbers in the source document, with rating of weak matches, source quotes and sampling of
-  large tables (`SourceVerifier`, `SourceDocument`)
+  large tables (`SourceVerifier`, `ManifestVerifier`, `SourceDocument`)
 - Release gate: entry-specific locations, official main sources, no weak automatic matches, no zero values
   without justification (`Checker`)
 - Transfer of the lex values into the lookup values of the regulation (`Applier`)
@@ -94,7 +94,7 @@ counts with its year, also in a table row; after an enactment word it is a citat
 The year rating and the number lookup read the words of a language from a language file `{language}.json`
 (`LanguageSet`). The package ships English, German, French, Spanish, Italian, Dutch and Portuguese in the folder
 `LexVocabulary` next to the library. A folder of additional language files, given by the caller
-(`SourceVerifier.VerifyManifest(…, languageDirectory)`, `LanguageSet.Get(languages, additionalDirectory)`; in
+(`ManifestVerifier.VerifyManifest(…, languageDirectory)`, `LanguageSet.Get(languages, additionalDirectory)`; in
 pecmd `LexVerifySource Vocabulary:<folder>` or the environment variable `PAYROLL_ENGINE_LEX_VOCABULARY`), adds a
 language or replaces a package file with the same language code, so a new language needs no new library
 version. The library reads no environment variable or configuration of its own. A manifest selects the languages of its sources with `languages` (`["de", "fr"]`); without it all
@@ -185,10 +185,10 @@ holds no number to look up: `SourceResult.Zero` lists these properties. A `notAp
 (`Lookup.Key.Property`, the reason says why the rule does not apply) documents such a property
 (`SourceResult.NotApplicable`); a zero property without it is listed in `SourceResult.UnjustifiedZero`, so a rate
 set to 0 by mistake does not stay unnoticed (the checker reports it, a finding in the release mode).
-`SourceVerifier.VerifyManifest` checks
+`ManifestVerifier.VerifyManifest` checks
 all entries of a manifest, inline content and JSON `contentFile` tables, against the local evidence or a live loader.
 The local evidence of an entry is its `documentRef`, otherwise the declared file with the same source URL.
-`Checker.UnusedEvidence` lists the evidence files that back no entry: a declared file without `documentRef`, source
+`EvidenceCheck.UnusedEvidence` lists the evidence files that back no entry: a declared file without `documentRef`, source
 URL, `contentFile` or verification evidence pointing to it, and a file in `.lex` that is not declared in `files[]`.
 Such a file is never read, its entries count as without local evidence (the checker reports it, a finding in the
 release mode). In the release mode an entry without manual verification needs readable local evidence or a source
@@ -200,7 +200,7 @@ e.g. the official text saved from the browser) or a manual verification.
 `SourceResult.Location` names at most three sections per source. Each source is named by its evidence file, or by
 the host when the document has no file name (live source): `XX-2026-guide.pdf: Sections "Page 24", "Page 25";
 XX-2026-limits.pdf: Section "Page 1"`. A location longer than 500 characters is not proposed.
-`SourceVerifier.IsToolLocation` recognizes these locations, so `/refreshlocations` may replace them.
+`SourceLocation.IsToolLocation` recognizes these locations, so `/refreshlocations` may replace them.
 
 ## Verification and Open Entries
 
@@ -225,11 +225,44 @@ from the payroll calendar of a tenant.
 
 ---
 
+## Workflow
+
+The Lex commands of the Payroll Console follow the life cycle of a data regulation satellite:
+
+| Step | Command | Library | Result |
+|:---|:---|:---|:---|
+| 1. Collect sources | `LexFetch` | `Fetcher` | Source document in the `.lex` folder, declared in `files[]` |
+| 2. Document values | `LexAdd` | `ManifestEditor` | Entries with source URLs, location and legal reference |
+| 3. Verify automatically | `LexVerifySource` | `ManifestVerifier`, `SourceVerifier` | `auto` verification records for the values found in the sources |
+| 4. Verify manually | `LexAttest` | `ManifestEditor` | `manual` verification records for the remaining values |
+| 5. Freeze | `LexSnapshot` | `SnapshotWriter` | `snapshot.json` with the hashes of manifest and evidence |
+| 6. Verify the snapshot | `LexVerify` | `Verifier` | Differences between manifest, snapshot and evidence files |
+| 7. Transfer | `LexApply` | `Applier` | Lex values written into the lookup values of the regulation |
+| 8. Check | `LexCheck` | `Checker`, `CheckReport` | Coverage, value differences and traceability report; release gate |
+| 9. Next cycle | `LexRollover` | `Rollover` | New satellite folder with open entries, continue with step 2 or 3 |
+
+A changed value runs through steps 3 to 8 again: a changed manifest no longer matches its snapshot, and
+`LexCheck` reports the difference until a new snapshot is written.
+
+---
+
 ## Project Structure
 
 ```
 PayrollEngine.Lex/
 ├── Lex/                          # Library source
+│   ├── Manifest.cs, Entry.cs, ...    # Manifest and snapshot model
+│   ├── Validator.cs, Schema.cs       # Validation, lex.schema.json (embedded resource)
+│   ├── ManifestEditor.cs, Fetcher.cs # Editing of lex.json, download of sources
+│   ├── SnapshotWriter.cs, Verifier.cs # Snapshot creation and verification
+│   ├── Checker.cs                    # LexCheck: CoverageCheck, ValueComparer, TraceabilityCheck, EvidenceCheck
+│   ├── CheckReport.cs                # Markdown and CSV report
+│   ├── ManifestVerifier.cs           # LexVerifySource: SourceVerifier, YearAnalyzer, EntryNumbers, SourceLocation
+│   ├── SourceDocument.cs             # Source readers: HtmlReader, PdfReader, SpreadsheetReader, OfficeXmlReader
+│   ├── LanguageSet.cs                # Language profiles of the source verification
+│   ├── Applier.cs, RegulationReader.cs # LexApply and reading of the regulation lookups
+│   ├── Rollover.cs                   # LexRollover
+│   └── LexVocabulary/                # Language files
 ├── Lex.Tests/                    # Unit tests
 ├── Directory.Build.props         # Shared build properties
 ├── PayrollEngine.Lex.sln         # Solution file
@@ -275,7 +308,7 @@ var release = Checker.Check(manifest, lexPath, requireLocation: true, requireVer
 await Checker.CheckSources(manifest, release);
 
 // look up the numbers of all entries in the local evidence
-var results = await SourceVerifier.VerifyManifest(manifest, lexDirectory);
+var results = await ManifestVerifier.VerifyManifest(manifest, lexDirectory);
 
 // write the lex values into the regulation lookups (dry run: differences only)
 var applied = Applier.Apply(manifest, lexPath, dryRun: true);

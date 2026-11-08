@@ -14,25 +14,37 @@ namespace PayrollEngine.Lex;
 /// </summary>
 public static class Applier
 {
+    /// <summary>String escaping as written by hand: umlauts, accents and symbols stay readable</summary>
     private static readonly JsonSerializerOptions StringOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
     };
 
+    /// <summary>Replacement of a byte range of a regulation file</summary>
     private sealed class Edit
     {
+        /// <summary>File of the replaced range</summary>
         internal RegulationFile File { get; init; }
+        /// <summary>Byte offset of the range (file content without byte order mark)</summary>
         internal int Offset { get; init; }
+        /// <summary>Byte length of the range, 0 for an insertion</summary>
         internal int Length { get; init; }
+        /// <summary>New JSON text of the range</summary>
         internal string Text { get; init; }
+        /// <summary>Lex entry that caused the edit, named in conflict messages</summary>
         internal string EntryKey { get; init; }
+        /// <summary>Byte offset after the range</summary>
         internal int End => Offset + Length;
     }
 
+    /// <summary>New lookup value for a lex entry without regulation value</summary>
     private sealed class Addition
     {
+        /// <summary>Key of the new lookup value</summary>
         internal string Key { get; init; }
+        /// <summary>Lex content of the new value</summary>
         internal string Content { get; init; }
+        /// <summary>True: JSON content written as valueObject, false: text written as value</summary>
         internal bool Structured { get; init; }
     }
 
@@ -46,6 +58,7 @@ public static class Applier
     {
         ArgumentNullException.ThrowIfNull(manifest);
         var lexDirectory = Path.GetDirectoryName(lexPath)!;
+        // lex.json lives in <satellite>/.lex; a manifest outside a .lex folder uses its own folder
         var satelliteDirectory = Directory.GetParent(lexDirectory)?.FullName ?? lexDirectory;
         var result = new ApplyResult { LexPath = lexPath, Satellite = Path.GetFileName(satelliteDirectory) };
 
@@ -68,6 +81,7 @@ public static class Applier
 
         var index = new RegulationIndex(regulation);
         var editionTag = EntryMapping.EditionTag(manifest);
+        // all changes are collected first and written per file in one pass: offsets refer to the original content
         var edits = new List<Edit>();
         var additions = new Dictionary<RegulationLookup, List<Addition>>();
         foreach (var entry in manifest.Values)
@@ -76,6 +90,7 @@ public static class Applier
             {
                 continue;
             }
+            // an open entry (rolled over from the previous cycle) must be verified before its value is applied
             if (entry.Open)
             {
                 result.Skipped.Add($"{entry.Key}: open entry, verify first");
@@ -111,6 +126,7 @@ public static class Applier
                         Replace(result, edits, entry.Key, value, target.Remainder, content);
                     }
                     break;
+                // a lookup-level entry (content file) can only replace the value of a single-value lookup
                 case EntryTargetKind.Lookup:
                     if (target.Lookup.Values.Count == 1)
                     {
@@ -121,12 +137,14 @@ public static class Applier
                         result.Skipped.Add($"{entry.Key}: lookup {target.Lookup.Name} has {target.Lookup.Values.Count} values, expected one");
                     }
                     break;
+                // an entry for a missing key of an existing lookup becomes a new value at the end of the values array
                 case EntryTargetKind.NewValue:
                     Add(result, additions, entry.Key, target.Lookup, target.Remainder, content);
                     break;
             }
         }
 
+        // the new values of a lookup are inserted together after its last value
         foreach (var (lookup, items) in additions)
         {
             edits.Add(new Edit
@@ -145,6 +163,7 @@ public static class Applier
             var bytes = Splice(file, group.OrderBy(x => x.Offset).ToList());
             try
             {
+                // safety net: never write a file that is no longer valid JSON
                 using var document = JsonDocument.Parse(bytes, LexJson.DocumentOptions);
             }
             catch (JsonException exception)
@@ -155,6 +174,7 @@ public static class Applier
             }
             if (!dryRun)
             {
+                // the original byte order mark is kept
                 File.WriteAllBytes(file.Path, [.. file.Bom, .. bytes]);
                 result.WrittenFiles.Add(file.Path);
             }
@@ -162,10 +182,15 @@ public static class Applier
         return result;
     }
 
+    /// <summary>
+    /// Replaces the value token (or the property of a split key) when the lex content differs
+    /// </summary>
     private static void Replace(ApplyResult result, List<Edit> edits, string entryKey, RegulationValue value,
         string remainder, string content)
     {
+        // target label in the change list: Lookup.Key/Property/Path
         var target = value.Lookup + "." + value.Key + (remainder.Length > 0 ? "/" + remainder.Replace('.', '/') : string.Empty);
+        // lookup value without value or valueObject property: nothing to replace
         if (value.TokenOffset < 0)
         {
             result.Skipped.Add($"{entryKey}: regulation value {target} has no value");
@@ -177,6 +202,7 @@ public static class Applier
         int length;
         JsonElement element;
         string difference;
+        // whole value: the token located by the reader
         if (remainder.Length == 0)
         {
             offset = value.TokenOffset;
@@ -197,12 +223,14 @@ public static class Applier
                 result.Skipped.Add($"{entryKey}: property path '{remainder}' not found in the regulation value");
                 return;
             }
+            // property of a structured value: compare and replace only this property
             (offset, length, element) = located.Value;
             difference = element.ValueKind is JsonValueKind.Object or JsonValueKind.Array
                 ? ValueComparer.Difference(element, null, content)
                 : ValueComparer.Difference(null, element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString(), content);
         }
 
+        // equal values (numeric or ignoring case) are not rewritten: the formatting of the file stays unchanged
         if (difference == null)
         {
             result.Unchanged++;
@@ -222,6 +250,7 @@ public static class Applier
             Text = Reindent(text, LineIndent(file.Content, offset), NewLine(file.Content)),
             EntryKey = entryKey
         };
+        // two entries must not change overlapping ranges (e.g. a whole value and one of its properties)
         var conflict = edits.FirstOrDefault(x => x.File == file && x.Offset < edit.End && edit.Offset < x.End);
         if (conflict != null)
         {
@@ -239,6 +268,9 @@ public static class Applier
         });
     }
 
+    /// <summary>
+    /// Registers a new lookup value; its form (value or valueObject) must match the existing values of the lookup
+    /// </summary>
     private static void Add(ApplyResult result, Dictionary<RegulationLookup, List<Addition>> additions,
         string entryKey, RegulationLookup lookup, string valueKey, string content)
     {
@@ -247,6 +279,7 @@ public static class Applier
             result.Skipped.Add($"{entryKey}: lookup {lookup.Name} has no values array");
             return;
         }
+        // a lookup holds either scalar values or structured values, never both
         var structured = EntryMapping.IsStructured(content);
         if (lookup.Values.Count > 0 && lookup.Values.Any(x => x.Object != null) != structured)
         {
@@ -259,6 +292,7 @@ public static class Applier
         {
             additions[lookup] = items = [];
         }
+        // several property entries of the same new key cannot be merged into one value
         if (items.Any(x => string.Equals(x.Key, valueKey, StringComparison.Ordinal)))
         {
             result.Skipped.Add($"{entryKey}: value {lookup.Name}.{valueKey} is added by another entry");
@@ -285,6 +319,7 @@ public static class Applier
         {
             return null;
         }
+        // walk the property path level by level; property names are compared ignoring case
         var parts = path.Split('.');
         for (var i = 0; i < parts.Length; i++)
         {
@@ -307,6 +342,7 @@ public static class Applier
                 {
                     var start = (int)reader.TokenStartIndex;
                     var element = JsonElement.ParseValue(ref reader);
+                    // offsets of the slice reader are relative to the token: add the token offset
                     return (offset + start, (int)reader.BytesConsumed - start, element);
                 }
                 break;
@@ -334,6 +370,7 @@ public static class Applier
             }
             return content.Trim();
         }
+        // the new token keeps the JSON type of the existing token: number stays number, boolean stays boolean, else string
         switch (existing.ValueKind)
         {
             case JsonValueKind.Number:
@@ -356,6 +393,9 @@ public static class Applier
         }
     }
 
+    /// <summary>
+    /// JSON kind of literal content (number, boolean, ...), null if the content is no JSON literal
+    /// </summary>
     private static JsonValueKind? Literal(string content)
     {
         try
@@ -369,10 +409,14 @@ public static class Applier
         }
     }
 
+    /// <summary>
+    /// JSON text of new lookup values, indented like the existing values
+    /// </summary>
     private static string AdditionText(RegulationLookup lookup, List<Addition> items)
     {
         var content = lookup.File.Content;
         var newLine = NewLine(content);
+        // an empty values array has no value to copy the indentation from: indent one level below the "values" property
         var empty = lookup.LastValueOffset < 0;
         var itemIndent = empty
             ? LineIndent(content, lookup.ValuesOffset) + "  "
@@ -396,11 +440,15 @@ public static class Applier
         }
         if (empty)
         {
+            // the closing bracket of a previously empty array moves to its own line
             builder.Append(newLine).Append(LineIndent(content, lookup.ValuesOffset));
         }
         return builder.ToString();
     }
 
+    /// <summary>
+    /// Content of the file with all edits applied; the edits are sorted by offset and do not overlap
+    /// </summary>
     private static byte[] Splice(RegulationFile file, List<Edit> edits)
     {
         using var stream = new MemoryStream();
@@ -416,6 +464,9 @@ public static class Applier
         return stream.ToArray();
     }
 
+    /// <summary>
+    /// JSON string literal of a text
+    /// </summary>
     private static string JsonString(string text) => JsonSerializer.Serialize(text, StringOptions);
 
     /// <summary>
@@ -431,6 +482,9 @@ public static class Applier
         return lines[0] + newLine + string.Join(newLine, lines.Skip(1).Select(x => indent + x));
     }
 
+    /// <summary>
+    /// Leading whitespace of the line that contains the offset
+    /// </summary>
     private static string LineIndent(byte[] content, int offset)
     {
         var start = offset;
@@ -446,6 +500,9 @@ public static class Applier
         return Encoding.UTF8.GetString(content, start, end - start);
     }
 
+    /// <summary>
+    /// Line break of the file: CRLF if the file contains one, else LF
+    /// </summary>
     private static string NewLine(byte[] content) =>
         content.AsSpan().IndexOf("\r\n"u8) >= 0 ? "\r\n" : "\n";
 }

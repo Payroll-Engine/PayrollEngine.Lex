@@ -28,6 +28,7 @@ public static class Verifier
         Compare(errors, "provider", manifest.Provider, snapshot.Provider);
 
         // values: keys and inline content
+        // entries are compared by key in both directions: added and removed entries are reported
         var snapshotValues = new Dictionary<string, Entry>(StringComparer.Ordinal);
         foreach (var value in snapshot.Values ?? [])
         {
@@ -49,6 +50,7 @@ public static class Verifier
                 errors.Add($"Value '{value.Key}' is in lex.json but not in the snapshot");
                 continue;
             }
+            // content files are compared by hash with the snapshot files below
             if (value.HasInlineContent && !string.Equals(value.Content, snapValue.Content, StringComparison.Ordinal))
             {
                 errors.Add($"Value '{value.Key}': content differs from the snapshot");
@@ -83,6 +85,7 @@ public static class Verifier
                 errors.Add($"File '{name}' is in the snapshot but missing in the .lex folder");
                 continue;
             }
+            // the size is only compared when the hash matches (a changed hash already reports the file)
             if (!string.Equals(ContentHash.FileHash(path), file.Sha256, StringComparison.OrdinalIgnoreCase))
             {
                 errors.Add($"File '{name}': content differs from the snapshot (sha256)");
@@ -103,6 +106,9 @@ public static class Verifier
         return errors;
     }
 
+    /// <summary>
+    /// The verification record of an entry must be the same in lex.json and in the snapshot
+    /// </summary>
     private static void VerifyVerification(List<string> errors, Entry value, Entry snapValue, Snapshot snapshot)
     {
         var verification = value.Verification;
@@ -126,6 +132,9 @@ public static class Verifier
         }
     }
 
+    /// <summary>
+    /// Header fields must match exactly
+    /// </summary>
     private static void Compare(List<string> errors, string field, string manifestValue, string snapshotValue)
     {
         if (!string.Equals(manifestValue, snapshotValue, StringComparison.Ordinal))
@@ -151,6 +160,7 @@ public static class Verifier
             }
             else if (value.HasContentFile)
             {
+                // LexSnapshot copies content files flat into .lex: the copy is hashed
                 var original = ContentHash.ResolvePath(lexDirectory, value.ContentFile);
                 var local = Path.Combine(lexDirectory, Path.GetFileName(original));
                 if (!File.Exists(local))
@@ -168,6 +178,7 @@ public static class Verifier
                 continue;
             }
 
+            // same order as SnapshotWriter, otherwise the hashes never match
             input.Append(value.QuoteHashInput());
             input.Append(value.ReferenceYearHashInput());
             if (value.Verification != null)
@@ -208,6 +219,9 @@ public static class Verifier
         return complete ? "sha256:" + ContentHash.StringHash(input.ToString()) : null;
     }
 
+    /// <summary>
+    /// An original outside .lex that changed after the snapshot is reported; a missing original is fine
+    /// </summary>
     private static void CheckOriginal(List<string> errors, string subject, string original, string local, string localHash)
     {
         if (string.IsNullOrWhiteSpace(original) || !File.Exists(original))

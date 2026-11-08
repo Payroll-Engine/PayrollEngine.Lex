@@ -13,16 +13,19 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal static class HtmlReader
 {
+    /// <summary>Longer headings are cut (e.g. a heading element wrapped around a whole block)</summary>
     private const int MaxHeadingLength = 200;
 
     /// <summary>Heading of the text before the first heading</summary>
     internal const string StartHeading = "(start of page)";
 
+    /// <summary>Elements whose content is no page text</summary>
     private static readonly HashSet<string> SkippedElements = new(StringComparer.OrdinalIgnoreCase)
     {
         "script", "style", "noscript", "template"
     };
 
+    /// <summary>Elements that start a new line; h5 and h6 are text, not sections</summary>
     private static readonly HashSet<string> BlockElements = new(StringComparer.OrdinalIgnoreCase)
     {
         "address", "article", "aside", "blockquote", "br", "button", "caption", "dd", "details", "div", "dl", "dt",
@@ -30,11 +33,13 @@ internal static class HtmlReader
         "main", "nav", "ol", "option", "p", "pre", "section", "summary", "table", "tbody", "tfoot", "thead", "tr", "ul"
     };
 
+    /// <summary>Table cells, separated by tabs</summary>
     private static readonly HashSet<string> CellElements = new(StringComparer.OrdinalIgnoreCase)
     {
         "td", "th"
     };
 
+    /// <summary>Horizontal white space including non-breaking and zero-width spaces</summary>
     private static readonly Regex Spaces = new(@"[ \f\v\u00a0\u200b]+", RegexOptions.Compiled);
 
     /// <summary>
@@ -46,6 +51,7 @@ internal static class HtmlReader
         var heading = StartHeading;
         var text = new StringBuilder();
         StringBuilder headingText = null;
+        // text inside a heading element goes to headingText, other text to the current section
         var position = 0;
 
         while (position < html.Length)
@@ -80,6 +86,7 @@ internal static class HtmlReader
                 continue;
             }
 
+            // skip to the end tag of a script or style block, its content may contain '<'
             if (!closing && SkippedElements.Contains(name))
             {
                 var end = html.IndexOf("</" + name, position, StringComparison.OrdinalIgnoreCase);
@@ -101,6 +108,7 @@ internal static class HtmlReader
                         // unclosed heading: the next heading ends it
                         heading = HeadingOf(headingText, heading);
                     }
+                    // the text before a new heading belongs to the previous heading
                     AddSection(sections, heading, text);
                     headingText = new StringBuilder();
                 }
@@ -164,9 +172,15 @@ internal static class HtmlReader
         return string.Join('\n', lines);
     }
 
+    /// <summary>
+    /// Headings h1 to h4 start a new section
+    /// </summary>
     private static bool IsSectionHeading(string name) =>
         name.Length == 2 && (name[0] == 'h' || name[0] == 'H') && name[1] is >= '1' and <= '4';
 
+    /// <summary>
+    /// Single-line heading text; an empty heading keeps the previous one
+    /// </summary>
     private static string HeadingOf(StringBuilder headingText, string previous)
     {
         var value = CleanLines(headingText.ToString()).Replace('\n', ' ').Replace('\t', ' ');
@@ -177,6 +191,9 @@ internal static class HtmlReader
         return value.Length > MaxHeadingLength ? value[..MaxHeadingLength] : value;
     }
 
+    /// <summary>
+    /// Adds the collected text as section and clears it; empty sections are dropped
+    /// </summary>
     private static void AddSection(List<(string Heading, string Text)> sections, string heading, StringBuilder text)
     {
         var value = CleanLines(text.ToString());
@@ -187,6 +204,9 @@ internal static class HtmlReader
         }
     }
 
+    /// <summary>
+    /// Appends text between tags with decoded entities
+    /// </summary>
     private static void AppendText(StringBuilder target, string raw)
     {
         if (raw.Length == 0)
@@ -235,6 +255,9 @@ internal static class HtmlReader
         return -1;
     }
 
+    /// <summary>
+    /// Element name of a tag and whether it is an end tag
+    /// </summary>
     private static (string Name, bool Closing) TagName(string html, int start, int end)
     {
         var i = start;

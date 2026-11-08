@@ -49,6 +49,7 @@ public static class Validator
                 continue;
             }
 
+            // keys address lookup values: a duplicate would make the comparison ambiguous
             if (!seenKeys.Add(value.Key))
             {
                 errors.Add($"Duplicate value key: '{value.Key}'");
@@ -57,6 +58,7 @@ public static class Validator
             var hasContent = value.HasInlineContent;
             var hasContentFile = value.HasContentFile;
 
+            // the value is given either inline or in a separate file, never both
             if (!hasContent && !hasContentFile)
             {
                 errors.Add($"Value '{value.Key}': must have either 'content' or 'contentFile'");
@@ -74,11 +76,13 @@ public static class Validator
                 }
             }
 
+            // an empty quote cannot be found in the source and would pass every check
             if (value.SourceQuote != null && string.IsNullOrWhiteSpace(value.SourceQuote))
             {
                 errors.Add($"Value '{value.Key}': sourceQuote is empty");
             }
 
+            // plausibility range for the year a value refers to
             if (value.ReferenceYear is < 1990 or > 2100)
             {
                 errors.Add($"Value '{value.Key}': referenceYear {value.ReferenceYear} is not a year from 1990 to 2100");
@@ -109,6 +113,7 @@ public static class Validator
                     _ => string.Empty
                 });
             }
+            // derived and notApplicable exclusions are property-level: a whole entry needs a manual verification
             if (exclusion.Kind == Exclusion.KindDerived && !string.IsNullOrWhiteSpace(exclusion.Pattern) &&
                 seenKeys.Contains(exclusion.Pattern.Trim()))
             {
@@ -140,6 +145,7 @@ public static class Validator
             {
                 continue;
             }
+            // the referenced document must be declared and present in the .lex folder
             if (!declaredFileNames.Contains(value.DocumentRef))
             {
                 errors.Add($"Value '{value.Key}': documentRef '{value.DocumentRef}' not found in files[] array");
@@ -167,6 +173,7 @@ public static class Validator
             {
                 continue;
             }
+            // a URL is either an official or a secondary source
             if (seenUrls.TryGetValue(source.Url, out var official) && official != source.IsOfficial)
             {
                 errors.Add($"Source '{source.Url}' is declared as official and as secondary source");
@@ -180,6 +187,7 @@ public static class Validator
             if (value.Verification != null && !string.IsNullOrWhiteSpace(value.Key))
             {
                 ValidateVerification(errors, value.Key, value.Verification, declaredFileNames);
+                // open entries are waiting for a new verification (e.g. after a rollover)
                 if (value.Open)
                 {
                     errors.Add($"Value '{value.Key}': an open entry must not have a verification record");
@@ -210,6 +218,7 @@ public static class Validator
                     errors.Add($"File '{file.FileName}': sourcePath not found: {resolved}");
                 }
             }
+            // a file needs an origin: a source path, source URLs or the file itself in the .lex folder
             else if (!file.Urls.Any())
             {
                 var localPath = Path.Combine(manifestDirectory, file.FileName);
@@ -247,6 +256,9 @@ public static class Validator
         }
     }
 
+    /// <summary>
+    /// Verification record of an entry: manual records need person and evidence, automatic records a method
+    /// </summary>
     private static void ValidateVerification(List<string> errors, string key, Verification verification,
         HashSet<string> declaredFileNames)
     {
@@ -269,6 +281,7 @@ public static class Validator
             {
                 errors.Add($"{subject} missing required field: evidence");
             }
+            // method and derived are written by the automatic verification only
             if (verification.Method != null)
             {
                 errors.Add($"{subject} method is only allowed in mode '{Verification.ModeAuto}'");
@@ -295,6 +308,7 @@ public static class Validator
             errors.Add($"{subject} evidence '{verification.Evidence}' not found in files[] array");
         }
 
+        // four-eyes review: reviewer and review date belong together
         if ((verification.ReviewedBy == null) != (verification.ReviewedOn == null))
         {
             errors.Add($"{subject} reviewedBy and reviewedOn must be set together");
@@ -302,6 +316,9 @@ public static class Validator
         ValidateDate(errors, subject, "reviewedOn", verification.ReviewedOn, required: false);
     }
 
+    /// <summary>
+    /// Optional or required ISO date (yyyy-MM-dd) of a verification field
+    /// </summary>
     private static void ValidateDate(List<string> errors, string subject, string field, string value, bool required)
     {
         if (string.IsNullOrWhiteSpace(value))
@@ -318,6 +335,9 @@ public static class Validator
         }
     }
 
+    /// <summary>
+    /// Relative paths are resolved against the .lex folder, absolute paths are kept
+    /// </summary>
     private static string ResolvePath(string baseDirectory, string relativePath)
     {
         if (string.IsNullOrWhiteSpace(relativePath) || Path.IsPathRooted(relativePath))

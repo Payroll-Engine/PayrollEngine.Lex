@@ -31,6 +31,10 @@ internal static class ValueComparer
         }
     }
 
+    /// <summary>
+    /// Compares a lex content with a regulation value: an unknown property path is an unresolved split,
+    /// a different value is a drift
+    /// </summary>
     internal static void Compare(CheckResult result, string entryKey, string content, RegulationValue value, string remainder)
     {
         if (!Resolve(value, remainder, out var target, out var scalar, out var problem))
@@ -39,6 +43,7 @@ internal static class ValueComparer
             CheckResult.AddSample(result.OrphanSamples, $"{entryKey}: {problem}");
             return;
         }
+        // a regulation value without content (e.g. null) is not compared
         if (target == null && scalar == null)
         {
             return;
@@ -73,6 +78,7 @@ internal static class ValueComparer
             problem = $"path '{remainder}' but the regulation value is a scalar";
             return false;
         }
+        // each part of the path is a property of the current object
         var current = value.Object.Value;
         foreach (var part in remainder.Split('.'))
         {
@@ -123,6 +129,7 @@ internal static class ValueComparer
         {
             try
             {
+                // all differences are collected, not only the first one
                 using var lexJson = JsonDocument.Parse(content, LexJson.DocumentOptions);
                 var differences = new List<string>();
                 DeepDifference(structured.Value, lexJson.RootElement, string.Empty, differences);
@@ -159,6 +166,10 @@ internal static class ValueComparer
         return $"{differences.Count} differences: {named}{more}";
     }
 
+    /// <summary>
+    /// Collects the differences of two JSON elements: properties by name ignoring case, arrays by position,
+    /// scalars by <see cref="ScalarEquals"/>
+    /// </summary>
     private static void DeepDifference(JsonElement regulation, JsonElement lex, string path, List<string> differences)
     {
         if (regulation.ValueKind == JsonValueKind.Object && lex.ValueKind == JsonValueKind.Object)
@@ -173,6 +184,7 @@ internal static class ValueComparer
                 }
                 DeepDifference(property.Value, lexValue, path + "/" + property.Name, differences);
             }
+            // properties missing in the regulation
             var names = regulation.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var name in lexProperties.Keys.Where(n => !names.Contains(n)))
             {
@@ -184,6 +196,7 @@ internal static class ValueComparer
         {
             var left = regulation.EnumerateArray().ToList();
             var right = lex.EnumerateArray().ToList();
+            // arrays of different length are one difference, the items are not compared
             if (left.Count != right.Count)
             {
                 differences.Add($"{path} array length {left.Count} vs {right.Count}");
@@ -223,6 +236,7 @@ internal static class ValueComparer
         if (decimal.TryParse(a, NumberStyles.Any, CultureInfo.InvariantCulture, out var left) &&
             decimal.TryParse(b, NumberStyles.Any, CultureInfo.InvariantCulture, out var right))
         {
+            // tolerance for rounding of computed rates (e.g. 0.1 vs 0.09999999)
             return Math.Abs(left - right) < 0.0000001m;
         }
         return string.Equals(a, b, StringComparison.OrdinalIgnoreCase);
@@ -230,6 +244,9 @@ internal static class ValueComparer
 
     // helpers ----------------------------------------------------------------
 
+    /// <summary>
+    /// Shortens a value for the report to 60 characters
+    /// </summary>
     internal static string Shorten(string text) =>
         text is { Length: > 60 } ? text[..60] + "..." : text;
 }

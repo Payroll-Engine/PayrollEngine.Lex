@@ -302,6 +302,7 @@ public sealed class LanguageSet
     /// <inheritdoc />
     public override string ToString() => Label;
 
+    /// <summary>Language profiles of the set</summary>
     internal IReadOnlyList<LanguageProfile> Profiles { get; }
 
     /// <summary>Month number (1–12) of a month name or abbreviation</summary>
@@ -339,18 +340,32 @@ public sealed class LanguageSet
         return day is < 1 or > 31 ? null : (month, day);
     }
 
+    /// <summary>Factor of a scale word (e.g. million, Mio.)</summary>
     internal IReadOnlyDictionary<string, decimal> Scales { get; }
+    /// <summary>Percent sign or word after a number</summary>
     internal Regex PercentSign { get; }
+    /// <summary>Scale word after a number</summary>
     internal Regex ScaleWord { get; }
+    /// <summary>Fraction word after a number (e.g. half)</summary>
     internal Regex FractionWord { get; }
+    /// <summary>Validity words before a year (e.g. from, ab): the year is a validity year</summary>
     internal Regex ValidityBefore { get; }
+    /// <summary>Validity words after a year (e.g. onwards)</summary>
     internal Regex ValidityAfter { get; }
+    /// <summary>Words before a year that mark a value as unchanged since that year</summary>
     internal Regex UnchangedBefore { get; }
+    /// <summary>Document number with slash before a year (e.g. No. 153/2023): no validity year</summary>
     internal Regex SlashNumberBefore { get; }
+    /// <summary>Number-of phrase before a year (e.g. Act No. 12 of 2024): no validity year</summary>
     internal Regex NumberOfBefore { get; }
+    /// <summary>Title words before a year (act, regulation): the year is part of a title</summary>
     internal Regex TitleBefore { get; }
+    /// <summary>Gazette words before a year (e.g. BGBl.): the year is a publication year</summary>
     internal Regex GazetteBefore { get; }
+    /// <summary>Enactment words before a date (e.g. dated, vom): the year is an enactment year</summary>
     internal Regex EnactmentDateBefore { get; }
+    /// <summary>Enumeration of years (e.g. 2025 and 2026)</summary>
     internal Regex YearEnumeration { get; }
+    /// <summary>Range of years (e.g. 2025-2026, 2025/26)</summary>
     internal Regex YearRange { get; }
 }

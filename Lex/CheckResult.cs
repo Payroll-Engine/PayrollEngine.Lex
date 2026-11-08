@@ -12,6 +12,7 @@ public sealed class CheckResult
 
     /// <summary>Name of the data regulation satellite folder</summary>
     public string Satellite { get; init; }
+    /// <summary>Name of the regulation of the satellite</summary>
     internal string Regulation { get; set; }
 
     // manifest
@@ -22,6 +23,7 @@ public sealed class CheckResult
     public bool HasSnapshot { get; internal set; }
 
     // coverage
+    /// <summary>Number of regulation lookups</summary>
     internal int RegulationLookups { get; set; }
 
     /// <summary>Number of regulation lookup values</summary>
@@ -29,7 +31,9 @@ public sealed class CheckResult
 
     /// <summary>Number of lex entries</summary>
     public int LexEntries { get; internal set; }
+    /// <summary>Regulation values covered by a lex entry of their own</summary>
     internal int CoveredDirect { get; set; }
+    /// <summary>Regulation values covered by a lex entry of the whole lookup</summary>
     internal int CoveredByLookup { get; set; }
 
     /// <summary>Regulation values without lex entry</summary>
@@ -48,6 +52,7 @@ public sealed class CheckResult
     public List<string> OrphanSamples { get; } = [];
 
     // value comparison
+    /// <summary>Regulation values compared with the lex content</summary>
     internal int Compared { get; set; }
 
     /// <summary>Value differences between lex and regulation</summary>
@@ -64,16 +69,21 @@ public sealed class CheckResult
     public int MissingSourceLocation { get; internal set; }
 
     // source URLs (only with CheckUrls)
+    /// <summary>The source URLs were checked (CheckUrls)</summary>
     internal bool UrlsChecked { get; set; }
 
     /// <summary>Source URLs that do not exist</summary>
     public List<string> DeadUrls { get; } = [];
+    /// <summary>Source URLs that refuse automated access (no finding)</summary>
     internal int BlockedUrls { get; set; }
 
     /// <summary>Source URLs whose normalized text differs from the snapshot: check the values</summary>
     public List<string> ChangedSources { get; } = [];
+    /// <summary>Source URLs compared with the text hash of the snapshot</summary>
     internal int SourcesCompared { get; set; }
+    /// <summary>Source URLs whose text could not be loaded for the comparison</summary>
     internal int SourcesNotComparable { get; set; }
+    /// <summary>Source URLs without text hash in the snapshot</summary>
     internal int SourcesWithoutBaseline { get; set; }
 
     /// <summary>A missing sourceLocation is a finding only in the mode Required</summary>
@@ -94,9 +104,13 @@ public sealed class CheckResult
     public List<string> SecondaryMainSourceSamples { get; } = [];
 
     // documented exclusions
+    /// <summary>Regulation values without lex entry, documented by a coverage exclusion</summary>
     internal int ExcludedCoverage { get; set; }
+    /// <summary>Lex entries without sourceLocation, documented by a sourceLocation exclusion</summary>
     internal int ExcludedSourceLocation { get; set; }
+    /// <summary>Lex entries without regulation value, documented by an orphan exclusion</summary>
     internal int ExcludedOrphans { get; set; }
+    /// <summary>Lex entries excluded from the automatic verification</summary>
     internal int ExcludedAutoVerification { get; set; }
 
     /// <summary>Entry properties documented as derived (exclusion kind derived)</summary>
@@ -104,6 +118,7 @@ public sealed class CheckResult
 
     /// <summary>Zero entry properties documented as not applicable (exclusion kind notApplicable)</summary>
     public int ExcludedNotApplicable { get; internal set; }
+    /// <summary>Notes on the exclusions for the report</summary>
     internal List<string> ExclusionNotes { get; } = [];
 
     /// <summary>Bundle entries with zero properties without justification (neither notApplicable nor derived);
@@ -219,8 +234,10 @@ public sealed class CheckResult
         (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0 ||
                      NotVerifiable > 0));
 
+    /// <summary>Maximum number of samples per finding in the report</summary>
     internal const int MaxSamples = 8;
 
+    /// <summary>Adds a sample unless <see cref="MaxSamples"/> is reached</summary>
     internal static void AddSample(List<string> samples, string text)
     {
         if (samples.Count < MaxSamples)

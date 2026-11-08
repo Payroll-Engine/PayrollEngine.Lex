@@ -7,11 +7,13 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal static class LexJson
 {
+    /// <summary>Tolerant parsing of JSON content (comments, trailing commas)</summary>
     internal static readonly JsonDocumentOptions DocumentOptions = new()
     {
         CommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
     };
 
+    /// <summary>Reading of snapshot.json</summary>
     internal static readonly JsonSerializerOptions SnapshotOptions = new() { PropertyNameCaseInsensitive = true };
 }

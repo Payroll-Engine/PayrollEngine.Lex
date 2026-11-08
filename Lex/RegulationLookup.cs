@@ -7,8 +7,11 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal sealed class RegulationLookup
 {
+    /// <summary>Lookup name</summary>
     internal string Name { get; init; }
+    /// <summary>Alternative lookup name, null without</summary>
     internal string Alias { get; set; }
+    /// <summary>File of the lookup</summary>
     internal RegulationFile File { get; init; }
 
     /// <summary>Lookup has a values array</summary>
@@ -23,5 +26,6 @@ internal sealed class RegulationLookup
     /// <summary>Offset of the last value object</summary>
     internal int LastValueOffset { get; set; } = -1;
 
+    /// <summary>Values of the lookup</summary>
     internal List<RegulationValue> Values { get; } = [];
 }

@@ -216,6 +216,7 @@ public static class SourceVerifier
         private readonly int derivedNumbers;
         private readonly bool missing;
 
+        /// <summary>Entry with its readable sources, numbers and exclusions</summary>
         internal EntryContext(Entry entry, IReadOnlyList<(string Url, SourceDocument Document)> sources, string content,
             IReadOnlyList<Exclusion> exclusions, string validFrom, LanguageSet languages)
         {
@@ -249,24 +250,33 @@ public static class SourceVerifier
                 .ToList();
         }
 
+        /// <summary>Loaded sources of the entry</summary>
         internal IReadOnlyList<(string Url, SourceDocument Document)> Sources { get; }
+        /// <summary>Languages of the sources</summary>
         internal LanguageSet Languages { get; }
+        /// <summary>Period of the reference year, null without</summary>
         internal RelevantPeriod? Period { get; }
+        /// <summary>Sample of the content numbers to find</summary>
         internal List<decimal> Numbers { get; }
+        /// <summary>How percent values are looked up</summary>
         internal PercentLookup Percent { get; }
+        /// <summary>Source quote, null without</summary>
         internal string Quote { get; }
 
         /// <summary>Sections of the readable sources, null without readable source</summary>
         internal List<SourceSection> Sections { get; }
 
+        /// <summary>The number occurs in a section</summary>
         internal bool InSections(decimal number) => Sections.Any(s => s.Numbers.Contains(number, Percent));
 
+        /// <summary>Result without readable source</summary>
         internal SourceResult Unreadable() => new()
         {
             Key = entry.Key, Urls = urls, Reason = reason, Derived = derived, Zero = zero, NotApplicable = notApplicable,
             Match = missing ? SourceMatch.NoEvidence : SourceMatch.Unreadable
         };
 
+        /// <summary>Result with match, found numbers and location</summary>
         internal SourceResult Result(SourceMatch match, List<decimal> found = null, string location = null, string ambiguity = null)
         {
             var tooLong = location is { Length: > TraceabilityCheck.MaxLocationLength };

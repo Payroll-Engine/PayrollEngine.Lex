@@ -20,21 +20,26 @@ public static class Rollover
     private const string LexFolder = ".lex";
     private const string LexFileName = "lex.json";
     private const string SnapshotFileName = "snapshot.json";
+    /// <summary>Maximum length of a reported year mention line</summary>
     private const int MaxMentionLength = 160;
 
+    /// <summary>Build output and IDE folders are not copied</summary>
     private static readonly HashSet<string> ExcludedDirectories = new(StringComparer.OrdinalIgnoreCase)
     {
         "bin", "obj", "nupkgs", ".vs"
     };
 
+    /// <summary>Text files whose content is updated (year tag, version, file references); other files are copied</summary>
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".json", ".pecmd", ".props", ".targets", ".csproj", ".config", ".md", ".txt", ".cmd", ".sh",
         ".xml", ".yml", ".yaml", ".cs"
     };
 
+    /// <summary>UTF-8 that fails on invalid bytes: such a file is copied unchanged instead of corrupted</summary>
     private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
+    /// <summary>Tolerant reading of handwritten lex.json files</summary>
     private static readonly JsonSerializerOptions ReadOptions = new()
     {
         PropertyNameCaseInsensitive = true,
@@ -42,6 +47,7 @@ public static class Rollover
         AllowTrailingCommas = true
     };
 
+    /// <summary>Readable string escaping for the new validFrom tokens</summary>
     private static readonly JsonSerializerOptions WriteOptions = new()
     {
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping
@@ -91,6 +97,7 @@ public static class Rollover
             return result;
         }
         var previous = DateTime.ParseExact(manifest.ValidFrom, "yyyy-MM-dd", CultureInfo.InvariantCulture);
+        // a rollover always moves to a later year: the year tag of the names must change
         if (cycleStart.Year <= previous.Year)
         {
             result.Error = $"The cycle start {result.ValidFrom} does not follow the year of validFrom {manifest.ValidFrom}";
@@ -100,6 +107,7 @@ public static class Rollover
         var newTag = cycleStart.Year.ToString(CultureInfo.InvariantCulture);
 
         var sourceName = Path.GetFileName(source);
+        // the folder name carries the year tag; a mid-year edition (2026b) becomes the plain next year (2027)
         var edition = EditionSuffix(sourceName, oldTag);
         if (edition == null)
         {
@@ -110,6 +118,7 @@ public static class Rollover
         var targetName = RenameName(sourceName);
         var target = Path.Combine(Path.GetDirectoryName(source)!, targetName);
         result.TargetDirectory = target;
+        // never overwrite an existing satellite
         if (Directory.Exists(target) || File.Exists(target))
         {
             result.Error = $"The target {target} exists";
@@ -124,6 +133,7 @@ public static class Rollover
         }
 
         // file plan
+        // renamed names are collected to update references in the copied text files
         var names = new Dictionary<string, string>(StringComparer.Ordinal) { [sourceName] = targetName };
         result.Renamed.Add($"{sourceName} -> {targetName}");
         var plan = new List<(string Source, string Relative)>();
@@ -137,6 +147,7 @@ public static class Rollover
                 continue;
             }
             var inLex = parts.Length > 1 && string.Equals(parts[0], LexFolder, StringComparison.OrdinalIgnoreCase);
+            // the snapshot belongs to the old values: the new cycle starts without snapshot
             if (inLex && parts.Length == 2 && string.Equals(parts[1], SnapshotFileName, StringComparison.OrdinalIgnoreCase))
             {
                 continue;
@@ -144,6 +155,7 @@ public static class Rollover
             for (var i = 0; i < parts.Length; i++)
             {
                 var isFile = i == parts.Length - 1;
+                // evidence documents keep their names, only content files of entries are renamed
                 if (inLex && (!isFile || !contentFiles.Contains(file)))
                 {
                     continue;
@@ -172,6 +184,7 @@ public static class Rollover
             result.Error = "Regulation JSON could not be read: " + exception.Message;
             return result;
         }
+        // the validFrom tokens are replaced in place, the files keep their formatting
         var validFromTokens = regulation.ValidFromTokens
             .GroupBy(x => x.File.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(x => x.Key, x => x.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -182,8 +195,10 @@ public static class Rollover
 
         var references = names
             .Where(x => !string.Equals(x.Key, x.Value, StringComparison.Ordinal))
+            // longest names first: Data.Tax.2026.Rates is replaced before Data.Tax.2026
             .OrderByDescending(x => x.Key.Length)
             .ToList();
+        // remaining mentions of the old year are reported for a manual review (e.g. descriptions, legal references)
         var mention = new Regex($"(?<![0-9]){oldTag}(?![0-9])", RegexOptions.CultureInvariant);
 
         // file contents
@@ -194,6 +209,7 @@ public static class Rollover
             var isLex = string.Equals(file, lexPath, StringComparison.OrdinalIgnoreCase);
             if (isLex)
             {
+                // lex.json: new validFrom, renamed content files and keys, all entries marked open (verify again)
                 var editor = ManifestEditor.Parse(File.ReadAllText(file));
                 editor.SetValidFrom(result.ValidFrom);
                 var keys = editor.RollContentFiles(x => RenamePath(x, RenameName), oldTag, newTag);
@@ -206,6 +222,7 @@ public static class Rollover
                 continue;
             }
             var inLex = relative.StartsWith(LexFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            // evidence and binary files are copied unchanged
             if (inLex || !TextExtensions.Contains(Path.GetExtension(file)))
             {
                 output.Add((relative, file, null));
@@ -213,6 +230,7 @@ public static class Rollover
             }
 
             var bytes = File.ReadAllBytes(file);
+            // the byte order mark is kept: token offsets are counted without it
             var bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
             var content = bom ? bytes[3..] : bytes;
             var changes = new List<string>();
@@ -234,6 +252,7 @@ public static class Rollover
                 output.Add((relative, file, null));
                 continue;
             }
+            // package version: 2026.1-beta.dev becomes 2027.1-beta.dev
             var edited = SetVersion(Path.GetFileName(file), text, oldTag, newTag);
             if (!string.Equals(edited, text, StringComparison.Ordinal))
             {
@@ -255,6 +274,7 @@ public static class Rollover
             output.Add((relative, null, bom ? [0xEF, 0xBB, 0xBF, .. encoded] : encoded));
         }
 
+        // what the user has to do after the rollover
         result.Notes.Add($"Not part of the rollover: solution and test projects, references outside {targetName}, removing {sourceName}");
         result.Notes.Add("Next steps: enter and verify the values of the open entries, LexSnapshot, LexApply, LexCheck");
         if (dryRun)
@@ -264,6 +284,7 @@ public static class Rollover
 
         try
         {
+            // write only after the whole plan succeeded; a failure removes the partial folder
             foreach (var (relative, file, content) in output)
             {
                 var path = Path.Combine(target, relative);
@@ -304,6 +325,9 @@ public static class Rollover
         Regex.Replace(name, $@"(?<=(^|\.)){oldTag}{(edition.Length > 0 ? $"(?:{Regex.Escape(edition)})?" : string.Empty)}(?=(\.|$))",
             newTag, RegexOptions.CultureInvariant);
 
+    /// <summary>
+    /// Renames every segment of a relative path (forward slashes, as written in lex.json)
+    /// </summary>
     private static string RenamePath(string path, Func<string, string> renameName) =>
         string.Join('/', path.Replace('\\', '/').Split('/').Select(renameName));
 
@@ -318,12 +342,14 @@ public static class Rollover
         var position = 0;
         foreach (var token in tokens.OrderBy(x => x.Offset))
         {
+            // a validFrom that is no date (e.g. a placeholder) is reported, not replaced
             if (token.Value == null || token.Value.Length < 10 || !EntryRules.IsDate(token.Value[..10]))
             {
                 notes.Add($"{relative}: validFrom '{token.Value}' is no date, not changed");
                 continue;
             }
             output.AddRange(content[position..token.Offset]);
+            // the date part is replaced, a time part (T00:00:00Z) is kept
             output.AddRange(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(validFrom + token.Value[10..], WriteOptions)));
             position = token.Offset + token.Length;
             count++;
@@ -332,6 +358,9 @@ public static class Rollover
         return output.ToArray();
     }
 
+    /// <summary>
+    /// Year-based package version in Directory.Build.props and regulation-package.json; other files unchanged
+    /// </summary>
     private static string SetVersion(string fileName, string text, string oldTag, string newTag)
     {
         if (string.Equals(fileName, "Directory.Build.props", StringComparison.OrdinalIgnoreCase))
@@ -347,6 +376,9 @@ public static class Rollover
         return text;
     }
 
+    /// <summary>
+    /// Lines of a file that still mention the old year
+    /// </summary>
     private static void AddMentions(RolloverResult result, string relative, string text, Regex mention)
     {
         var lines = text.Split('\n');
@@ -366,6 +398,9 @@ public static class Rollover
         }
     }
 
+    /// <summary>
+    /// Removes a partially written satellite folder
+    /// </summary>
     private static void TryDelete(string directory)
     {
         try

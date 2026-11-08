@@ -8,10 +8,15 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal sealed class RegulationData
 {
+    /// <summary>Name of the regulation</summary>
     internal string Name { get; set; }
+    /// <summary>validFrom of the regulation</summary>
     internal string ValidFrom { get; set; }
+    /// <summary>Number of lookups</summary>
     internal int LookupCount { get; set; }
+    /// <summary>Values of all lookups</summary>
     internal List<RegulationValue> Values { get; } = [];
+    /// <summary>All lookups</summary>
     internal List<RegulationLookup> Lookups { get; } = [];
 
     /// <summary>Lookup names including the names without satellite namespace</summary>

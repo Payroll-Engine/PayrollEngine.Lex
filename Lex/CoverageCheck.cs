@@ -10,10 +10,14 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal static class CoverageCheck
 {
+    /// <summary>
+    /// Maps the entries to the regulation values and counts covered, excluded and uncovered values and orphan entries
+    /// </summary>
     internal static void CheckCoverage(Manifest manifest, string lexDirectory, CheckResult result, RegulationData regulation)
     {
         var coverageExclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindCoverage).ToList();
         var orphanExclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindOrphan).ToList();
+        // exclusions that match nothing are reported: they would hide future gaps
         var usedExclusions = new HashSet<Exclusion>();
 
         var coveredLookups = MapEntries(manifest, lexDirectory, result, regulation, orphanExclusions, usedExclusions);
@@ -38,6 +42,7 @@ internal static class CoverageCheck
         RegulationData regulation, List<Exclusion> orphanExclusions, HashSet<Exclusion> usedExclusions)
     {
         var index = new RegulationIndex(regulation);
+        // the edition tag (e.g. 2026) maps year-tagged entry keys to the regulation keys
         var editionTag = EntryMapping.EditionTag(manifest);
         var coveredLookups = new HashSet<string>(StringComparer.Ordinal);
         foreach (var entry in manifest.Values)
@@ -47,6 +52,7 @@ internal static class CoverageCheck
                 continue;
             }
             var target = EntryMapping.Resolve(entry, index, editionTag);
+            // a key can address several values (same key in several files): all are covered
             if (target.Kind == EntryTargetKind.Values)
             {
                 var content = ValueComparer.CompareContent(entry, lexDirectory);
@@ -81,6 +87,9 @@ internal static class CoverageCheck
         return coveredLookups;
     }
 
+    /// <summary>
+    /// An entry without regulation value is an orphan, unless excluded
+    /// </summary>
     private static void CountOrphan(string entryKey, CheckResult result, List<Exclusion> orphanExclusions,
         HashSet<Exclusion> usedExclusions)
     {
@@ -114,6 +123,7 @@ internal static class CoverageCheck
                 result.CoveredByLookup++;
                 continue;
             }
+            // a coverage exclusion may address the lookup name or its alias
             var fullKey = value.Lookup + "." + value.Key;
             var exclusion = coverageExclusions.FirstOrDefault(x =>
                 x.Matches(fullKey) || (value.LookupAlias != null && x.Matches(value.LookupAlias + "." + value.Key)));
@@ -137,6 +147,7 @@ internal static class CoverageCheck
         var keys = DerivedProperties.Keys(manifest);
         foreach (var exclusion in manifest.Exclusions.Where(x => DerivedProperties.IsPropertyKind(x.Kind)))
         {
+            // the pattern is split into the entry key and the property path
             var (key, path) = DerivedProperties.Resolve(exclusion.Pattern, keys);
             if (key == null)
             {
@@ -175,6 +186,7 @@ internal static class CoverageCheck
     /// </summary>
     internal static void CheckReferenceYears(Manifest manifest, CheckResult result)
     {
+        // without valid validFrom every reference year is reported
         var validYear = manifest.ValidFrom is { Length: >= 4 } &&
                         int.TryParse(manifest.ValidFrom.AsSpan(0, 4), NumberStyles.None, CultureInfo.InvariantCulture, out var year)
             ? year
@@ -204,6 +216,7 @@ internal static class CoverageCheck
             {
                 continue;
             }
+            // zero properties addressed by a derived or notApplicable exclusion are justified
             var justified = DerivedProperties.Of(entry.Key, manifest.Exclusions, keys)
                 .Select(x => DerivedProperties.Resolve(x.Pattern, keys).Path);
             var unjustified = DerivedProperties.Unjustified(zeros, justified);

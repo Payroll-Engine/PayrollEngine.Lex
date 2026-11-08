@@ -20,24 +20,32 @@ public static class CheckReport
     // ReSharper disable once UnusedMember.Global
     public static void Write(IReadOnlyList<CheckResult> results, string reportPath)
     {
+        // the report folder is created on demand
         var directory = Path.GetDirectoryName(Path.GetFullPath(reportPath));
         if (!string.IsNullOrEmpty(directory))
         {
             Directory.CreateDirectory(directory);
         }
+        // UTF-8 without byte order mark: the files are committed and compared in git
         File.WriteAllText(reportPath, BuildMarkdown(results), new UTF8Encoding(false));
         File.WriteAllText(Path.ChangeExtension(reportPath, ".csv"), BuildCsv(results), new UTF8Encoding(false));
     }
 
+    /// <summary>
+    /// CSV with one row per manifest; the column order is stable, new columns are appended at the end
+    /// </summary>
+    /// <param name="results">Check results</param>
     internal static string BuildCsv(IReadOnlyList<CheckResult> results)
     {
         var csv = new StringBuilder();
+        // semicolon separator: opens in Excel with European locale settings
         csv.AppendLine("Satellite;LexPath;Snapshot;RegulationLookups;RegulationValues;LexEntries;CoveredDirect;CoveredByLookup;" +
                        "Uncovered;Orphans;UnresolvedSplit;Compared;Drift;MissingSourceUrls;MissingSourceLocation;" +
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                        "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
                        "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence;NotVerifiable");
+        // one row per satellite, values in the order of the header
         foreach (var r in results)
         {
             csv.AppendLine(string.Join(';',
@@ -52,15 +60,21 @@ public static class CheckReport
         return csv.ToString();
     }
 
+    /// <summary>
+    /// Markdown report: summary over all manifests, findings per manifest, verification table and documented exclusions
+    /// </summary>
+    /// <param name="results">Check results</param>
     internal static string BuildMarkdown(IReadOnlyList<CheckResult> results)
     {
         var text = new StringBuilder();
         text.AppendLine("# Lex check report");
         text.AppendLine();
+        // the release gate adds measures that are no findings during development
         var release = results.Any(r => r.Release);
         text.AppendLine($"Created {DateTime.Now.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture)} by `pecmd LexCheck`" +
                         (release ? " (release gate)." : "."));
         text.AppendLine();
+        // summary: totals over all manifests (long: sums over many satellites)
         text.AppendLine("## Summary");
         text.AppendLine();
         text.AppendLine("| Measure | Value |");
@@ -94,6 +108,7 @@ public static class CheckReport
             text.AppendLine($"| Entries excluded from auto verification with an auto record | {results.Sum(r => (long)r.ExcludedAutoVerified)} |");
             text.AppendLine($"| Entries verifiable neither locally nor live | {results.Sum(r => (long)r.NotVerifiable)} |");
         }
+        // URL measures only when the run checked the sources online (/checkurls)
         if (results.Any(r => r.UrlsChecked))
         {
             text.AppendLine($"| Source URLs not found | {results.Sum(r => (long)r.DeadUrls.Count)} |");
@@ -103,6 +118,7 @@ public static class CheckReport
             text.AppendLine($"| Sources not comparable (blocked or unreadable) | {results.Sum(r => (long)r.SourcesNotComparable)} |");
             text.AppendLine($"| Sources without text hash in the snapshot | {results.Sum(r => (long)r.SourcesWithoutBaseline)} |");
         }
+        // documented exclusions are no findings, they are listed for transparency
         text.AppendLine($"| Excluded (documented): without lex entry | {results.Sum(r => (long)r.ExcludedCoverage)} |");
         text.AppendLine($"| Excluded (documented): without sourceLocation | {results.Sum(r => (long)r.ExcludedSourceLocation)} |");
         text.AppendLine($"| Excluded (documented): derived properties | {results.Sum(r => (long)r.ExcludedDerived)} |");
@@ -112,6 +128,7 @@ public static class CheckReport
                         "Check each candidate against the source. Freshness of the snapshot is checked by `LexVerify`.");
 
         text.AppendLine();
+        // findings: one section per manifest with findings, samples limited to CheckResult.MaxSamples
         text.AppendLine("## Findings");
         foreach (var r in results.Where(x => x.HasFindings))
         {
@@ -134,6 +151,7 @@ public static class CheckReport
             }
             text.AppendLine($"- Values: regulation {r.RegulationValues}, lex entries {r.LexEntries}; " +
                             $"covered {r.CoveredDirect}, at lookup level {r.CoveredByLookup}, without entry {r.Uncovered}; orphans {r.Orphans}");
+            // coverage details: regulation values without entry and entries without regulation value
             if (r.Uncovered > 0)
             {
                 text.AppendLine($"  - without entry: {Join(r.UncoveredSamples, r.Uncovered)}");
@@ -154,10 +172,12 @@ public static class CheckReport
             {
                 text.AppendLine($"- Source changed, check value: {url}");
             }
+            // sourceLocation counts only when the run requires locations (/locationrequired)
             if (r.MissingSourceUrls + (r.RequireLocation ? r.MissingSourceLocation : 0) + r.MissingLegalReference > 0)
             {
                 text.AppendLine($"- Missing fields: sourceUrls {r.MissingSourceUrls}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");
             }
+            // verification state: without record (only when required), open and missing second review
             if (r.RequireVerification && r.Unverified > 0)
             {
                 text.AppendLine($"- Without verification ({r.Unverified}): {Join(r.UnverifiedSamples, r.Unverified)}");
@@ -174,6 +194,7 @@ public static class CheckReport
             {
                 text.AppendLine($"- Location not entry-specific ({r.UnspecificLocations}): {Join(r.UnspecificLocationSamples, r.UnspecificLocations)}");
             }
+            // release-only findings
             if (r.Release && r.SecondaryMainSource > 0)
             {
                 text.AppendLine($"- Secondary main source ({r.SecondaryMainSource}): {Join(r.SecondaryMainSourceSamples, r.SecondaryMainSource)}");
@@ -198,6 +219,7 @@ public static class CheckReport
             {
                 text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
             }
+            // manifest and regulation must start on the same date
             if (!r.ValidFromMatch)
             {
                 text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
@@ -208,10 +230,12 @@ public static class CheckReport
             }
         }
         text.AppendLine();
+        // verification table: one row per manifest, also for manifests without findings
         text.AppendLine("## Verification");
         text.AppendLine();
         text.AppendLine("| Satellite | Entries | Auto | Manual | Without | Open | Without second review |");
         text.AppendLine("|:---|---:|---:|---:|---:|---:|---:|");
+        // satellite names repeat across countries (Data.Tax.2026): such rows get the repository folder as prefix
         var duplicates = results.GroupBy(r => r.Satellite, StringComparer.OrdinalIgnoreCase)
             .Where(g => g.Count() > 1)
             .Select(g => g.Key)
@@ -221,6 +245,7 @@ public static class CheckReport
             text.AppendLine($"| {SatelliteLabel(r, duplicates)} | {r.LexEntries} | {r.VerifiedAuto} | {r.VerifiedManual} | {r.Unverified} | {r.Open} | {r.MissingReview} |");
         }
 
+        // documented exclusions with their reasons, per manifest
         var excluded = results.Where(r => r.ExclusionNotes.Count > 0).ToList();
         if (excluded.Count > 0)
         {
@@ -251,11 +276,15 @@ public static class CheckReport
         {
             return result.Satellite;
         }
+        // lex.json lives in <satellite>/.lex: two levels up is the satellite folder, its parent the repository folder
         var satelliteDirectory = Path.GetDirectoryName(Path.GetDirectoryName(result.LexPath));
         var parent = Path.GetFileName(Path.GetDirectoryName(satelliteDirectory));
         return string.IsNullOrEmpty(parent) ? result.Satellite : $"{parent}/{result.Satellite}";
     }
 
+    /// <summary>
+    /// Samples as code spans; "..." marks that the total exceeds the samples
+    /// </summary>
     private static string Join(IReadOnlyCollection<string> samples, int total) =>
         string.Join("; ", samples.Select(s => $"`{s}`")) + (total > samples.Count ? ", ..." : string.Empty);
 }

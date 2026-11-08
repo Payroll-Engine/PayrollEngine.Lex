@@ -5,7 +5,9 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal sealed class RegulationToken
 {
+    /// <summary>File of the token</summary>
     internal RegulationFile File { get; init; }
+    /// <summary>Token value</summary>
     internal string Value { get; init; }
 
     /// <summary>Offset of the opening quote</summary>

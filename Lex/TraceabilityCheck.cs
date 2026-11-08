@@ -9,14 +9,21 @@ namespace PayrollEngine.Lex;
 /// </summary>
 internal static class TraceabilityCheck
 {
+    /// <summary>Minimum number of entries sharing a location to treat it as not entry-specific</summary>
     private const int SharedLocationEntries = 5;
+    /// <summary>Minimum length of a shared location; short shared locations (e.g. a table name) are fine</summary>
     private const int SharedLocationLength = 200;
+    /// <summary>A longer source location is a pasted text, not a location</summary>
     internal const int MaxLocationLength = 500;
 
+    /// <summary>
+    /// Counts entries without source URL, legal reference or specific source location
+    /// </summary>
     internal static void CheckTraceability(Manifest manifest, CheckResult result)
     {
         var exclusions = manifest.Exclusions.Where(x => x.Kind == Exclusion.KindSourceLocation).ToList();
         var used = new HashSet<Exclusion>();
+        // URLs declared as secondary sources (e.g. commentaries) must not be the main source
         var secondary = manifest.Sources
             .Where(x => !x.IsOfficial && !string.IsNullOrWhiteSpace(x.Url))
             .Select(x => x.Url)
@@ -31,6 +38,7 @@ internal static class TraceabilityCheck
                 result.MissingLegalReference++;
             }
         }
+        // unused exclusions are errors: they hide future gaps
         foreach (var exclusion in exclusions.Where(x => !used.Contains(x)))
         {
             result.ValidationErrors.Add($"Exclusion (sourceLocation) '{exclusion.Pattern}' matches no entry without sourceLocation: remove it");
@@ -72,6 +80,7 @@ internal static class TraceabilityCheck
     private static void CheckLocation(Entry value, CheckResult result, HashSet<string> shared, List<Exclusion> exclusions,
         HashSet<Exclusion> used)
     {
+        // a too long or shared location counts as unspecific, but not as missing
         var location = value.SourceLocation?.Trim();
         if (location != null && (location.Length > MaxLocationLength || shared.Contains(location)))
         {
@@ -94,8 +103,12 @@ internal static class TraceabilityCheck
         }
     }
 
+    /// <summary>
+    /// Counts the verification records of the entries: open, auto, manual and unverified
+    /// </summary>
     internal static void CheckVerification(Manifest manifest, CheckResult result)
     {
+        // manual verifications of entries from these sources need a review
         var fourEyesUrls = manifest.Sources
             .Where(x => x.IsFourEyes && !string.IsNullOrWhiteSpace(x.Url))
             .Select(x => x.Url)
@@ -110,6 +123,7 @@ internal static class TraceabilityCheck
                 usedExclusions.Add(autoExclusion);
                 result.ExcludedAutoVerification++;
             }
+            // an open entry waits for a new verification, its old record is not counted
             if (value.Open)
             {
                 result.Open++;
@@ -157,6 +171,9 @@ internal static class TraceabilityCheck
         }
     }
 
+    /// <summary>
+    /// Compares the date part of validFrom in lex.json and in the regulation
+    /// </summary>
     internal static void CheckValidFrom(CheckResult result)
     {
         if (result.LexValidFrom == null || result.RegulationValidFrom == null)
@@ -167,5 +184,8 @@ internal static class TraceabilityCheck
             Left10(result.LexValidFrom), Left10(result.RegulationValidFrom), StringComparison.Ordinal);
     }
 
+    /// <summary>
+    /// Date part (yyyy-MM-dd) of a date or date-time
+    /// </summary>
     private static string Left10(string value) => value.Length >= 10 ? value[..10] : value;
 }
