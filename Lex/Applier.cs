@@ -145,7 +145,7 @@ public static class Applier
             var bytes = Splice(file, group.OrderBy(x => x.Offset).ToList());
             try
             {
-                using var document = JsonDocument.Parse(bytes, Checker.JsonOptions);
+                using var document = JsonDocument.Parse(bytes, LexJson.DocumentOptions);
             }
             catch (JsonException exception)
             {
@@ -182,7 +182,7 @@ public static class Applier
             offset = value.TokenOffset;
             length = value.TokenLength;
             element = value.Token!.Value;
-            difference = Checker.Difference(value.Object, value.Scalar, content);
+            difference = ValueComparer.Difference(value.Object, value.Scalar, content);
         }
         else
         {
@@ -199,8 +199,8 @@ public static class Applier
             }
             (offset, length, element) = located.Value;
             difference = element.ValueKind is JsonValueKind.Object or JsonValueKind.Array
-                ? Checker.Difference(element, null, content)
-                : Checker.Difference(null, element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString(), content);
+                ? ValueComparer.Difference(element, null, content)
+                : ValueComparer.Difference(null, element.ValueKind == JsonValueKind.String ? element.GetString() : element.ToString(), content);
         }
 
         if (difference == null)
@@ -341,7 +341,7 @@ public static class Applier
                 {
                     return content.Trim();
                 }
-                reason = $"lex content '{Checker.Shorten(content)}' is not a number";
+                reason = $"lex content '{ValueComparer.Shorten(content)}' is not a number";
                 return null;
             case JsonValueKind.True:
             case JsonValueKind.False:
@@ -349,7 +349,7 @@ public static class Applier
                 {
                     return content.Trim();
                 }
-                reason = $"lex content '{Checker.Shorten(content)}' is not a boolean";
+                reason = $"lex content '{ValueComparer.Shorten(content)}' is not a boolean";
                 return null;
             default:
                 return JsonString(content);

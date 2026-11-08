@@ -151,67 +151,6 @@
             <param name="manifest">Manifest (lex.json)</param>
             <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
         </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckPropertyExclusions(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
-            a notApplicable property must have the value 0
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            Entries whose reference year differs from the validFrom year: listed as information for the review
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
-            by mistake would otherwise never be looked up in the source
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
-            <summary>
-            Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
-            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
-            without declaration in files[] is unused too (not frozen in the snapshot).
-            An unused file is never read by LexVerifySource: its entries count as without local evidence.
-            </summary>
-            <param name="manifest">Manifest</param>
-            <param name="lexDirectory">Folder of lex.json</param>
-            <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            The evidence of a verification record must be frozen in the snapshot
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.GitList(System.String,System.Boolean)">
-            <summary>
-            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CompareContent(PayrollEngine.Lex.Entry,System.String)">
-            <summary>
-            Content to compare: inline content, or the text of a JSON content file (null without comparable content)
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.Difference(System.Nullable{System.Text.Json.JsonElement},System.String,System.String)">
-            <summary>
-            Difference between a regulation value (structured or scalar) and the lex content, null if equal
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.Checker.MaxNamedDifferences">
-            <summary>Number of differences named in the summary of a structured value</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.DifferenceSummary(System.Collections.Generic.List{System.String})">
-            <summary>
-            Single difference as is, several as count with the first ones, null without difference
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.ScalarEquals(System.String,System.String)">
-            <summary>
-            Numbers are compared numerically, text ignoring case
-            </summary>
-        </member>
         <member name="T:PayrollEngine.Lex.CheckReport">
             <summary>
             Writes the LexCheck results as Markdown report and CSV file
@@ -322,7 +261,7 @@
             <summary>Samples of entries with a reference year other than the validFrom year</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.UnusedEvidence">
-            <summary>Evidence files that back no entry (see <see cref="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)"/>); a finding only in the release mode</summary>
+            <summary>Evidence files that back no entry (see <see cref="M:PayrollEngine.Lex.EvidenceCheck.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)"/>); a finding only in the release mode</summary>
         </member>
         <member name="P:PayrollEngine.Lex.CheckResult.UnusedEvidenceSamples">
             <summary>Samples of evidence files that back no entry</summary>
@@ -428,6 +367,40 @@
         <member name="M:PayrollEngine.Lex.ContentHash.ResolvePath(System.String,System.String)">
             <summary>
             Resolve a path relative to a base directory
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.CoverageCheck">
+            <summary>
+            Coverage of the regulation lookup values by lex entries, exclusions, zero values and reference years
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.MapEntries(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,PayrollEngine.Lex.RegulationData,System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
+            <summary>
+            Maps the lex entries to the regulation values: marks covered values, compares their contents and counts
+            the entries without regulation value
+            </summary>
+            <returns>Lookups covered as a whole by an entry with content file</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CountCoverage(System.Collections.Generic.IEnumerable{PayrollEngine.Lex.RegulationValue},PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
+            <summary>
+            Counts the regulation values covered directly, by lookup, by exclusion or not at all
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CheckPropertyExclusions(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
+            a notApplicable property must have the value 0
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Entries whose reference year differs from the validFrom year: listed as information for the review
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
+            by mistake would otherwise never be looked up in the source
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.DerivedProperties">
@@ -742,6 +715,48 @@
         </member>
         <member name="F:PayrollEngine.Lex.EntryTargetKind.NewValue">
             <summary>Lookup exists, the value is missing</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EvidenceCheck">
+            <summary>
+            Evidence files of a lex manifest: declaration, snapshot, git tracking and usage
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckDeclaredFiles(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{System.String})">
+            <summary>
+            Files declared in files[] must exist in the .lex folder
+            </summary>
+            <returns>Declared file names</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckEntryFiles(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.List{System.String})">
+            <summary>
+            A documentRef must be declared and exist, a content file must exist
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckRepositoryState(System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{System.String})">
+            <summary>
+            Repository state of the evidence: untracked or ignored files are not part of the compliance record
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
+            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
+            without declaration in files[] is unused too (not frozen in the snapshot).
+            An unused file is never read by LexVerifySource: its entries count as without local evidence.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            The evidence of a verification record must be frozen in the snapshot
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.GitList(System.String,System.Boolean)">
+            <summary>
+            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.EvidenceFile">
             <summary>
@@ -1195,6 +1210,11 @@
             </summary>
             <param name="before">Text before the year</param>
             <param name="start">Text position of the date in <paramref name="before"/></param>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexJson">
+            <summary>
+            JSON options shared by the lex checks
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
@@ -2372,6 +2392,32 @@
             </summary>
             <param name="stream">The spreadsheet stream (the format is detected from the content)</param>
         </member>
+        <member name="T:PayrollEngine.Lex.TraceabilityCheck">
+            <summary>
+            Traceability fields of lex entries: sources, legal reference, location, verification and validFrom
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.SharedLocations(PayrollEngine.Lex.Manifest)">
+            <summary>
+            Long source locations repeated by several entries (not entry-specific)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CheckSources(PayrollEngine.Lex.Entry,PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            An entry needs a source URL; its main source must not be a secondary source
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CheckLocation(PayrollEngine.Lex.Entry,PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
+            <summary>
+            An entry needs an entry-specific source location, unless excluded
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TraceabilityCheck.CountVerification(PayrollEngine.Lex.Entry,PayrollEngine.Lex.CheckResult,System.Boolean,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            Counts the verification record of an entry: auto (not allowed when excluded), manual (four-eyes review
+            when a source requires it) or without
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.UnitKind">
             <summary>
             Percent lookup mode of a lex entry unit
@@ -2462,6 +2508,45 @@
             <summary>
             Languages of the manifest: language codes without duplicates; the language files are resolved by
             LexVerifySource (see <see cref="T:PayrollEngine.Lex.LanguageSet"/>), the folder of additional language files is given there
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ValueComparer">
+            <summary>
+            Comparison of regulation lookup values with lex entry contents
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.CompareContent(PayrollEngine.Lex.Entry,System.String)">
+            <summary>
+            Content to compare: inline content, or the text of a JSON content file (null without comparable content)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.Resolve(PayrollEngine.Lex.RegulationValue,System.String,System.Nullable{System.Text.Json.JsonElement}@,System.String@,System.String@)">
+            <summary>
+            Resolves the property path of a split key (Lookup.Key.Property) in the regulation value
+            </summary>
+            <returns>False with a problem text when the path does not exist</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.Property(System.Text.Json.JsonElement,System.String)">
+            <summary>
+            Property of a JSON object by name ignoring case, null if missing or not an object
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.Difference(System.Nullable{System.Text.Json.JsonElement},System.String,System.String)">
+            <summary>
+            Difference between a regulation value (structured or scalar) and the lex content, null if equal
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ValueComparer.MaxNamedDifferences">
+            <summary>Number of differences named in the summary of a structured value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.DifferenceSummary(System.Collections.Generic.List{System.String})">
+            <summary>
+            Single difference as is, several as count with the first ones, null without difference
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ValueComparer.ScalarEquals(System.String,System.String)">
+            <summary>
+            Numbers are compared numerically, text ignoring case
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Verification">

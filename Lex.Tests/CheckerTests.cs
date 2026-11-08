@@ -170,7 +170,7 @@ public class CheckerTests
             "[{\"a\":1,\"code\":\"131\"},{\"a\":2,\"code\":\"132\"},{\"a\":3},{\"a\":4,\"bloc\":\"81\"},{\"a\":5}]");
         const string lex = "[{\"a\":1},{\"a\":2},{\"a\":3},{\"a\":4,\"bloc\":\"82\"},{\"a\":6}]";
 
-        var difference = Checker.Difference(regulation.RootElement, null, lex);
+        var difference = ValueComparer.Difference(regulation.RootElement, null, lex);
 
         Assert.StartsWith("4 differences: [0]/code missing in lex; [1]/code missing in lex; [3]/bloc regulation '81' vs lex '82'", difference);
         Assert.EndsWith("(+1 more)", difference);
@@ -181,8 +181,8 @@ public class CheckerTests
     {
         using var regulation = System.Text.Json.JsonDocument.Parse("[{\"a\":1,\"code\":\"131\"}]");
 
-        Assert.Equal("[0]/code missing in lex", Checker.Difference(regulation.RootElement, null, "[{\"a\":1}]"));
-        Assert.Null(Checker.Difference(regulation.RootElement, null, "[{\"a\":1,\"code\":\"131\"}]"));
+        Assert.Equal("[0]/code missing in lex", ValueComparer.Difference(regulation.RootElement, null, "[{\"a\":1}]"));
+        Assert.Null(ValueComparer.Difference(regulation.RootElement, null, "[{\"a\":1,\"code\":\"131\"}]"));
     }
 
     [Fact]
@@ -288,5 +288,5 @@ public class CheckerTests
     [InlineData("7.5", "7.6", false)]
     [InlineData("ABC", "abc", true)]
     public void ScalarEquals_ComparesNumbersAndIgnoresCase(string a, string b, bool expected) =>
-        Assert.Equal(expected, Checker.ScalarEquals(a, b));
+        Assert.Equal(expected, ValueComparer.ScalarEquals(a, b));
 }

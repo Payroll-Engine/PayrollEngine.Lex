@@ -79,7 +79,7 @@ internal static class DerivedProperties
         try
         {
             // ReSharper disable once AssignNullToNotNullAttribute
-            using var document = JsonDocument.Parse(content, Checker.JsonOptions);
+            using var document = JsonDocument.Parse(content, LexJson.DocumentOptions);
             foreach (var exclusion in excluded)
             {
                 var path = Resolve(exclusion.Pattern, [entryKey]).Path;
@@ -112,7 +112,7 @@ internal static class DerivedProperties
         }
         try
         {
-            using var document = JsonDocument.Parse(content, Checker.JsonOptions);
+            using var document = JsonDocument.Parse(content, LexJson.DocumentOptions);
             if (document.RootElement.ValueKind == JsonValueKind.Object)
             {
                 CollectZeros(document.RootElement, string.Empty, zeros);
@@ -187,7 +187,7 @@ internal static class DerivedProperties
         }
         try
         {
-            using var document = JsonDocument.Parse(content, Checker.JsonOptions);
+            using var document = JsonDocument.Parse(content, LexJson.DocumentOptions);
             if (!TryGet(document.RootElement, path, out var element))
             {
                 return false;

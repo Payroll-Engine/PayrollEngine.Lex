@@ -99,7 +99,7 @@ internal static class EntryMapping
         }
         try
         {
-            using var document = JsonDocument.Parse(text, Checker.JsonOptions);
+            using var document = JsonDocument.Parse(text, LexJson.DocumentOptions);
             return true;
         }
         catch (JsonException)

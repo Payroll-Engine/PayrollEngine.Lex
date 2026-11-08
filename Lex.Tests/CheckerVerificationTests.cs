@@ -194,7 +194,7 @@ public class CheckerVerificationTests
         var manifest = Manifest(null,
             Value("Rates.A", "7.5", Auto()), Value("Rates.B", "10", Auto()), Value("Rates.C", "12", Auto()));
 
-        Assert.Equal(["rates.pdf"], Checker.UnusedEvidence(manifest, s.LexDirectory));
+        Assert.Equal(["rates.pdf"], EvidenceCheck.UnusedEvidence(manifest, s.LexDirectory));
     }
 
     [Fact]
@@ -206,9 +206,9 @@ public class CheckerVerificationTests
             Value("Rates.A", "7.5", Auto()));
         var byVerification = Manifest(null, Value("Rates.A", "7.5", Manual()));
 
-        Assert.Empty(Checker.UnusedEvidence(byReference, s.LexDirectory));
-        Assert.Empty(Checker.UnusedEvidence(byUrl, s.LexDirectory));
-        Assert.Empty(Checker.UnusedEvidence(byVerification, s.LexDirectory));
+        Assert.Empty(EvidenceCheck.UnusedEvidence(byReference, s.LexDirectory));
+        Assert.Empty(EvidenceCheck.UnusedEvidence(byUrl, s.LexDirectory));
+        Assert.Empty(EvidenceCheck.UnusedEvidence(byVerification, s.LexDirectory));
     }
 
     [Fact]
@@ -218,7 +218,7 @@ public class CheckerVerificationTests
         File.WriteAllText(Path.Combine(s.LexDirectory, "annex.pdf"), "annex");
         var manifest = Manifest(null, Value("Rates.A", "7.5", Auto(), "rates.pdf"));
 
-        Assert.Equal(["annex.pdf (not in files[])"], Checker.UnusedEvidence(manifest, s.LexDirectory));
+        Assert.Equal(["annex.pdf (not in files[])"], EvidenceCheck.UnusedEvidence(manifest, s.LexDirectory));
     }
 
     [Fact]

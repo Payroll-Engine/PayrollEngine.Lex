@@ -269,7 +269,7 @@ public static class SourceVerifier
 
         internal SourceResult Result(SourceMatch match, List<decimal> found = null, string location = null, string ambiguity = null)
         {
-            var tooLong = location is { Length: > Checker.MaxLocationLength };
+            var tooLong = location is { Length: > TraceabilityCheck.MaxLocationLength };
             return new()
             {
                 Key = entry.Key, Urls = urls, Match = match, NumbersTotal = Numbers.Count, ContentNumbers = allNumbers.Count,

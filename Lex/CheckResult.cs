@@ -119,7 +119,7 @@ public sealed class CheckResult
     /// <summary>Samples of entries with a reference year other than the validFrom year</summary>
     public List<string> OtherReferenceYearSamples { get; } = [];
 
-    /// <summary>Evidence files that back no entry (see <see cref="Checker.UnusedEvidence"/>); a finding only in the release mode</summary>
+    /// <summary>Evidence files that back no entry (see <see cref="EvidenceCheck.UnusedEvidence"/>); a finding only in the release mode</summary>
     public int UnusedEvidence { get; internal set; }
 
     /// <summary>Samples of evidence files that back no entry</summary>
@@ -218,4 +218,14 @@ public sealed class CheckResult
         (RequireLocation && UnspecificLocations > 0) ||
         (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0 ||
                      NotVerifiable > 0));
+
+    internal const int MaxSamples = 8;
+
+    internal static void AddSample(List<string> samples, string text)
+    {
+        if (samples.Count < MaxSamples)
+        {
+            samples.Add(text);
+        }
+    }
 }
