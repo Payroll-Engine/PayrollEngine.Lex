@@ -87,12 +87,12 @@ public class NumberSearchTests
     [InlineData(999999.5, false)]
     [InlineData(0.999999, false)]
     public void IsPlaceholder(double value, bool expected) =>
-        Assert.Equal(expected, SourceVerifier.IsPlaceholder((decimal)value));
+        Assert.Equal(expected, EntryNumbers.IsPlaceholder((decimal)value));
 
     [Fact]
     public void ContentNumbers_SkipsPlaceholders() =>
         Assert.Equal([250000m, 500000m],
-            SourceVerifier.ContentNumbers("[{\"from\":0,\"to\":250000},{\"from\":250000,\"to\":500000},{\"from\":500000,\"to\":\"999999.99\"},{\"to\":9999999999.0}]"));
+            EntryNumbers.ContentNumbers("[{\"from\":0,\"to\":250000},{\"from\":250000,\"to\":500000},{\"from\":500000,\"to\":\"999999.99\"},{\"to\":9999999999.0}]"));
 
     [Fact]
     public void Verify_SlabWithPlaceholder_IsFound() =>

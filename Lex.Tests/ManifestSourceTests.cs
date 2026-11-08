@@ -38,7 +38,7 @@ public class ManifestSourceTests
         WriteEvidence(s);
         await File.WriteAllTextAsync(Path.Combine(s.LexDirectory, "rates.json"), Table);
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(Manifest(TableEntry()), s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(Manifest(TableEntry()), s.LexDirectory));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal(7, result.NumbersTotal);
@@ -54,7 +54,7 @@ public class ManifestSourceTests
         using var s = new TestSatellite();
         WriteEvidence(s);
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(Manifest(TableEntry("absent.json")), s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(Manifest(TableEntry("absent.json")), s.LexDirectory));
 
         Assert.Equal(SourceMatch.NoContent, result.Match);
         Assert.Contains("contentFile missing", result.Reason);
@@ -67,7 +67,7 @@ public class ManifestSourceTests
         WriteEvidence(s);
         await File.WriteAllTextAsync(Path.Combine(s.LexDirectory, "rates.csv"), "Over;Rate\n12500;0.035");
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(Manifest(TableEntry("rates.csv")), s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(Manifest(TableEntry("rates.csv")), s.LexDirectory));
 
         Assert.Equal(SourceMatch.NoContent, result.Match);
         Assert.Contains("not JSON", result.Reason);
@@ -82,7 +82,7 @@ public class ManifestSourceTests
         var manifest = Manifest(TableEntry(),
             new Exclusion { Kind = Exclusion.KindAutoVerification, Pattern = "StateRates", Reason = "verified by payroll expert" });
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(manifest, s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(manifest, s.LexDirectory));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal("verified by payroll expert", result.ExcludedReason);
@@ -95,7 +95,7 @@ public class ManifestSourceTests
         using var s = new TestSatellite();
         var entry = TestSatellite.Value("Rates.A", "8.55");
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(TestSatellite.Manifest(entry), s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(TestSatellite.Manifest(entry), s.LexDirectory));
 
         Assert.Equal(SourceMatch.NoEvidence, result.Match);
         Assert.Null(result.Evidence);

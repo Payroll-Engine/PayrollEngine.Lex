@@ -38,11 +38,11 @@ public class PeriodTests
     public void Period_FromValidFrom(int? referenceYear, string validFrom, int year, bool fiscal,
         int startMonth, int startDay) =>
         Assert.Equal(new RelevantPeriod(year, fiscal, startMonth, startDay),
-            SourceVerifier.Period(referenceYear, validFrom));
+            YearAnalyzer.Period(referenceYear, validFrom));
 
     [Fact]
     public void Period_WithoutYear_IsNull() =>
-        Assert.Null(SourceVerifier.Period(null, null));
+        Assert.Null(YearAnalyzer.Period(null, null));
 
     // recognition --------------------------------------------------------------
 
@@ -67,7 +67,7 @@ public class PeriodTests
     [InlineData("Year of Assessment 2027", 2026, false)]
     public void YearHits_Period(string text, int start, bool plain)
     {
-        var hit = Assert.Single(SourceVerifier.YearHits(text));
+        var hit = Assert.Single(YearAnalyzer.YearHits(text));
 
         Assert.Equal(start, hit.PeriodStart);
         Assert.Equal([start, start + 1], hit.Years);
@@ -80,7 +80,7 @@ public class PeriodTests
     [InlineData("Updated 2011-12-31")]
     [InlineData("Rates FY 25-27")]
     public void YearHits_NoPeriod_IsIgnored(string text) =>
-        Assert.Empty(SourceVerifier.YearHits(text));
+        Assert.Empty(YearAnalyzer.YearHits(text));
 
     [Theory]
     [InlineData("Valid 2024-2026", new[] { 2024, 2025, 2026 })]
@@ -88,7 +88,7 @@ public class PeriodTests
     [InlineData("Tax year 2026", new[] { 2026 })]
     public void YearHits_YearOrGroup_IsNoPeriod(string text, int[] years)
     {
-        var hit = Assert.Single(SourceVerifier.YearHits(text));
+        var hit = Assert.Single(YearAnalyzer.YearHits(text));
 
         Assert.Null(hit.PeriodStart);
         Assert.Equal(years, hit.Years);
@@ -106,7 +106,7 @@ public class PeriodTests
     [InlineData("Desde el 1 de enero de 2026", 1, 1)]
     public void YearHits_Date_HasMonthAndDay(string text, int month, int? day)
     {
-        var hit = Assert.Single(SourceVerifier.YearHits(text));
+        var hit = Assert.Single(YearAnalyzer.YearHits(text));
 
         Assert.Equal([2026], hit.Years);
         Assert.Equal(month, hit.Month);
@@ -117,7 +117,7 @@ public class PeriodTests
     [InlineData("Rates 2026")]
     [InlineData("Tax year 2026")]
     public void YearHits_WithoutDate_HasNoMonth(string text) =>
-        Assert.Null(Assert.Single(SourceVerifier.YearHits(text)).Month);
+        Assert.Null(Assert.Single(YearAnalyzer.YearHits(text)).Month);
 
     [Theory]
     [InlineData("for the assessment year commencing on the 1st day of April, 2027", 2026)]
@@ -127,7 +127,7 @@ public class PeriodTests
     [InlineData("for the income year starting from 1 July 2025", 2025)]
     public void YearHits_TaxYearByStartDate_IsPeriod(string text, int start)
     {
-        var hit = Assert.Single(SourceVerifier.YearHits(text));
+        var hit = Assert.Single(YearAnalyzer.YearHits(text));
 
         Assert.Equal(start, hit.PeriodStart);
         Assert.Equal([start, start + 1], hit.Years);

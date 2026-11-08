@@ -105,7 +105,7 @@ public static class Checker
 
     /// <summary>
     /// Release gate: verify the entries without manual verification against their local evidence
-    /// (<see cref="SourceVerifier.VerifyManifest"/>); an ambiguous entry and an entry whose quote is not found
+    /// (<see cref="ManifestVerifier.VerifyManifest"/>); an ambiguous entry and an entry whose quote is not found
     /// need a manual verification; an entry without readable local evidence whose sources are not readable live
     /// according to the snapshot (live sources with text hash) can be verified neither locally nor live
     /// </summary>
@@ -118,7 +118,7 @@ public static class Checker
             .Select(x => x.Key)
             .ToHashSet(StringComparer.Ordinal);
         var readableLive = UrlChecker.ReadBaseline(result.LexPath);
-        var sources = await SourceVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!);
+        var sources = await ManifestVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!);
         foreach (var source in sources.Where(x => !manual.Contains(x.Key)))
         {
             switch (source.Match)

@@ -102,7 +102,7 @@ public class MultiSourceTests
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Null(result.Location);
-        Assert.Equal(SourceVerifier.LocationTooLongNote, result.Note);
+        Assert.Equal(SourceLocation.LocationTooLongNote, result.Note);
         Assert.True(result.CanWrite);
     }
 
@@ -125,7 +125,7 @@ public class MultiSourceTests
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal("XX-2026-guide.pdf: Section \"Page 1\"; XX-2026-limits.pdf: Section \"Page 1\"", result.Location);
-        Assert.True(SourceVerifier.IsToolLocation(result.Location));
+        Assert.True(SourceLocation.IsToolLocation(result.Location));
     }
 
     [Fact]
@@ -142,7 +142,7 @@ public class MultiSourceTests
 
         Assert.Equal("unemployment-2026.html: Section \"Taxable wages\"; leave.example.org: Section \"Employee share\"",
             result.Location);
-        Assert.True(SourceVerifier.IsToolLocation(result.Location));
+        Assert.True(SourceLocation.IsToolLocation(result.Location));
     }
 
     [Fact]

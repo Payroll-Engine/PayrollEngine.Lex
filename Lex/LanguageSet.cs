@@ -270,7 +270,7 @@ public sealed class LanguageSet
         // Verordnung vom 20.12.2024
         EnactmentDateBefore = new(
             "(?:" + enactment + "|(?-i:" + gazette + @"))(?:[^\n;:]{0,40}?\s(?:" +
-            Words(p => p.DateLinks) + "))?\\s+(?:" + dayMonthDate + "|" + SourceVerifier.NumericDate + ")$",
+            Words(p => p.DateLinks) + "))?\\s+(?:" + dayMonthDate + "|" + YearAnalyzer.NumericDate + ")$",
             RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // year groups --------------------------------------------------------

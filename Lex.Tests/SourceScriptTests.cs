@@ -59,7 +59,7 @@ public class SourceScriptTests
         const string text = "Limit \u0661\u066c\u0662\u0663\u0664 in \u0662\u0660\u0662\u0666";
 
         var hit = Assert.Single(SourceNumbers.Scan(text).Hits(1234m, PercentLookup.None));
-        var year = Assert.Single(SourceVerifier.YearHits(text));
+        var year = Assert.Single(YearAnalyzer.YearHits(text));
 
         Assert.Equal((6, 5), hit);
         Assert.Equal(15, year.Index);
@@ -68,7 +68,7 @@ public class SourceScriptTests
 
     [Fact]
     public void Years_Devanagari() =>
-        Assert.Equal([2026], SourceVerifier.Years("\u0935\u0930\u094d\u0937 \u0968\u0966\u0968\u096c"));
+        Assert.Equal([2026], YearAnalyzer.Years("\u0935\u0930\u094d\u0937 \u0968\u0966\u0968\u096c"));
 
     [Fact]
     public void Quote_OtherScript_IsFound()
@@ -118,12 +118,12 @@ public class SourceScriptTests
     [InlineData("2025 CHF per month")]
     [InlineData("2025 \u20b9 per month")]
     public void Years_AmountWithCurrency_IsNoYear(string text) =>
-        Assert.Empty(SourceVerifier.Years(text));
+        Assert.Empty(YearAnalyzer.Years(text));
 
     [Theory]
     [InlineData("in 2025 the rate")]
     [InlineData("2025 Euros per month")]
     [InlineData("CHFX 2025")]
     public void Years_WithoutCurrency_IsYear(string text) =>
-        Assert.Equal([2025], SourceVerifier.Years(text));
+        Assert.Equal([2025], YearAnalyzer.Years(text));
 }

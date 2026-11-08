@@ -64,10 +64,10 @@ public class LanguageSetTests
     {
         var english = LanguageSet.Get(["en"]);
         var german = LanguageSet.Get(["de"]);
-        Assert.Single(SourceVerifier.YearHits("Werte 2024 und 2025", german));
-        Assert.Equal(2, SourceVerifier.YearHits("Werte 2024 und 2025", english).Count);
-        Assert.True(SourceVerifier.YearHits("gültig ab 1. Januar 2025", german).Single().Validity);
-        Assert.False(SourceVerifier.YearHits("gültig ab 1. Januar 2025", english).Single().Validity);
+        Assert.Single(YearAnalyzer.YearHits("Werte 2024 und 2025", german));
+        Assert.Equal(2, YearAnalyzer.YearHits("Werte 2024 und 2025", english).Count);
+        Assert.True(YearAnalyzer.YearHits("gültig ab 1. Januar 2025", german).Single().Validity);
+        Assert.False(YearAnalyzer.YearHits("gültig ab 1. Januar 2025", english).Single().Validity);
         Assert.Contains(5m, SourceNumbers.Scan("5 Prozent", german).Percents);
         Assert.DoesNotContain(5m, SourceNumbers.Scan("5 Prozent", english).Percents);
     }
@@ -75,8 +75,8 @@ public class LanguageSetTests
     [Fact]
     public void Selection_CitationOfOtherLanguage_IsYear()
     {
-        Assert.Empty(SourceVerifier.Years("BGBl. I 2024 Nr. 12", LanguageSet.Get(["de"])));
-        Assert.Equal([2024], SourceVerifier.Years("BGBl. I 2024 Nr. 12", LanguageSet.Get(["fr"])));
+        Assert.Empty(YearAnalyzer.Years("BGBl. I 2024 Nr. 12", LanguageSet.Get(["de"])));
+        Assert.Equal([2024], YearAnalyzer.Years("BGBl. I 2024 Nr. 12", LanguageSet.Get(["fr"])));
     }
 
     // additional folder -----------------------------------------------------------
@@ -87,8 +87,8 @@ public class LanguageSetTests
         using var folder = new LanguageFolder(("da.json", Danish));
         var danish = folder.Get("da");
         Assert.Equal(["da"], danish.Languages);
-        Assert.Single(SourceVerifier.YearHits("satser 2024 og 2025", danish));
-        Assert.True(SourceVerifier.YearHits("med virkning fra 1. januar 2025", danish).Single().Validity);
+        Assert.Single(YearAnalyzer.YearHits("satser 2024 og 2025", danish));
+        Assert.True(YearAnalyzer.YearHits("med virkning fra 1. januar 2025", danish).Single().Validity);
         Assert.Contains(4.5m, SourceNumbers.Scan("4,5 procent", danish).Percents);
         Assert.Contains("da", folder.Get().Languages);
         Assert.Contains("en", folder.Get().Languages);
@@ -101,8 +101,8 @@ public class LanguageSetTests
     {
         using var folder = new LanguageFolder(("en.json", """{ "language": "en", "percentWords": ["percent"] }"""));
         var english = folder.Get("en");
-        Assert.Equal(2, SourceVerifier.YearHits("rates 2024 and 2025", english).Count);
-        Assert.Single(SourceVerifier.YearHits("rates 2024 and 2025", LanguageSet.Get(["en"])));
+        Assert.Equal(2, YearAnalyzer.YearHits("rates 2024 and 2025", english).Count);
+        Assert.Single(YearAnalyzer.YearHits("rates 2024 and 2025", LanguageSet.Get(["en"])));
     }
 
     [Theory]
@@ -148,22 +148,22 @@ public class LanguageSetTests
     [Fact]
     public async Task VerifyManifest_UsesManifestLanguages()
     {
-        var results = await SourceVerifier.VerifyManifest(Manifest(["de"]), Path.GetTempPath());
+        var results = await ManifestVerifier.VerifyManifest(Manifest(["de"]), Path.GetTempPath());
         Assert.Equal(LanguageSet.Get(["de"]).Label, results.Single().Languages);
-        results = await SourceVerifier.VerifyManifest(Manifest(null), Path.GetTempPath());
+        results = await ManifestVerifier.VerifyManifest(Manifest(null), Path.GetTempPath());
         Assert.Equal(LanguageSet.All.Label, results.Single().Languages);
     }
 
     [Fact]
     public async Task VerifyManifest_UnknownLanguage_Throws() =>
-        await Assert.ThrowsAsync<ArgumentException>(() => SourceVerifier.VerifyManifest(Manifest(["xx"]), Path.GetTempPath()));
+        await Assert.ThrowsAsync<ArgumentException>(() => ManifestVerifier.VerifyManifest(Manifest(["xx"]), Path.GetTempPath()));
 
     [Fact]
     public async Task VerifyManifest_LanguageOfAdditionalFolder()
     {
         using var folder = new LanguageFolder(("da.json", Danish));
-        await Assert.ThrowsAsync<ArgumentException>(() => SourceVerifier.VerifyManifest(Manifest(["da"]), Path.GetTempPath()));
-        var results = await SourceVerifier.VerifyManifest(Manifest(["da"]), Path.GetTempPath(), languageDirectory: folder.Path);
+        await Assert.ThrowsAsync<ArgumentException>(() => ManifestVerifier.VerifyManifest(Manifest(["da"]), Path.GetTempPath()));
+        var results = await ManifestVerifier.VerifyManifest(Manifest(["da"]), Path.GetTempPath(), languageDirectory: folder.Path);
         Assert.Equal(folder.Get("da").Label, results.Single().Languages);
     }
 

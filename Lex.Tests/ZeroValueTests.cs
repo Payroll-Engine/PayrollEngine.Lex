@@ -106,7 +106,7 @@ public class ZeroValueTests
         manifest.Files.Add(new EvidenceFile { FileName = "rates.html", SourceUrls = [Url] });
         manifest.Exclusions.Add(NotApplicable());
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(manifest, s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(manifest, s.LexDirectory));
 
         Assert.Equal("DisabilityRate", Assert.Single(result.NotApplicable).Property);
         Assert.Empty(result.UnjustifiedZero);

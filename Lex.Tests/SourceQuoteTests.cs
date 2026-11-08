@@ -109,5 +109,5 @@ public class SourceQuoteTests
     [InlineData("  wages \n paid\t now ", "wages paid now")]
     [InlineData("Rate - 39%", "Rate - 39%")]
     public void Canonical(string text, string expected) =>
-        Assert.Equal(expected, SourceVerifier.Canonical(text));
+        Assert.Equal(expected, SourceLocation.Canonical(text));
 }

@@ -86,7 +86,7 @@ public class SourceVerifierTests
     [InlineData("days", "None")]
     [InlineData("USD/hour", "None")]
     public void Percent_OfUnit(string unit, string expected) =>
-        Assert.Equal(expected, SourceVerifier.Percent(unit).ToString());
+        Assert.Equal(expected, UnitKind.Percent(unit).ToString());
 
     private const string RateTable = """
         Tipos de cotización
@@ -231,13 +231,13 @@ public class SourceVerifierTests
     {
         var numbers = Enumerable.Range(2, 100).Select(x => (decimal)x).ToList();
 
-        var sample = SourceVerifier.Sample(numbers);
+        var sample = EntryNumbers.Sample(numbers);
 
         Assert.Equal(40, sample.Count);
         Assert.Equal(2m, sample[0]);
         Assert.Equal(101m, sample[^1]);
         Assert.Equal(sample.Count, sample.Distinct().Count());
-        Assert.Equal(sample, SourceVerifier.Sample(numbers));
+        Assert.Equal(sample, EntryNumbers.Sample(numbers));
     }
 
     [Fact]
@@ -369,7 +369,7 @@ public class SourceVerifierTests
     [InlineData("Valid 2024 through 2026", new[] { 2024, 2025, 2026 })]
     [InlineData("Valid 2024\u20132026", new[] { 2024, 2025, 2026 })]
     public void YearHits_GroupEnumerationAndRange(string text, int[] expected) =>
-        Assert.Equal(expected, Assert.Single(SourceVerifier.YearHits(text)).Years);
+        Assert.Equal(expected, Assert.Single(YearAnalyzer.YearHits(text)).Years);
 
     [Fact]
     public void MultiYearTable_WithoutValidFrom_IsFound() =>
@@ -453,7 +453,7 @@ public class SourceVerifierTests
     [InlineData("January 1, 2025 to December 31, 2025", new[] { 2025 })]
     [InlineData("Reported on 2024, 2025, or 2026 forms", new[] { 2024, 2025, 2026 })]
     public void Years_NumberRow(string text, int[] expected) =>
-        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+        Assert.Equal(expected.Order(), YearAnalyzer.Years(text).Order());
 
     // validity ----------------------------------------------------------------
 
@@ -595,7 +595,7 @@ public class SourceVerifierTests
     [InlineData("Limit $2000, 2010 %, 12,025 and 2025.50 in 2025", new[] { 2025 })]
     [InlineData("Valid 1989 to 2101", new int[0])]
     public void Years_IgnoreReferenceYears(string text, int[] expected) =>
-        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+        Assert.Equal(expected.Order(), YearAnalyzer.Years(text).Order());
 
     // citations ----------------------------------------------------------------
 
@@ -630,7 +630,7 @@ public class SourceVerifierTests
     [InlineData("wet van 20 december 2024, rate for 2025", new[] { 2025 })]
     [InlineData("Decreto-Lei de 29 de dezembro de 2024, rate for 2025", new[] { 2025 })]
     public void Years_IgnoreCitations(string text, int[] expected) =>
-        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+        Assert.Equal(expected.Order(), YearAnalyzer.Years(text).Order());
 
     [Theory]
     [InlineData("Valid until 12/31/2024; rate for 2025", new[] { 2024, 2025 })]
@@ -640,7 +640,7 @@ public class SourceVerifierTests
     [InlineData("In Q1 of 2024. Rate 3 of 2025 rates", new[] { 2024, 2025 })]
     [InlineData("Valid 2024-2026", new[] { 2024, 2025, 2026 })]
     public void Years_NoCitation_IsKept(string text, int[] expected) =>
-        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+        Assert.Equal(expected.Order(), YearAnalyzer.Years(text).Order());
 
     [Theory]
     [InlineData("Ceiling 4,800 till 16.09.2024", new[] { 2024 })]
@@ -651,7 +651,7 @@ public class SourceVerifierTests
     [InlineData("Amount 1.234.2024", new int[0])]
     [InlineData("Version 12.31.2024", new int[0])]
     public void Years_NumericDate(string text, int[] expected) =>
-        Assert.Equal(expected.Order(), SourceVerifier.Years(text).Order());
+        Assert.Equal(expected.Order(), YearAnalyzer.Years(text).Order());
 
     [Theory]
     [InlineData("Ceiling 4,800 till 16.09.2025", SourceMatch.Ambiguous)]
@@ -685,5 +685,5 @@ public class SourceVerifierTests
     [InlineData("Table 3", false)]
     [InlineData("", false)]
     public void IsToolLocation(string location, bool expected) =>
-        Assert.Equal(expected, SourceVerifier.IsToolLocation(location));
+        Assert.Equal(expected, SourceLocation.IsToolLocation(location));
 }

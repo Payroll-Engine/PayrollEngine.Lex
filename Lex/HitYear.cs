@@ -5,7 +5,7 @@
 namespace PayrollEngine.Lex;
 
 /// <summary>
-/// Year context of a number hit (see <see cref="SourceVerifier.YearContext"/>)
+/// Year context of a number hit (see <see cref="YearAnalyzer.Classify"/>)
 /// </summary>
 internal enum HitYear
 {

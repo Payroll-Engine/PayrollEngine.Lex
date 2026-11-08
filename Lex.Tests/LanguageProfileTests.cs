@@ -91,7 +91,7 @@ public class LanguageProfileTests
     [InlineData("taxas 2024 ou 2025", new[] { 2024, 2025 })]
     [InlineData("taxas de 2024 até 2026", new[] { 2024, 2025, 2026 })]
     public void YearGroup_Languages(string text, int[] expected) =>
-        Assert.Equal(expected, Assert.Single(SourceVerifier.YearHits(text)).Years);
+        Assert.Equal(expected, Assert.Single(YearAnalyzer.YearHits(text)).Years);
 
     [Theory]
     [InlineData("Betrag für 2025 und 2026: 8.600 Euro", SourceMatch.Found)]
@@ -164,7 +164,7 @@ public class LanguageProfileTests
     [InlineData("besluit van 12 juli 2024")]
     [InlineData("Portaria de 3 de abril de 2024")]
     public void EnactmentDate_IsNoYear(string text) =>
-        Assert.Empty(SourceVerifier.Years(text));
+        Assert.Empty(YearAnalyzer.Years(text));
 
     // collisions -------------------------------------------------------------------
 
@@ -183,7 +183,7 @@ public class LanguageProfileTests
     [InlineData("in 2023 a total, in 2025")]
     [InlineData("2023 of the 2025 rates")]
     public void ShortWord_NotBetweenTwoYears_IsNoGroup(string text) =>
-        Assert.Equal(2, SourceVerifier.YearHits(text).Count);
+        Assert.Equal(2, YearAnalyzer.YearHits(text).Count);
 
     [Fact]
     public void Alternation_LongestFirst() =>

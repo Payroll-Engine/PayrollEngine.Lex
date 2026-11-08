@@ -115,7 +115,7 @@ public class DerivedTests
         manifest.Files.Add(new EvidenceFile { FileName = "fees.html", SourceUrls = [Url] });
         manifest.Exclusions.Add(Derived());
 
-        var result = Assert.Single(await SourceVerifier.VerifyManifest(manifest, s.LexDirectory));
+        var result = Assert.Single(await ManifestVerifier.VerifyManifest(manifest, s.LexDirectory));
 
         Assert.Equal(SourceMatch.Found, result.Match);
         Assert.Equal("Levy", Assert.Single(result.Derived).Property);
