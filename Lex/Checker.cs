@@ -969,7 +969,9 @@ public static class Checker
             try
             {
                 using var lexJson = JsonDocument.Parse(content, JsonOptions);
-                return DeepDifference(structured.Value, lexJson.RootElement, string.Empty);
+                var differences = new List<string>();
+                DeepDifference(structured.Value, lexJson.RootElement, string.Empty, differences);
+                return DifferenceSummary(differences);
             }
             catch (JsonException)
             {
@@ -981,7 +983,28 @@ public static class Checker
             : $"regulation '{Shorten(scalar)}' vs lex '{Shorten(content)}'";
     }
 
-    private static string DeepDifference(JsonElement regulation, JsonElement lex, string path)
+    /// <summary>Number of differences named in the summary of a structured value</summary>
+    private const int MaxNamedDifferences = 3;
+
+    /// <summary>
+    /// Single difference as is, several as count with the first ones, null without difference
+    /// </summary>
+    private static string DifferenceSummary(List<string> differences)
+    {
+        if (differences.Count == 0)
+        {
+            return null;
+        }
+        if (differences.Count == 1)
+        {
+            return differences[0];
+        }
+        var named = string.Join("; ", differences.Take(MaxNamedDifferences));
+        var more = differences.Count > MaxNamedDifferences ? $" (+{differences.Count - MaxNamedDifferences} more)" : string.Empty;
+        return $"{differences.Count} differences: {named}{more}";
+    }
+
+    private static void DeepDifference(JsonElement regulation, JsonElement lex, string path, List<string> differences)
     {
         if (regulation.ValueKind == JsonValueKind.Object && lex.ValueKind == JsonValueKind.Object)
         {
@@ -990,20 +1013,17 @@ public static class Checker
             {
                 if (!lexProperties.TryGetValue(property.Name, out var lexValue))
                 {
-                    return $"{path}/{property.Name} missing in lex";
+                    differences.Add($"{path}/{property.Name} missing in lex");
+                    continue;
                 }
-                var difference = DeepDifference(property.Value, lexValue, path + "/" + property.Name);
-                if (difference != null)
-                {
-                    return difference;
-                }
+                DeepDifference(property.Value, lexValue, path + "/" + property.Name, differences);
             }
             var names = regulation.EnumerateObject().Select(p => p.Name).ToHashSet(StringComparer.OrdinalIgnoreCase);
             foreach (var name in lexProperties.Keys.Where(n => !names.Contains(n)))
             {
-                return $"{path}/{name} only in lex";
+                differences.Add($"{path}/{name} only in lex");
             }
-            return null;
+            return;
         }
         if (regulation.ValueKind == JsonValueKind.Array && lex.ValueKind == JsonValueKind.Array)
         {
@@ -1011,26 +1031,27 @@ public static class Checker
             var right = lex.EnumerateArray().ToList();
             if (left.Count != right.Count)
             {
-                return $"{path} array length {left.Count} vs {right.Count}";
+                differences.Add($"{path} array length {left.Count} vs {right.Count}");
+                return;
             }
             for (var i = 0; i < left.Count; i++)
             {
-                var difference = DeepDifference(left[i], right[i], $"{path}[{i}]");
-                if (difference != null)
-                {
-                    return difference;
-                }
+                DeepDifference(left[i], right[i], $"{path}[{i}]", differences);
             }
-            return null;
+            return;
         }
         if (regulation.ValueKind is JsonValueKind.Object or JsonValueKind.Array ||
             lex.ValueKind is JsonValueKind.Object or JsonValueKind.Array)
         {
-            return $"{path} structure differs";
+            differences.Add($"{path} structure differs");
+            return;
         }
         var a = regulation.ValueKind == JsonValueKind.String ? regulation.GetString() : regulation.ToString();
         var b = lex.ValueKind == JsonValueKind.String ? lex.GetString() : lex.ToString();
-        return ScalarEquals(a, b) ? null : $"{path} regulation '{Shorten(a)}' vs lex '{Shorten(b)}'";
+        if (!ScalarEquals(a, b))
+        {
+            differences.Add($"{path} regulation '{Shorten(a)}' vs lex '{Shorten(b)}'");
+        }
     }
 
     /// <summary>

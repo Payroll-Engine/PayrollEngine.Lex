@@ -379,6 +379,14 @@
             Difference between a regulation value (structured or scalar) and the lex content, null if equal
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.Checker.MaxNamedDifferences">
+            <summary>Number of differences named in the summary of a structured value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.DifferenceSummary(System.Collections.Generic.List{System.String})">
+            <summary>
+            Single difference as is, several as count with the first ones, null without difference
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.Checker.ScalarEquals(System.String,System.String)">
             <summary>
             Numbers are compared numerically, text ignoring case
