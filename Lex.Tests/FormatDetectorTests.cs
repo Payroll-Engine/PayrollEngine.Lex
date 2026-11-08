@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using ClosedXML.Excel;
 using Xunit;
@@ -166,15 +164,5 @@ public class FormatDetectorTests
         var document = await SourceDocument.LoadLive("https://example.org/page", client);
 
         Assert.Equal(SourceState.Unsupported, document.State);
-    }
-
-    private sealed class FileHandler(byte[] bytes, string mediaType) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var content = new ByteArrayContent(bytes);
-            content.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
-        }
     }
 }

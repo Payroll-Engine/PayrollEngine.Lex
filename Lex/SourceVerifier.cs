@@ -13,196 +13,6 @@ using System.Threading.Tasks;
 namespace PayrollEngine.Lex;
 
 /// <summary>
-/// Verification state of one lex entry against its source
-/// </summary>
-public enum SourceMatch
-{
-    /// <summary>All numbers of the entry are found in the source</summary>
-    Found,
-
-    /// <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
-    /// with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-    /// or is found in words only; or a number of the entry has a hit closest to another year and no hit closest
-    /// to the relevant year (reference year of the entry or year of validFrom; e.g. a table over several years).
-    /// Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
-    Ambiguous,
-
-    /// <summary>Some numbers are found, others are not</summary>
-    Partial,
-
-    /// <summary>None of the numbers is found</summary>
-    NotFound,
-
-    /// <summary>The sourceQuote of the entry is not found in any readable source</summary>
-    QuoteNotFound,
-
-    /// <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
-    Unreadable,
-
-    /// <summary>The entry holds no numbers to look for</summary>
-    NoNumbers,
-
-    /// <summary>The content of the entry cannot be read (content file missing or not JSON)</summary>
-    NoContent,
-
-    /// <summary>The entry has no local evidence file for any source (local verification)</summary>
-    NoEvidence
-}
-
-/// <summary>
-/// Year context of a number hit (see <see cref="SourceVerifier.YearContext"/>)
-/// </summary>
-internal enum HitYear
-{
-    /// <summary>No year within the window</summary>
-    Neutral,
-
-    /// <summary>The closest year is the relevant year, or a year group that holds it</summary>
-    Positive,
-
-    /// <summary>The closest year is another year</summary>
-    Weak
-}
-
-/// <summary>
-/// Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
-/// the 1st of January: IN 2026-04-01 is the tax year 2026-27)
-/// </summary>
-/// <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
-/// <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
-/// <param name="StartMonth">Month of the tax year start (validFrom)</param>
-/// <param name="StartDay">Day of the tax year start (validFrom)</param>
-internal readonly record struct RelevantPeriod(int Year, bool Fiscal, int StartMonth = 1, int StartDay = 1)
-{
-    /// <summary>
-    /// Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
-    /// before; null when the date has no day in the start month and the tax year does not start on the 1st
-    /// </summary>
-    internal int? TaxYearOf(int year, int month, int? day)
-    {
-        if (month != StartMonth)
-        {
-            return month > StartMonth ? year : year - 1;
-        }
-        if (StartDay == 1)
-        {
-            return year;
-        }
-        return day == null ? null : day >= StartDay ? year : year - 1;
-    }
-}
-
-/// <summary>
-/// Year, year group (enumeration, range) or tax year period of a text with its position
-/// </summary>
-internal sealed class YearHit(List<int> years, int index, int length, bool validity = false,
-    int? periodStart = null, bool plain = false, int? month = null, int? day = null)
-{
-    /// <summary>Month of a date with the year (<c>January 2026</c>, <c>17.09.2026</c>), null without date</summary>
-    internal int? Month => month;
-
-    /// <summary>Day of a date with the year, null without day</summary>
-    internal int? Day => day;
-
-    /// <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
-    internal List<int> Years => years;
-
-    /// <summary>Text position of the first year</summary>
-    internal int Index => index;
-
-    /// <summary>Text length up to the end of the last year</summary>
-    internal int Length => length;
-
-    /// <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or a value
-    /// unchanged from the year (<c>unchanged from 2024</c>)</summary>
-    internal bool Validity => validity;
-
-    /// <summary>Start year of a tax year period (<c>2025-26</c>, <c>FY 2025-26</c>, <c>AY 2026-27</c>: 2025),
-    /// null for a year or a year group</summary>
-    internal int? PeriodStart => periodStart;
-
-    /// <summary>A period of two full consecutive years without prefix (<c>2025-2026</c>, <c>2025/2026</c>,
-    /// <c>2025 to 2026</c>): a year group for a calendar year</summary>
-    internal bool Plain => plain;
-
-    /// <summary>Group with a further year that ends at the text position</summary>
-    internal YearHit Join(int year, int end) => new([.. years, year], index, end - index, validity);
-
-    /// <summary>The year at the start of the section text (year of the section heading)</summary>
-    internal YearHit AtStart() => new(years, 0, 0, validity, periodStart, plain, month, day);
-}
-
-/// <summary>
-/// Result for one entry
-/// </summary>
-public sealed class SourceResult
-{
-    /// <summary>Key of the lex entry</summary>
-    public string Key { get; internal init; }
-
-    /// <summary>Source URLs of the lex entry</summary>
-    public List<string> Urls { get; internal init; } = [];
-
-    /// <summary>Verification state</summary>
-    public SourceMatch Match { get; internal init; }
-
-    /// <summary>Numbers of the entry that were looked up (a sample of a large table)</summary>
-    public int NumbersTotal { get; internal init; }
-
-    /// <summary>All numbers of the entry content; more than <see cref="NumbersTotal"/> when sampled</summary>
-    public int ContentNumbers { get; internal init; }
-
-    /// <summary>The numbers of a large table were sampled</summary>
-    public bool Sampled => ContentNumbers > NumbersTotal;
-
-    /// <summary>Numbers found in the source</summary>
-    public int NumbersFound { get; internal init; }
-
-    /// <summary>Numbers missing in the source</summary>
-    public List<string> Missing { get; internal init; } = [];
-
-    /// <summary>Proposed source location (sections that hold the numbers)</summary>
-    public string Location { get; internal init; }
-
-    /// <summary>Reason of an unreadable source; with several sources, the unreadable ones; reason of missing content</summary>
-    public string Reason { get; internal init; }
-
-    /// <summary>Why the evidence of an ambiguous entry is weak</summary>
-    public string Ambiguity { get; internal init; }
-
-    /// <summary>Source quote of the entry</summary>
-    public string Quote { get; internal init; }
-
-    /// <summary>Local evidence file of the entry (first source with a local file), null for a live verification</summary>
-    public string Evidence { get; internal set; }
-
-    /// <summary>Languages of the verification with the hash of their profiles (<see cref="LanguageSet.Label"/>)</summary>
-    public string Languages { get; internal set; }
-
-    /// <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
-    public string ExcludedReason { get; internal set; }
-
-    /// <summary>Derived properties of the entry (exclusion kind derived); their numbers are not looked up</summary>
-    public List<DerivedValue> Derived { get; internal init; } = [];
-
-    /// <summary>Property paths of a bundle entry with the value 0; their numbers are not looked up</summary>
-    public List<string> Zero { get; internal init; } = [];
-
-    /// <summary>Zero properties of the entry with a notApplicable exclusion</summary>
-    public List<DerivedValue> NotApplicable { get; internal init; } = [];
-
-    /// <summary>Zero properties without justification: neither a notApplicable nor a derived exclusion</summary>
-    public List<string> UnjustifiedZero =>
-        DerivedProperties.Unjustified(Zero, NotApplicable.Concat(Derived).Select(x => x.Property));
-
-    /// <summary>Hint for the review of the result, e.g. all numbers of the entry are derived</summary>
-    public string Note { get; internal init; }
-
-    /// <summary>The source location and the automatic verification record may be written</summary>
-    public bool CanWrite => Match == SourceMatch.Found && ExcludedReason == null;
-}
-
-/// <summary>
 /// Looks up the numbers of lex entries in their source documents
 /// </summary>
 public static class SourceVerifier
@@ -333,7 +143,10 @@ public static class SourceVerifier
         switch (element.ValueKind)
         {
             case JsonValueKind.Number:
-                if (element.TryGetDecimal(out var value)) Consider(numbers, value);
+                if (element.TryGetDecimal(out var value))
+                {
+                    Consider(numbers, value);
+                }
                 break;
             case JsonValueKind.String:
                 Add(numbers, element.GetString());
@@ -351,7 +164,10 @@ public static class SourceVerifier
                 }
                 break;
             case JsonValueKind.Array:
-                foreach (var item in element.EnumerateArray()) Collect(item, numbers);
+                foreach (var item in element.EnumerateArray())
+                {
+                    Collect(item, numbers);
+                }
                 break;
         }
     }
@@ -631,7 +447,10 @@ public static class SourceVerifier
                 .Where(s => perSource.GetValueOrDefault(s.Url ?? string.Empty) < MaxSectionsPerSource)
                 .Select(s => (Section: s, Hits: remaining.Count(n => s.Numbers.Contains(n, percent))))
                 .OrderByDescending(x => x.Hits).FirstOrDefault();
-            if (best.Section == null || best.Hits == 0) break;
+            if (best.Section == null || best.Hits == 0)
+            {
+                break;
+            }
             AddToCover(best.Section);
         }
         return remaining.Count == 0 ? Location(sources, cover) : null;

@@ -9,69 +9,6 @@ using System.Text.Json;
 namespace PayrollEngine.Lex;
 
 /// <summary>
-/// Kind of a regulation change
-/// </summary>
-public enum ApplyChangeKind
-{
-    /// <summary>Existing value replaced</summary>
-    Changed,
-
-    /// <summary>New lookup value</summary>
-    Added
-}
-
-/// <summary>
-/// Regulation value written from a lex entry
-/// </summary>
-public sealed class ApplyChange
-{
-    /// <summary>Lex entry key</summary>
-    public string EntryKey { get; init; }
-
-    /// <summary>Regulation file name</summary>
-    public string File { get; init; }
-
-    /// <summary>Regulation target: Lookup.Key with optional /property path</summary>
-    public string Target { get; init; }
-
-    /// <summary>Kind of change</summary>
-    public ApplyChangeKind Kind { get; init; }
-
-    /// <summary>Difference before the change</summary>
-    public string Detail { get; init; }
-}
-
-/// <summary>
-/// Result of applying a lex manifest to its data regulation satellite
-/// </summary>
-public sealed class ApplyResult
-{
-    /// <summary>Full path of lex.json</summary>
-    public string LexPath { get; init; }
-
-    /// <summary>Name of the data regulation satellite folder</summary>
-    public string Satellite { get; init; }
-
-    /// <summary>Changes of the regulation values</summary>
-    public List<ApplyChange> Changes { get; } = [];
-
-    /// <summary>Lex entries that could not be applied, with reason</summary>
-    public List<string> Skipped { get; } = [];
-
-    /// <summary>Regulation values equal to the lex content</summary>
-    public int Unchanged { get; internal set; }
-
-    /// <summary>Regulation files written</summary>
-    public List<string> WrittenFiles { get; } = [];
-
-    /// <summary>Information without changes (e.g. no lookups in the regulation JSON)</summary>
-    public string Note { get; internal set; }
-
-    /// <summary>Error that prevented the apply action</summary>
-    public string Error { get; set; }
-}
-
-/// <summary>
 /// Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
 /// Only differing values are replaced in place; descriptions and the formatting of the file are kept.
 /// </summary>

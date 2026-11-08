@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http.Headers;
 using System.Text;
 using Xunit;
 
@@ -168,20 +166,5 @@ public class PdfReaderTests
 
         Assert.True(document.IsReadable);
         Assert.Equal("Page 1", Assert.Single(document.Sections).Heading);
-    }
-
-    private sealed class LengthStream(long length) : MemoryStream
-    {
-        public override long Length => length;
-    }
-
-    private sealed class FileHandler(byte[] bytes, string mediaType) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var content = new ByteArrayContent(bytes);
-            content.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
-        }
     }
 }

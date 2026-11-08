@@ -115,7 +115,10 @@ internal static class HtmlReader
             var target = headingText ?? text;
             if (CellElements.Contains(name))
             {
-                if (!closing) target.Append('\t');
+                if (!closing)
+                {
+                    target.Append('\t');
+                }
             }
             else if (BlockElements.Contains(name))
             {
@@ -206,14 +209,23 @@ internal static class HtmlReader
             var c = html[i];
             if (quote != '\0')
             {
-                if (c == quote) quote = '\0';
+                if (c == quote)
+                {
+                    quote = '\0';
+                }
             }
             else if (c is '"' or '\'')
             {
                 // quotes only delimit attribute values after '='
                 var previous = i - 1;
-                while (previous > open && char.IsWhiteSpace(html[previous])) previous--;
-                if (html[previous] == '=') quote = c;
+                while (previous > open && char.IsWhiteSpace(html[previous]))
+                {
+                    previous--;
+                }
+                if (html[previous] == '=')
+                {
+                    quote = c;
+                }
             }
             else if (c == '>')
             {
@@ -227,9 +239,15 @@ internal static class HtmlReader
     {
         var i = start;
         var closing = i < end && html[i] == '/';
-        if (closing) i++;
+        if (closing)
+        {
+            i++;
+        }
         var nameStart = i;
-        while (i < end && (char.IsLetterOrDigit(html[i]) || html[i] is '-' or ':')) i++;
+        while (i < end && (char.IsLetterOrDigit(html[i]) || html[i] is '-' or ':'))
+        {
+            i++;
+        }
         return (html[nameStart..i], closing);
     }
 }

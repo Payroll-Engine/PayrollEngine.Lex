@@ -120,41 +120,92 @@ public static class CheckReport
             text.AppendLine();
             text.AppendLine($"`{r.LexPath}`");
             text.AppendLine();
-            if (r.Error != null) text.AppendLine($"- {r.Error}");
-            foreach (var error in r.ValidationErrors) text.AppendLine($"- Manifest: {error}");
-            if (!r.HasSnapshot) text.AppendLine("- snapshot.json is missing");
+            if (r.Error != null)
+            {
+                text.AppendLine($"- {r.Error}");
+            }
+            foreach (var error in r.ValidationErrors)
+            {
+                text.AppendLine($"- Manifest: {error}");
+            }
+            if (!r.HasSnapshot)
+            {
+                text.AppendLine("- snapshot.json is missing");
+            }
             text.AppendLine($"- Values: regulation {r.RegulationValues}, lex entries {r.LexEntries}; " +
                             $"covered {r.CoveredDirect}, at lookup level {r.CoveredByLookup}, without entry {r.Uncovered}; orphans {r.Orphans}");
-            if (r.Uncovered > 0) text.AppendLine($"  - without entry: {Join(r.UncoveredSamples, r.Uncovered)}");
-            if (r.Orphans > 0 || r.UnresolvedSplit > 0) text.AppendLine($"  - orphans / unresolved ({r.Orphans} + {r.UnresolvedSplit}): {Join(r.OrphanSamples, r.Orphans + r.UnresolvedSplit)}");
-            if (r.Drift > 0) text.AppendLine($"- Differences ({r.Drift} of {r.Compared} compared): {Join(r.DriftSamples, r.Drift)}");
-            foreach (var url in r.DeadUrls) text.AppendLine($"- Source URL not found: {url}");
-            foreach (var url in r.ChangedSources) text.AppendLine($"- Source changed, check value: {url}");
+            if (r.Uncovered > 0)
+            {
+                text.AppendLine($"  - without entry: {Join(r.UncoveredSamples, r.Uncovered)}");
+            }
+            if (r.Orphans > 0 || r.UnresolvedSplit > 0)
+            {
+                text.AppendLine($"  - orphans / unresolved ({r.Orphans} + {r.UnresolvedSplit}): {Join(r.OrphanSamples, r.Orphans + r.UnresolvedSplit)}");
+            }
+            if (r.Drift > 0)
+            {
+                text.AppendLine($"- Differences ({r.Drift} of {r.Compared} compared): {Join(r.DriftSamples, r.Drift)}");
+            }
+            foreach (var url in r.DeadUrls)
+            {
+                text.AppendLine($"- Source URL not found: {url}");
+            }
+            foreach (var url in r.ChangedSources)
+            {
+                text.AppendLine($"- Source changed, check value: {url}");
+            }
             if (r.MissingSourceUrls + (r.RequireLocation ? r.MissingSourceLocation : 0) + r.MissingLegalReference > 0)
             {
                 text.AppendLine($"- Missing fields: sourceUrls {r.MissingSourceUrls}, sourceLocation {r.MissingSourceLocation}, legalReference {r.MissingLegalReference}");
             }
             if (r.RequireVerification && r.Unverified > 0)
+            {
                 text.AppendLine($"- Without verification ({r.Unverified}): {Join(r.UnverifiedSamples, r.Unverified)}");
+            }
             if (r.Open > 0)
+            {
                 text.AppendLine($"- Open entries, verify again ({r.Open}): {Join(r.OpenSamples, r.Open)}");
+            }
             if (r.MissingReview > 0)
+            {
                 text.AppendLine($"- Manual verification without second review ({r.MissingReview}): {Join(r.MissingReviewSamples, r.MissingReview)}");
+            }
             if (r.RequireLocation && r.UnspecificLocations > 0)
+            {
                 text.AppendLine($"- Location not entry-specific ({r.UnspecificLocations}): {Join(r.UnspecificLocationSamples, r.UnspecificLocations)}");
+            }
             if (r.Release && r.SecondaryMainSource > 0)
+            {
                 text.AppendLine($"- Secondary main source ({r.SecondaryMainSource}): {Join(r.SecondaryMainSourceSamples, r.SecondaryMainSource)}");
+            }
             if (r.Release && r.ManualVerificationRequired > 0)
+            {
                 text.AppendLine($"- Manual verification required ({r.ManualVerificationRequired}): {Join(r.ManualVerificationSamples, r.ManualVerificationRequired)}");
+            }
             if (r.Release && r.UnjustifiedZero > 0)
+            {
                 text.AppendLine($"- Zero values without justification ({r.UnjustifiedZero}): {Join(r.UnjustifiedZeroSamples, r.UnjustifiedZero)}");
+            }
             if (r.Release && r.UnusedEvidence > 0)
+            {
                 text.AppendLine($"- Evidence files that back no entry ({r.UnusedEvidence}): {Join(r.UnusedEvidenceSamples, r.UnusedEvidence)}");
+            }
             if (r.Release && r.NotVerifiable > 0)
+            {
                 text.AppendLine($"- Verifiable neither locally nor live ({r.NotVerifiable}): {Join(r.NotVerifiableSamples, r.NotVerifiable)}");
-            if (r.FileProblems.Count > 0) text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
-            if (!r.ValidFromMatch) text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
-            if (r.Note != null) text.AppendLine($"- Note: {r.Note}");
+            }
+            if (r.FileProblems.Count > 0)
+            {
+                text.AppendLine($"- Evidence: {string.Join("; ", r.FileProblems)}");
+            }
+            if (!r.ValidFromMatch)
+            {
+                text.AppendLine($"- validFrom: lex {r.LexValidFrom}, regulation {r.RegulationValidFrom}");
+            }
+            if (r.Note != null)
+            {
+                text.AppendLine($"- Note: {r.Note}");
+            }
         }
         text.AppendLine();
         text.AppendLine("## Verification");
@@ -182,7 +233,10 @@ public static class CheckReport
                                 $"{r.ExcludedOrphans} entries without value, {r.ExcludedAutoVerification} entries excluded from auto verification, " +
                                 $"{r.ExcludedDerived} derived properties, {r.ExcludedNotApplicable} properties not applicable)");
                 text.AppendLine();
-                foreach (var note in r.ExclusionNotes) text.AppendLine($"- {note}");
+                foreach (var note in r.ExclusionNotes)
+                {
+                    text.AppendLine($"- {note}");
+                }
             }
         }
         return text.ToString();

@@ -217,12 +217,6 @@ public class CheckerTests
         Assert.True(required.HasFindings);
     }
 
-    private sealed class FakeHandler(Func<HttpRequestMessage, HttpStatusCode> status) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken) =>
-            Task.FromResult(new HttpResponseMessage(status(request)));
-    }
-
     [Fact]
     public async Task DeadUrl_IsFinding_BlockedUrl_IsNote()
     {
@@ -236,7 +230,7 @@ public class CheckerTests
             new Entry { Key = b.Key, Content = b.Content, SourceUrls = ["https://example.org/blocked"], SourceLocation = "p. 1", LegalReference = "x" });
         var result = Checker.Check(manifest, s.LexPath);
 
-        using var checker = new UrlChecker(new FakeHandler(r =>
+        using var checker = new UrlChecker(new StatusHandler(r =>
             r.RequestUri!.AbsolutePath == "/gone" ? HttpStatusCode.NotFound : HttpStatusCode.Forbidden));
         await checker.Apply(manifest, result);
 
@@ -255,7 +249,7 @@ public class CheckerTests
         var manifest = TestSatellite.Manifest(TestSatellite.Value("Rates.A", "7.5"), TestSatellite.Value("Rates.B", "10"));
         var result = Checker.Check(manifest, s.LexPath);
 
-        using var checker = new UrlChecker(new FakeHandler(_ => HttpStatusCode.OK));
+        using var checker = new UrlChecker(new StatusHandler(_ => HttpStatusCode.OK));
         await checker.Apply(manifest, result);
 
         Assert.Empty(result.DeadUrls);

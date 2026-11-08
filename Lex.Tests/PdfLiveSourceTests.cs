@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http.Headers;
 using Xunit;
 
 namespace PayrollEngine.Lex.Tests;
@@ -13,17 +11,6 @@ public class PdfLiveSourceTests
 
     private static SourceDocument Read(byte[] pdf) =>
         new() { State = SourceState.Readable, Sections = PdfReader.Read(new MemoryStream(pdf)) };
-
-    /// <summary>Answers every request with the PDF</summary>
-    private sealed class PdfHandler(byte[] pdf) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var content = new ByteArrayContent(pdf);
-            content.Headers.ContentType = new MediaTypeHeaderValue("application/pdf");
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
-        }
-    }
 
     [Fact]
     public void TextHash_SameContent_IsEqual() =>
@@ -42,7 +29,7 @@ public class PdfLiveSourceTests
     {
         using var s = new TestSatellite();
         var manifest = TestSatellite.Manifest(TestSatellite.Value("Rates.A", "8.5"));
-        using var snapshotClient = new HttpClient(new PdfHandler(snapshotPdf));
+        using var snapshotClient = new HttpClient(new FileHandler(snapshotPdf, "application/pdf"));
         var snapshot = await new SnapshotWriter().WriteAsync(manifest, s.LexDirectory, s.LexDirectory, dryRun: false,
             loadLiveSource: url => SourceDocument.LoadLive(url, snapshotClient));
         var live = Assert.Single(snapshot.LiveSources);
@@ -51,7 +38,7 @@ public class PdfLiveSourceTests
         Assert.Null(live.Reason);
 
         var result = new CheckResult { LexPath = s.LexPath, HasSnapshot = true };
-        using var checker = new UrlChecker(new PdfHandler(livePdf));
+        using var checker = new UrlChecker(new FileHandler(livePdf, "application/pdf"));
         await checker.Apply(manifest, result);
         return result;
     }

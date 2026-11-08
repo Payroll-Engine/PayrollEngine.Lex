@@ -188,14 +188,29 @@ public sealed class ManifestEditor
             ["key"] = value.Key,
             ["content"] = value.Content ?? string.Empty
         };
-        if (value.Unit != null) entry["unit"] = value.Unit;
+        if (value.Unit != null)
+        {
+            entry["unit"] = value.Unit;
+        }
         entry["sourceUrls"] = new JsonArray(value.Urls.Select(x => (JsonNode)x).ToArray());
         entry["sourceLocation"] = value.SourceLocation ?? string.Empty;
-        if (value.SourceQuote != null) entry["sourceQuote"] = value.SourceQuote;
-        if (value.ReferenceYear != null) entry["referenceYear"] = value.ReferenceYear.Value;
+        if (value.SourceQuote != null)
+        {
+            entry["sourceQuote"] = value.SourceQuote;
+        }
+        if (value.ReferenceYear != null)
+        {
+            entry["referenceYear"] = value.ReferenceYear.Value;
+        }
         entry["legalReference"] = value.LegalReference ?? string.Empty;
-        if (value.DocumentRef != null) entry["documentRef"] = value.DocumentRef;
-        if (value.Description != null) entry["description"] = value.Description;
+        if (value.DocumentRef != null)
+        {
+            entry["documentRef"] = value.DocumentRef;
+        }
+        if (value.Description != null)
+        {
+            entry["description"] = value.Description;
+        }
         Items("values", create: true).Add(entry);
         Changes++;
     }

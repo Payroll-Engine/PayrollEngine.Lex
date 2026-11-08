@@ -8,21 +8,6 @@ using System.Text.RegularExpressions;
 namespace PayrollEngine.Lex;
 
 /// <summary>
-/// Lookup of a value below 1 as percentage (0.085 as 8.5)
-/// </summary>
-internal enum PercentLookup
-{
-    /// <summary>No percentage: the value is looked up as written (factor, hours, currency amount)</summary>
-    None,
-
-    /// <summary>As percentage with a percent sign or word: 8.5%, 8,5 Prozent</summary>
-    Sign,
-
-    /// <summary>As percentage with or without a percent sign: a rate table of percentage points (2,60 for 0.026)</summary>
-    Points
-}
-
-/// <summary>
 /// Numbers of a source text: numerals (every separator interpretation), numerals followed by a percent sign
 /// (<c>%</c> or a percent word of a language: <c>percent</c>, <c>per centum</c>, <c>Prozent</c>,
 /// <c>pour cent</c>) and numbers in words (scales and fractions of the languages, see
@@ -57,13 +42,25 @@ internal sealed class SourceNumbers
     {
         var value = Math.Round(number, 6);
         var hits = Enumerable.Empty<(int Index, int Length)>();
-        if (numeralHits.TryGetValue(value, out var numerals)) hits = hits.Concat(numerals);
-        if (wordHits.TryGetValue(value, out var words)) hits = hits.Concat(words);
+        if (numeralHits.TryGetValue(value, out var numerals))
+        {
+            hits = hits.Concat(numerals);
+        }
+        if (wordHits.TryGetValue(value, out var words))
+        {
+            hits = hits.Concat(words);
+        }
         if (percent != PercentLookup.None && number < 1m)
         {
             var points = Math.Round(number * 100m, 6);
-            if (percentHits.TryGetValue(points, out var percents)) hits = hits.Concat(percents);
-            if (percent == PercentLookup.Points && numeralHits.TryGetValue(points, out var plain)) hits = hits.Concat(plain);
+            if (percentHits.TryGetValue(points, out var percents))
+            {
+                hits = hits.Concat(percents);
+            }
+            if (percent == PercentLookup.Points && numeralHits.TryGetValue(points, out var plain))
+            {
+                hits = hits.Concat(plain);
+            }
         }
         return hits.Distinct();
     }

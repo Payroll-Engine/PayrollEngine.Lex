@@ -1,5 +1,3 @@
-using System.Net;
-using System.Net.Http.Headers;
 using ClosedXML.Excel;
 using Xunit;
 
@@ -148,15 +146,5 @@ public class SpreadsheetReaderTests
         var xls = new SourceDocument { State = SourceState.Readable, Sections = SpreadsheetReader.Read(stream) };
         var xlsx = new SourceDocument { State = SourceState.Readable, Sections = SpreadsheetReader.Read(new MemoryStream(CreateXlsx())) };
         Assert.Equal(xls.TextHash(), xlsx.TextHash());
-    }
-
-    private sealed class FileHandler(byte[] bytes, string mediaType) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var content = new ByteArrayContent(bytes);
-            content.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
-            return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK) { Content = content });
-        }
     }
 }

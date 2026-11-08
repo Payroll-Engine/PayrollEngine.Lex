@@ -1,5 +1,4 @@
 using System.Net;
-using System.Text;
 using System.Text.Json;
 using Xunit;
 
@@ -14,21 +13,6 @@ public class LiveSourceTests
 
     private static string Page(string rate) =>
         $"<html><body><h2>Rates</h2><p>The rate is {rate}%.</p><p>{Filler}</p></body></html>";
-
-    /// <summary>Answers every request with the page of the URL or the status</summary>
-    private sealed class PageHandler(Dictionary<string, (HttpStatusCode Status, string Html)> pages) : HttpMessageHandler
-    {
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            var (status, html) = pages.TryGetValue(request.RequestUri!.ToString(), out var page) ? page : (HttpStatusCode.NotFound, null);
-            var response = new HttpResponseMessage(status);
-            if (html != null)
-            {
-                response.Content = new StringContent(html, Encoding.UTF8, "text/html");
-            }
-            return Task.FromResult(response);
-        }
-    }
 
     private static Manifest Manifest()
     {

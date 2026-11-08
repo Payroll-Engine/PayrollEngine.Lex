@@ -249,11 +249,17 @@ internal static class OfficeXmlReader
                             var level = int.TryParse(xml.GetAttribute("outline-level", TextNs), NumberStyles.None,
                                 CultureInfo.InvariantCulture, out var outline) ? outline : 1;
                             flow.StartParagraph(level - 1);
-                            if (xml.IsEmptyElement) flow.EndParagraph();
+                            if (xml.IsEmptyElement)
+                            {
+                                flow.EndParagraph();
+                            }
                             break;
                         case "p":
                             flow.StartParagraph();
-                            if (xml.IsEmptyElement) flow.EndParagraph();
+                            if (xml.IsEmptyElement)
+                            {
+                                flow.EndParagraph();
+                            }
                             break;
                         case "s":
                         case "tab":
@@ -270,7 +276,10 @@ internal static class OfficeXmlReader
                     {
                         case "table":
                             flow.StartTable();
-                            if (xml.IsEmptyElement) flow.EndTable();
+                            if (xml.IsEmptyElement)
+                            {
+                                flow.EndTable();
+                            }
                             break;
                         case "table-cell":
                         case "covered-table-cell":
@@ -336,7 +345,10 @@ internal static class OfficeXmlReader
                     {
                         case "p":
                             flow.StartParagraph();
-                            if (xml.IsEmptyElement) flow.EndParagraph();
+                            if (xml.IsEmptyElement)
+                            {
+                                flow.EndParagraph();
+                            }
                             break;
                         case "pStyle":
                             if (styles.TryGetValue(xml.GetAttribute("val", WordNs) ?? string.Empty, out var styleLevel))

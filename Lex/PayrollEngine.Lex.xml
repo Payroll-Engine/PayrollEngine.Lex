@@ -4,16 +4,34 @@
         <name>PayrollEngine.Lex</name>
     </assembly>
     <members>
-        <member name="T:PayrollEngine.Lex.ApplyChangeKind">
+        <member name="T:PayrollEngine.Lex.Applier">
             <summary>
-            Kind of a regulation change
+            Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
+            Only differing values are replaced in place; descriptions and the formatting of the file are kept.
             </summary>
         </member>
-        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Changed">
-            <summary>Existing value replaced</summary>
+        <member name="M:PayrollEngine.Lex.Applier.Apply(PayrollEngine.Lex.Manifest,System.String,System.Boolean)">
+            <summary>
+            Apply one manifest
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="lexPath">Full path of lex.json</param>
+            <param name="dryRun">Report the changes without writing</param>
         </member>
-        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Added">
-            <summary>New lookup value</summary>
+        <member name="M:PayrollEngine.Lex.Applier.Locate(System.Byte[],System.Int32,System.Int32,System.String)">
+            <summary>
+            Locate a property path inside a JSON object token
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.TokenText(System.Text.Json.JsonElement,System.Boolean,System.String,System.String@)">
+            <summary>
+            JSON text of the new value token, in the form of the existing token
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.Reindent(System.String,System.String,System.String)">
+            <summary>
+            Continuation lines of a multi-line value are indented like the line of the token
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.ApplyChange">
             <summary>
@@ -34,6 +52,17 @@
         </member>
         <member name="P:PayrollEngine.Lex.ApplyChange.Detail">
             <summary>Difference before the change</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ApplyChangeKind">
+            <summary>
+            Kind of a regulation change
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Changed">
+            <summary>Existing value replaced</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Added">
+            <summary>New lookup value</summary>
         </member>
         <member name="T:PayrollEngine.Lex.ApplyResult">
             <summary>
@@ -64,35 +93,6 @@
         <member name="P:PayrollEngine.Lex.ApplyResult.Error">
             <summary>Error that prevented the apply action</summary>
         </member>
-        <member name="T:PayrollEngine.Lex.Applier">
-            <summary>
-            Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
-            Only differing values are replaced in place; descriptions and the formatting of the file are kept.
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Applier.Apply(PayrollEngine.Lex.Manifest,System.String,System.Boolean)">
-            <summary>
-            Apply one manifest
-            </summary>
-            <param name="manifest">Manifest (lex.json)</param>
-            <param name="lexPath">Full path of lex.json</param>
-            <param name="dryRun">Report the changes without writing</param>
-        </member>
-        <member name="M:PayrollEngine.Lex.Applier.Locate(System.Byte[],System.Int32,System.Int32,System.String)">
-            <summary>
-            Locate a property path inside a JSON object token
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Applier.TokenText(System.Text.Json.JsonElement,System.Boolean,System.String,System.String@)">
-            <summary>
-            JSON text of the new value token, in the form of the existing token
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Applier.Reindent(System.String,System.String,System.String)">
-            <summary>
-            Continuation lines of a multi-line value are indented like the line of the token
-            </summary>
-        </member>
         <member name="T:PayrollEngine.Lex.AttestResult">
             <summary>
             Result of writing a manual verification record or a review
@@ -115,6 +115,119 @@
         </member>
         <member name="F:PayrollEngine.Lex.AttestResult.NotFound">
             <summary>No entry with the key</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.Checker">
+            <summary>
+            Checks a lex manifest against the lookup values of its data regulation satellite:
+            coverage, orphans, value differences, traceability fields, evidence files and validFrom.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Checker.ReferenceEntryPrefix">
+            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.IsReferenceEntry(System.String)">
+            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)">
+            <summary>
+            Check one satellite
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="lexPath">Full path of lex.json</param>
+            <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
+            <param name="requireVerification">Treat an entry without verification record as a finding</param>
+            <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
+            a secondary main source, an entry excluded from auto verification with an automatic record and a zero property
+            without notApplicable exclusion are findings.
+            The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)"/>.</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Release gate: verify the entries without manual verification against their local evidence
+            (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/>); an ambiguous entry and an entry whose quote is not found
+            need a manual verification; an entry without readable local evidence whose sources are not readable live
+            according to the snapshot (live sources with text hash) can be verified neither locally nor live
+            </summary>
+            <param name="manifest">Manifest (lex.json)</param>
+            <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckPropertyExclusions(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
+            a notApplicable property must have the value 0
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Entries whose reference year differs from the validFrom year: listed as information for the review
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
+            by mistake would otherwise never be looked up in the source
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
+            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
+            without declaration in files[] is unused too (not frozen in the snapshot).
+            An unused file is never read by LexVerifySource: its entries count as without local evidence.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            The evidence of a verification record must be frozen in the snapshot
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.GitList(System.String,System.Boolean)">
+            <summary>
+            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.CompareContent(PayrollEngine.Lex.Entry,System.String)">
+            <summary>
+            Content to compare: inline content, or the text of a JSON content file (null without comparable content)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.Difference(System.Nullable{System.Text.Json.JsonElement},System.String,System.String)">
+            <summary>
+            Difference between a regulation value (structured or scalar) and the lex content, null if equal
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Checker.MaxNamedDifferences">
+            <summary>Number of differences named in the summary of a structured value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.DifferenceSummary(System.Collections.Generic.List{System.String})">
+            <summary>
+            Single difference as is, several as count with the first ones, null without difference
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Checker.ScalarEquals(System.String,System.String)">
+            <summary>
+            Numbers are compared numerically, text ignoring case
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.CheckReport">
+            <summary>
+            Writes the LexCheck results as Markdown report and CSV file
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.CheckReport.Write(System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.CheckResult},System.String)">
+            <summary>
+            Write the report (Markdown) and a CSV file with the same name
+            </summary>
+            <param name="results">Check results</param>
+            <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.CheckReport.SatelliteLabel(PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            Satellite name, prefixed with the parent folder when several results share the name (e.g. a check over a root folder)
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.CheckResult">
             <summary>
@@ -296,119 +409,6 @@
             Any finding that needs action
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.Checker">
-            <summary>
-            Checks a lex manifest against the lookup values of its data regulation satellite:
-            coverage, orphans, value differences, traceability fields, evidence files and validFrom.
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.Checker.ReferenceEntryPrefix">
-            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.IsReferenceEntry(System.String)">
-            <summary>Entries with this key prefix reference an official calculator and have no regulation value</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)">
-            <summary>
-            Check one satellite
-            </summary>
-            <param name="manifest">Manifest (lex.json)</param>
-            <param name="lexPath">Full path of lex.json</param>
-            <param name="requireLocation">Treat a missing sourceLocation as a finding</param>
-            <param name="requireVerification">Treat an entry without verification record as a finding</param>
-            <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
-            a secondary main source, an entry excluded from auto verification with an automatic record and a zero property
-            without notApplicable exclusion are findings.
-            The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)"/>.</param>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            Release gate: verify the entries without manual verification against their local evidence
-            (<see cref="M:PayrollEngine.Lex.SourceVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/>); an ambiguous entry and an entry whose quote is not found
-            need a manual verification; an entry without readable local evidence whose sources are not readable live
-            according to the snapshot (live sources with text hash) can be verified neither locally nor live
-            </summary>
-            <param name="manifest">Manifest (lex.json)</param>
-            <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckPropertyExclusions(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            A derived or notApplicable exclusion must address an existing property of an entry (e.g. not renamed);
-            a notApplicable property must have the value 0
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            Entries whose reference year differs from the validFrom year: listed as information for the review
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckZeros(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            Zero properties of a bundle entry need a notApplicable exclusion (or a derived exclusion): a rate set to 0
-            by mistake would otherwise never be looked up in the source
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
-            <summary>
-            Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
-            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
-            without declaration in files[] is unused too (not frozen in the snapshot).
-            An unused file is never read by LexVerifySource: its entries count as without local evidence.
-            </summary>
-            <param name="manifest">Manifest</param>
-            <param name="lexDirectory">Folder of lex.json</param>
-            <returns>File names, undeclared files with the suffix " (not in files[])"</returns>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckVerificationEvidence(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult)">
-            <summary>
-            The evidence of a verification record must be frozen in the snapshot
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.GitList(System.String,System.Boolean)">
-            <summary>
-            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.CompareContent(PayrollEngine.Lex.Entry,System.String)">
-            <summary>
-            Content to compare: inline content, or the text of a JSON content file (null without comparable content)
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.Difference(System.Nullable{System.Text.Json.JsonElement},System.String,System.String)">
-            <summary>
-            Difference between a regulation value (structured or scalar) and the lex content, null if equal
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.Checker.MaxNamedDifferences">
-            <summary>Number of differences named in the summary of a structured value</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.DifferenceSummary(System.Collections.Generic.List{System.String})">
-            <summary>
-            Single difference as is, several as count with the first ones, null without difference
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Checker.ScalarEquals(System.String,System.String)">
-            <summary>
-            Numbers are compared numerically, text ignoring case
-            </summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.CheckReport">
-            <summary>
-            Writes the LexCheck results as Markdown report and CSV file
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.CheckReport.Write(System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.CheckResult},System.String)">
-            <summary>
-            Write the report (Markdown) and a CSV file with the same name
-            </summary>
-            <param name="results">Check results</param>
-            <param name="reportPath">Path of the Markdown file; the CSV file uses the same name with the extension .csv</param>
-        </member>
-        <member name="M:PayrollEngine.Lex.CheckReport.SatelliteLabel(PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String})">
-            <summary>
-            Satellite name, prefixed with the parent folder when several results share the name (e.g. a check over a root folder)
-            </summary>
-        </member>
         <member name="T:PayrollEngine.Lex.ContentHash">
             <summary>
             Hash helpers shared by LexSnapshot, LexVerify and LexCheck.
@@ -429,22 +429,6 @@
             <summary>
             Resolve a path relative to a base directory
             </summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.DerivedValue">
-            <summary>
-            Property of a lex entry addressed by a property exclusion: derived from other values (exclusion kind
-            <c>derived</c>) or not applicable (exclusion kind <c>notApplicable</c>); its numbers are not looked up in the source
-            </summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.DerivedValue.Property">
-            <summary>Property path within the entry content (e.g. <c>Levy</c> or <c>Group.Rate</c>)</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.DerivedValue.Value">
-            <summary>Value of the property in the entry content</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.DerivedValue.Reason">
-            <summary>Reason of the exclusion: formula and legal reference (derived) or why the value does not apply
-            (notApplicable)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.DerivedProperties">
             <summary>
@@ -514,6 +498,22 @@
             <summary>
             Property of a JSON object by path (object properties separated by a dot, names ignoring case)
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.DerivedValue">
+            <summary>
+            Property of a lex entry addressed by a property exclusion: derived from other values (exclusion kind
+            <c>derived</c>) or not applicable (exclusion kind <c>notApplicable</c>); its numbers are not looked up in the source
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Property">
+            <summary>Property path within the entry content (e.g. <c>Levy</c> or <c>Group.Rate</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Value">
+            <summary>Value of the property in the entry content</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.DerivedValue.Reason">
+            <summary>Reason of the exclusion: formula and legal reference (derived) or why the value does not apply
+            (notApplicable)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.Entry">
             <summary>
@@ -623,33 +623,6 @@
             The non-empty source URLs, in declaration order
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.EntryTargetKind">
-            <summary>
-            Kind of the regulation target of a lex entry
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.EntryTargetKind.None">
-            <summary>No regulation lookup</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.EntryTargetKind.Values">
-            <summary>Existing lookup values (with optional property path)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.EntryTargetKind.Lookup">
-            <summary>Whole lookup, entry backed by a content file</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.EntryTargetKind.NewValue">
-            <summary>Lookup exists, the value is missing</summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.EntryTarget">
-            <summary>
-            Regulation target of a lex entry
-            </summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.RegulationIndex">
-            <summary>
-            Lookup values by lex key: Lookup.Key, Alias.Key and the bare value key
-            </summary>
-        </member>
         <member name="T:PayrollEngine.Lex.EntryMapping">
             <summary>
             Maps lex entries to regulation lookup values, shared by the check and the apply of a manifest
@@ -710,6 +683,28 @@
             <summary>
             Today in the format yyyy-MM-dd
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryTarget">
+            <summary>
+            Regulation target of a lex entry
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryTargetKind">
+            <summary>
+            Kind of the regulation target of a lex entry
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.None">
+            <summary>No regulation lookup</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.Values">
+            <summary>Existing lookup values (with optional property path)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.Lookup">
+            <summary>Whole lookup, entry backed by a content file</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.NewValue">
+            <summary>Lookup exists, the value is missing</summary>
         </member>
         <member name="T:PayrollEngine.Lex.EvidenceFile">
             <summary>
@@ -797,22 +792,26 @@
             Test if a key is matched by this exclusion
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.FetchState">
+        <member name="T:PayrollEngine.Lex.Fetcher">
             <summary>
-            State of a fetched evidence file
+            Downloads a source document unchanged into the .lex folder
             </summary>
         </member>
-        <member name="F:PayrollEngine.Lex.FetchState.Created">
-            <summary>The file was created</summary>
+        <member name="M:PayrollEngine.Lex.Fetcher.FetchAsync(System.Net.Http.HttpClient,System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            Download a source document into the .lex folder
+            </summary>
+            <param name="client">HTTP client</param>
+            <param name="url">Source URL (http or https)</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <param name="fileName">Target file name, default from the URL</param>
+            <param name="overwrite">Replace an existing file with different content</param>
+            <exception cref="T:System.Net.Http.HttpRequestException">The source could not be loaded</exception>
         </member>
-        <member name="F:PayrollEngine.Lex.FetchState.Unchanged">
-            <summary>The existing file has the same content</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.FetchState.Replaced">
-            <summary>The existing file was replaced</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.FetchState.Differs">
-            <summary>The existing file differs and was kept (requires overwrite)</summary>
+        <member name="M:PayrollEngine.Lex.Fetcher.FileNameFromUrl(System.Uri,System.String)">
+            <summary>
+            File name from the last URL segment; without extension one is derived from the media type
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.FetchResult">
             <summary>
@@ -834,26 +833,22 @@
         <member name="P:PayrollEngine.Lex.FetchResult.State">
             <summary>File state</summary>
         </member>
-        <member name="T:PayrollEngine.Lex.Fetcher">
+        <member name="T:PayrollEngine.Lex.FetchState">
             <summary>
-            Downloads a source document unchanged into the .lex folder
+            State of a fetched evidence file
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.Fetcher.FetchAsync(System.Net.Http.HttpClient,System.String,System.String,System.String,System.Boolean)">
-            <summary>
-            Download a source document into the .lex folder
-            </summary>
-            <param name="client">HTTP client</param>
-            <param name="url">Source URL (http or https)</param>
-            <param name="lexDirectory">Folder of lex.json</param>
-            <param name="fileName">Target file name, default from the URL</param>
-            <param name="overwrite">Replace an existing file with different content</param>
-            <exception cref="T:System.Net.Http.HttpRequestException">The source could not be loaded</exception>
+        <member name="F:PayrollEngine.Lex.FetchState.Created">
+            <summary>The file was created</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.Fetcher.FileNameFromUrl(System.Uri,System.String)">
-            <summary>
-            File name from the last URL segment; without extension one is derived from the media type
-            </summary>
+        <member name="F:PayrollEngine.Lex.FetchState.Unchanged">
+            <summary>The existing file has the same content</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.FetchState.Replaced">
+            <summary>The existing file was replaced</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.FetchState.Differs">
+            <summary>The existing file differs and was kept (requires overwrite)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.FileResolver">
             <summary>
@@ -925,6 +920,20 @@
             <summary>
             Text of a text document; a byte order mark selects the encoding, otherwise UTF-8
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.HitYear">
+            <summary>
+            Year context of a number hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Neutral">
+            <summary>No year within the window</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Positive">
+            <summary>The closest year is the relevant year, or a year group that holds it</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.HitYear.Weak">
+            <summary>The closest year is another year</summary>
         </member>
         <member name="T:PayrollEngine.Lex.HtmlReader">
             <summary>
@@ -1454,9 +1463,39 @@
             </summary>
             <param name="stream">The PDF stream (seekable)</param>
         </member>
+        <member name="T:PayrollEngine.Lex.PercentLookup">
+            <summary>
+            Lookup of a value below 1 as percentage (0.085 as 8.5)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.None">
+            <summary>No percentage: the value is looked up as written (factor, hours, currency amount)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.Sign">
+            <summary>As percentage with a percent sign or word: 8.5%, 8,5 Prozent</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.PercentLookup.Points">
+            <summary>As percentage with or without a percent sign: a rate table of percentage points (2,60 for 0.026)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationData">
+            <summary>
+            Lookup values of the Regulation folder of a satellite
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.LookupNames">
+            <summary>Lookup names including the names without satellite namespace</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationData.ValidFromTokens">
+            <summary>validFrom tokens of all regulations</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RegulationFile">
             <summary>
             Regulation JSON file with its content (without byte order mark)
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationIndex">
+            <summary>
+            Lookup values by lex key: Lookup.Key, Alias.Key and the bare value key
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationLookup">
@@ -1476,24 +1515,15 @@
         <member name="P:PayrollEngine.Lex.RegulationLookup.LastValueOffset">
             <summary>Offset of the last value object</summary>
         </member>
-        <member name="T:PayrollEngine.Lex.RegulationValue">
+        <member name="T:PayrollEngine.Lex.RegulationReader">
             <summary>
-            Lookup value of a regulation file with the location of its value token
+            Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
             </summary>
         </member>
-        <member name="P:PayrollEngine.Lex.RegulationValue.Token">
-            <summary>Value token (value or valueObject), null without value</summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.RegulationData">
+        <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
             <summary>
-            Lookup values of the Regulation folder of a satellite
+            Read all regulation files (*.json) of the Regulation folder below the satellite directory
             </summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.RegulationData.LookupNames">
-            <summary>Lookup names including the names without satellite namespace</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.RegulationData.ValidFromTokens">
-            <summary>validFrom tokens of all regulations</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationToken">
             <summary>
@@ -1506,29 +1536,83 @@
         <member name="P:PayrollEngine.Lex.RegulationToken.Length">
             <summary>Length including the quotes</summary>
         </member>
-        <member name="T:PayrollEngine.Lex.RegulationReader">
+        <member name="T:PayrollEngine.Lex.RegulationValue">
             <summary>
-            Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
+            Lookup value of a regulation file with the location of its value token
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
+        <member name="P:PayrollEngine.Lex.RegulationValue.Token">
+            <summary>Value token (value or valueObject), null without value</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RelevantPeriod">
             <summary>
-            Read all regulation files (*.json) of the Regulation folder below the satellite directory
+            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
+            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
+            </summary>
+            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
+            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+            <param name="StartMonth">Month of the tax year start (validFrom)</param>
+            <param name="StartDay">Day of the tax year start (validFrom)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.RelevantPeriod.#ctor(System.Int32,System.Boolean,System.Int32,System.Int32)">
+            <summary>
+            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
+            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
+            </summary>
+            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
+            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
+            <param name="StartMonth">Month of the tax year start (validFrom)</param>
+            <param name="StartDay">Day of the tax year start (validFrom)</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.Year">
+            <summary>Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.Fiscal">
+            <summary>The period is a tax year starting in <paramref name="Year"/></summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartMonth">
+            <summary>Month of the tax year start (validFrom)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartDay">
+            <summary>Day of the tax year start (validFrom)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RelevantPeriod.TaxYearOf(System.Int32,System.Int32,System.Nullable{System.Int32})">
+            <summary>
+            Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
+            before; null when the date has no day in the start month and the tax year does not start on the 1st
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.YearMention">
+        <member name="T:PayrollEngine.Lex.Rollover">
             <summary>
-            Line of a rolled file that still mentions the previous year
+            Prepares the satellite of the next cycle: the folder is copied with the year tag of the cycle start,
+            validFrom and the year-based version are set and all lex entries are marked as open.
+            Values, descriptions and lookup keys are not changed.
             </summary>
         </member>
-        <member name="P:PayrollEngine.Lex.YearMention.File">
-            <summary>File path relative to the new satellite</summary>
+        <member name="M:PayrollEngine.Lex.Rollover.Run(System.String,System.DateTime,System.Boolean)">
+            <summary>
+            Roll a satellite to the cycle starting at the given date
+            </summary>
+            <param name="satelliteDirectory">Satellite directory of the previous cycle (contains .lex/lex.json)</param>
+            <param name="cycleStart">Start of the new cycle, the new validFrom</param>
+            <param name="dryRun">Report without writing</param>
         </member>
-        <member name="P:PayrollEngine.Lex.YearMention.Line">
-            <summary>Line number (1-based)</summary>
+        <member name="M:PayrollEngine.Lex.Rollover.EditionSuffix(System.String,System.String)">
+            <summary>
+            Edition suffix of the year tag in a folder name: empty for Data.Tax.2026, "b" for the mid-year
+            edition Data.Tax.2026b, null without year tag
+            </summary>
         </member>
-        <member name="P:PayrollEngine.Lex.YearMention.Text">
-            <summary>Line text (trimmed, shortened)</summary>
+        <member name="M:PayrollEngine.Lex.Rollover.RenameSegment(System.String,System.String,System.String,System.String)">
+            <summary>
+            Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json); the edition suffix
+            of the folder (e.g. 2026b) is dropped in the new cycle
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">
+            <summary>
+            Replace the date part of the validFrom tokens, the time part is kept
+            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.RolloverResult">
             <summary>
@@ -1567,38 +1651,6 @@
         </member>
         <member name="P:PayrollEngine.Lex.RolloverResult.Error">
             <summary>Error that prevented the rollover, nothing written</summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.Rollover">
-            <summary>
-            Prepares the satellite of the next cycle: the folder is copied with the year tag of the cycle start,
-            validFrom and the year-based version are set and all lex entries are marked as open.
-            Values, descriptions and lookup keys are not changed.
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Rollover.Run(System.String,System.DateTime,System.Boolean)">
-            <summary>
-            Roll a satellite to the cycle starting at the given date
-            </summary>
-            <param name="satelliteDirectory">Satellite directory of the previous cycle (contains .lex/lex.json)</param>
-            <param name="cycleStart">Start of the new cycle, the new validFrom</param>
-            <param name="dryRun">Report without writing</param>
-        </member>
-        <member name="M:PayrollEngine.Lex.Rollover.EditionSuffix(System.String,System.String)">
-            <summary>
-            Edition suffix of the year tag in a folder name: empty for Data.Tax.2026, "b" for the mid-year
-            edition Data.Tax.2026b, null without year tag
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Rollover.RenameSegment(System.String,System.String,System.String,System.String)">
-            <summary>
-            Replace the year tag of a dot-separated name segment (e.g. Data.Tax.2026.json); the edition suffix
-            of the folder (e.g. 2026b) is dropped in the new cycle
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">
-            <summary>
-            Replace the date part of the validFrom tokens, the time part is kept
-            </summary>
         </member>
         <member name="T:PayrollEngine.Lex.Schema">
             <summary>
@@ -1785,24 +1837,6 @@
             True unless the source is marked as secondary (official: false)
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.SourceState">
-            <summary>
-            Readability of a source document
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceState.Readable">
-            <summary>Text could be extracted</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceState.Unreadable">
-            <summary>The source could not be requested or holds no text (blocked host, script-only page,
-            PDF without text layer, encrypted PDF)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceState.Unsupported">
-            <summary>The format has no reader (e.g. a ZIP archive or an unknown binary format)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceState.Missing">
-            <summary>No local evidence file exists</summary>
-        </member>
         <member name="T:PayrollEngine.Lex.SourceDocument">
             <summary>
             Text of a source document, split into sections (document headings, spreadsheet sheets, PDF pages)
@@ -1898,19 +1932,41 @@
             reader of the detected format; content without known signature is read as text or HTML unless it is binary
             </summary>
         </member>
-        <member name="T:PayrollEngine.Lex.PercentLookup">
+        <member name="T:PayrollEngine.Lex.SourceMatch">
             <summary>
-            Lookup of a value below 1 as percentage (0.085 as 8.5)
+            Verification state of one lex entry against its source
             </summary>
         </member>
-        <member name="F:PayrollEngine.Lex.PercentLookup.None">
-            <summary>No percentage: the value is looked up as written (factor, hours, currency amount)</summary>
+        <member name="F:PayrollEngine.Lex.SourceMatch.Found">
+            <summary>All numbers of the entry are found in the source</summary>
         </member>
-        <member name="F:PayrollEngine.Lex.PercentLookup.Sign">
-            <summary>As percentage with a percent sign or word: 8.5%, 8,5 Prozent</summary>
+        <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
+            <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
+            with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
+            or is found in words only; or a number of the entry has a hit closest to another year and no hit closest
+            to the relevant year (reference year of the entry or year of validFrom; e.g. a table over several years).
+            Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
         </member>
-        <member name="F:PayrollEngine.Lex.PercentLookup.Points">
-            <summary>As percentage with or without a percent sign: a rate table of percentage points (2,60 for 0.026)</summary>
+        <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
+            <summary>Some numbers are found, others are not</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.NotFound">
+            <summary>None of the numbers is found</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.QuoteNotFound">
+            <summary>The sourceQuote of the entry is not found in any readable source</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.Unreadable">
+            <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.NoNumbers">
+            <summary>The entry holds no numbers to look for</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.NoContent">
+            <summary>The content of the entry cannot be read (content file missing or not JSON)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceMatch.NoEvidence">
+            <summary>The entry has no local evidence file for any source (local verification)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceNumbers">
             <summary>
@@ -1965,150 +2021,6 @@
             </summary>
             <param name="text">Source text</param>
             <param name="languages">Languages of the percent, scale and fraction words, default: all languages</param>
-        </member>
-        <member name="T:PayrollEngine.Lex.SourceScript">
-            <summary>
-            Script normalization of a source text for the number and year search: digits of other scripts (Arabic-Indic,
-            Persian, Devanagari, Bengali, Gujarati, Tamil, Kannada, full width) become ASCII digits, the Arabic decimal and
-            thousands separators become <c>.</c> and <c>,</c>, the Arabic and the full width percent sign become <c>%</c>.
-            Every replacement is one character for one character, so text positions remain valid.
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.SourceScript.Normalize(System.String)">
-            <summary>
-            Normalize the script of a text; a text without such characters is returned unchanged
-            </summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.SourceMatch">
-            <summary>
-            Verification state of one lex entry against its source
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.Found">
-            <summary>All numbers of the entry are found in the source</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.Ambiguous">
-            <summary>All numbers are found, but the evidence is weak: the entry holds a single number that is written
-            with two digits at most (22%, 1.5), is written with three digits at most and occurs in many sections,
-            or is found in words only; or a number of the entry has a hit closest to another year and no hit closest
-            to the relevant year (reference year of the entry or year of validFrom; e.g. a table over several years).
-            Confirm the value manually (LexAttest) or anchor it with a sourceQuote.</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.Partial">
-            <summary>Some numbers are found, others are not</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.NotFound">
-            <summary>None of the numbers is found</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.QuoteNotFound">
-            <summary>The sourceQuote of the entry is not found in any readable source</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.Unreadable">
-            <summary>No source can be read (blocked host, script-only page, scanned PDF)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.NoNumbers">
-            <summary>The entry holds no numbers to look for</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.NoContent">
-            <summary>The content of the entry cannot be read (content file missing or not JSON)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.SourceMatch.NoEvidence">
-            <summary>The entry has no local evidence file for any source (local verification)</summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.HitYear">
-            <summary>
-            Year context of a number hit (see <see cref="M:PayrollEngine.Lex.SourceVerifier.YearContext(System.ValueTuple{System.Int32,System.Int32},System.Collections.Generic.IEnumerable{PayrollEngine.Lex.YearHit},PayrollEngine.Lex.RelevantPeriod)"/>)
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.HitYear.Neutral">
-            <summary>No year within the window</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.HitYear.Positive">
-            <summary>The closest year is the relevant year, or a year group that holds it</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.HitYear.Weak">
-            <summary>The closest year is another year</summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.RelevantPeriod">
-            <summary>
-            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
-            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
-            </summary>
-            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
-            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
-            <param name="StartMonth">Month of the tax year start (validFrom)</param>
-            <param name="StartDay">Day of the tax year start (validFrom)</param>
-        </member>
-        <member name="M:PayrollEngine.Lex.RelevantPeriod.#ctor(System.Int32,System.Boolean,System.Int32,System.Int32)">
-            <summary>
-            Relevant period of the year context: a calendar year, or a tax year that starts in the year (validFrom not on
-            the 1st of January: IN 2026-04-01 is the tax year 2026-27)
-            </summary>
-            <param name="Year">Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</param>
-            <param name="Fiscal">The period is a tax year starting in <paramref name="Year"/></param>
-            <param name="StartMonth">Month of the tax year start (validFrom)</param>
-            <param name="StartDay">Day of the tax year start (validFrom)</param>
-        </member>
-        <member name="P:PayrollEngine.Lex.RelevantPeriod.Year">
-            <summary>Relevant year: the reference year of the entry or the year of validFrom; the start year of a tax year</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.RelevantPeriod.Fiscal">
-            <summary>The period is a tax year starting in <paramref name="Year"/></summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartMonth">
-            <summary>Month of the tax year start (validFrom)</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.RelevantPeriod.StartDay">
-            <summary>Day of the tax year start (validFrom)</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.RelevantPeriod.TaxYearOf(System.Int32,System.Int32,System.Nullable{System.Int32})">
-            <summary>
-            Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
-            before; null when the date has no day in the start month and the tax year does not start on the 1st
-            </summary>
-        </member>
-        <member name="T:PayrollEngine.Lex.YearHit">
-            <summary>
-            Year, year group (enumeration, range) or tax year period of a text with its position
-            </summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Nullable{System.Int32},System.Boolean,System.Nullable{System.Int32},System.Nullable{System.Int32})">
-            <summary>
-            Year, year group (enumeration, range) or tax year period of a text with its position
-            </summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Month">
-            <summary>Month of a date with the year (<c>January 2026</c>, <c>17.09.2026</c>), null without date</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Day">
-            <summary>Day of a date with the year, null without day</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Years">
-            <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Index">
-            <summary>Text position of the first year</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Length">
-            <summary>Text length up to the end of the last year</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Validity">
-            <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or a value
-            unchanged from the year (<c>unchanged from 2024</c>)</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.PeriodStart">
-            <summary>Start year of a tax year period (<c>2025-26</c>, <c>FY 2025-26</c>, <c>AY 2026-27</c>: 2025),
-            null for a year or a year group</summary>
-        </member>
-        <member name="P:PayrollEngine.Lex.YearHit.Plain">
-            <summary>A period of two full consecutive years without prefix (<c>2025-2026</c>, <c>2025/2026</c>,
-            <c>2025 to 2026</c>): a year group for a calendar year</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.YearHit.Join(System.Int32,System.Int32)">
-            <summary>Group with a further year that ends at the text position</summary>
-        </member>
-        <member name="M:PayrollEngine.Lex.YearHit.AtStart">
-            <summary>The year at the start of the section text (year of the section heading)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceResult">
             <summary>
@@ -2177,6 +2089,37 @@
         </member>
         <member name="P:PayrollEngine.Lex.SourceResult.CanWrite">
             <summary>The source location and the automatic verification record may be written</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceScript">
+            <summary>
+            Script normalization of a source text for the number and year search: digits of other scripts (Arabic-Indic,
+            Persian, Devanagari, Bengali, Gujarati, Tamil, Kannada, full width) become ASCII digits, the Arabic decimal and
+            thousands separators become <c>.</c> and <c>,</c>, the Arabic and the full width percent sign become <c>%</c>.
+            Every replacement is one character for one character, so text positions remain valid.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SourceScript.Normalize(System.String)">
+            <summary>
+            Normalize the script of a text; a text without such characters is returned unchanged
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceState">
+            <summary>
+            Readability of a source document
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceState.Readable">
+            <summary>Text could be extracted</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceState.Unreadable">
+            <summary>The source could not be requested or holds no text (blocked host, script-only page,
+            PDF without text layer, encrypted PDF)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceState.Unsupported">
+            <summary>The format has no reader (e.g. a ZIP archive or an unknown binary format)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceState.Missing">
+            <summary>No local evidence file exists</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceVerifier">
             <summary>
@@ -2564,20 +2507,6 @@
             </summary>
             <param name="stream">The spreadsheet stream (the format is detected from the content)</param>
         </member>
-        <member name="T:PayrollEngine.Lex.UrlStatus">
-            <summary>
-            Result of requesting one source URL
-            </summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.UrlStatus.Ok">
-            <summary>The page answers (2xx or redirect to an answering page)</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.UrlStatus.Blocked">
-            <summary>The host blocks scripted requests (401, 403, 429) or fails temporarily (5xx, timeout): not verifiable</summary>
-        </member>
-        <member name="F:PayrollEngine.Lex.UrlStatus.Dead">
-            <summary>The page does not exist (404, 410) or the host is unknown</summary>
-        </member>
         <member name="T:PayrollEngine.Lex.UrlChecker">
             <summary>
             Requests the source URLs of lex manifests
@@ -2623,6 +2552,20 @@
         </member>
         <member name="M:PayrollEngine.Lex.UrlChecker.Dispose">
             <inheritdoc />
+        </member>
+        <member name="T:PayrollEngine.Lex.UrlStatus">
+            <summary>
+            Result of requesting one source URL
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.UrlStatus.Ok">
+            <summary>The page answers (2xx or redirect to an answering page)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.UrlStatus.Blocked">
+            <summary>The host blocks scripted requests (401, 403, 429) or fails temporarily (5xx, timeout): not verifiable</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.UrlStatus.Dead">
+            <summary>The page does not exist (404, 410) or the host is unknown</summary>
         </member>
         <member name="T:PayrollEngine.Lex.Validator">
             <summary>
@@ -2726,6 +2669,63 @@
             Recompute the source hash. Returns null when a file needed for the hash is missing (reported in errors).
             Evidence copies in the .lex folder are the reference; an original outside .lex that differs from its copy is reported.
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.YearHit">
+            <summary>
+            Year, year group (enumeration, range) or tax year period of a text with its position
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.YearHit.#ctor(System.Collections.Generic.List{System.Int32},System.Int32,System.Int32,System.Boolean,System.Nullable{System.Int32},System.Boolean,System.Nullable{System.Int32},System.Nullable{System.Int32})">
+            <summary>
+            Year, year group (enumeration, range) or tax year period of a text with its position
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Month">
+            <summary>Month of a date with the year (<c>January 2026</c>, <c>17.09.2026</c>), null without date</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Day">
+            <summary>Day of a date with the year, null without day</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Years">
+            <summary>Years of the hit, one year or the years of a group; start and end year of a period</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Index">
+            <summary>Text position of the first year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Length">
+            <summary>Text length up to the end of the last year</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Validity">
+            <summary>Start of a validity (<c>effective January 1, 2025</c>, <c>2025 and after</c>) or a value
+            unchanged from the year (<c>unchanged from 2024</c>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.PeriodStart">
+            <summary>Start year of a tax year period (<c>2025-26</c>, <c>FY 2025-26</c>, <c>AY 2026-27</c>: 2025),
+            null for a year or a year group</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearHit.Plain">
+            <summary>A period of two full consecutive years without prefix (<c>2025-2026</c>, <c>2025/2026</c>,
+            <c>2025 to 2026</c>): a year group for a calendar year</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.YearHit.Join(System.Int32,System.Int32)">
+            <summary>Group with a further year that ends at the text position</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.YearHit.AtStart">
+            <summary>The year at the start of the section text (year of the section heading)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.YearMention">
+            <summary>
+            Line of a rolled file that still mentions the previous year
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.File">
+            <summary>File path relative to the new satellite</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.Line">
+            <summary>Line number (1-based)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.YearMention.Text">
+            <summary>Line text (trimmed, shortened)</summary>
         </member>
     </members>
 </doc>

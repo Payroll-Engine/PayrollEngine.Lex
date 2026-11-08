@@ -1,5 +1,4 @@
 using System.Net;
-using System.Net.Http.Headers;
 using Xunit;
 
 namespace PayrollEngine.Lex.Tests;
@@ -10,21 +9,8 @@ public sealed class FetcherTests : IDisposable
 
     public FetcherTests() => Directory.CreateDirectory(directory);
 
-    private sealed class Handler(HttpStatusCode status, string body, string mediaType) : HttpMessageHandler
-    {
-        private int Requests { get; set; }
-
-        protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-        {
-            Requests++;
-            var content = new ByteArrayContent(System.Text.Encoding.UTF8.GetBytes(body));
-            content.Headers.ContentType = new MediaTypeHeaderValue(mediaType);
-            return Task.FromResult(new HttpResponseMessage(status) { Content = content });
-        }
-    }
-
     private static HttpClient Client(string body = "rates 8.5", HttpStatusCode status = HttpStatusCode.OK,
-        string mediaType = "application/pdf") => new(new Handler(status, body, mediaType));
+        string mediaType = "application/pdf") => new(new BodyHandler(status, body, mediaType));
 
     [Fact]
     public async Task Fetch_CreatesFileNamedAfterUrl()
