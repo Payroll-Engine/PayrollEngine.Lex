@@ -50,6 +50,12 @@
 	  </None>
 	</ItemGroup>
 
+	<!--  publish json schema -->
+	<Target Name="PublishJsonSchema" AfterTargets="Build" Condition="exists('$(PayrollEngineSchemaDir)')">
+		<Message Importance="High" Text="Publish schema..." />
+		<Copy SourceFiles="$(ProjectDir)lex.schema.json" DestinationFiles="$(PayrollEngineSchemaDir)\PayrollEngine.Lex.schema.json" SkipUnchangedFiles="true" />
+	</Target>
+
 	<!-- publish package -->
 	<Target Name="PublishPackage" AfterTargets="Pack" Condition="exists('$(PayrollEnginePackageDir)')">
 		<Message Importance="High" Text="Publish package..." />
