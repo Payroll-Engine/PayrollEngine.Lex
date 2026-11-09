@@ -23,9 +23,10 @@
 	</ItemGroup>
 
 	<!-- language files: next to the library in the build output and in the output of the package consumers -->
+	<!-- PackagePath with forward slashes: packing on Linux treats backslash paths not as contentFiles (consumers would compile the json) -->
 	<ItemGroup>
 		<None Include="LexVocabulary\*.json" CopyToOutputDirectory="PreserveNewest" Pack="true"
-		      PackagePath="contentFiles\any\$(TargetFramework)\LexVocabulary\" PackageCopyToOutput="true" PackageFlatten="false" />
+		      PackagePath="contentFiles/any/$(TargetFramework)/LexVocabulary/" PackageCopyToOutput="true" PackageFlatten="false" BuildAction="None" />
 	</ItemGroup>
 
 	<!-- lex.json schema, read by Schema.Json -->
