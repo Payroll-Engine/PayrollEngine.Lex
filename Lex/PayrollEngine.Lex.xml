@@ -566,7 +566,8 @@
         </member>
         <member name="M:PayrollEngine.Lex.ContentHash.ResolvePath(System.String,System.String)">
             <summary>
-            Resolve a path relative to a base directory
+            Resolve a path relative to a base directory; backslash and slash are both folder separators
+            (lex.json written on Windows is read on Linux)
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.ContentSource">

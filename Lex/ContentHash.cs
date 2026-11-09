@@ -27,7 +27,8 @@ internal static class ContentHash
         Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(input)));
 
     /// <summary>
-    /// Resolve a path relative to a base directory
+    /// Resolve a path relative to a base directory; backslash and slash are both folder separators
+    /// (lex.json written on Windows is read on Linux)
     /// </summary>
     internal static string ResolvePath(string baseDirectory, string relativePath)
     {
@@ -35,6 +36,7 @@ internal static class ContentHash
         {
             return relativePath;
         }
-        return Path.GetFullPath(Path.Combine(baseDirectory, relativePath));
+        var normalized = relativePath.Replace('\\', '/').Replace('/', Path.DirectorySeparatorChar);
+        return Path.GetFullPath(Path.Combine(baseDirectory, normalized));
     }
 }
