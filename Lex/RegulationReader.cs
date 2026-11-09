@@ -7,7 +7,8 @@ using System.Text.Json;
 namespace PayrollEngine.Lex;
 
 /// <summary>
-/// Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
+/// Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value.
+/// The JSON entries of ZIP archives in the Regulation folder are read like files.
 /// </summary>
 internal static class RegulationReader
 {
@@ -16,6 +17,25 @@ internal static class RegulationReader
     {
         CommentHandling = JsonCommentHandling.Skip,
         AllowTrailingCommas = true
+    };
+
+    /// <summary>Root properties of a file that holds lookups only</summary>
+    private static readonly HashSet<string> LookupRootProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "$schema", "createdObjectDate", "tenants"
+    };
+
+    /// <summary>Tenant properties of a file that holds lookups only</summary>
+    private static readonly HashSet<string> LookupTenantProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "identifier", "updateMode", "culture", "calendar", "attributes", "regulations"
+    };
+
+    /// <summary>Regulation properties of a file that holds lookups only</summary>
+    private static readonly HashSet<string> LookupRegulationProperties = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "name", "namespace", "updateMode", "validFrom", "version", "description", "descriptionLocalizations",
+        "sharedRegulation", "attributes", "baseRegulations", "lookups"
     };
 
     /// <summary>State of reading one regulation file</summary>
@@ -30,8 +50,10 @@ internal static class RegulationReader
     }
 
     /// <summary>
-    /// Read all regulation files (*.json) of the Regulation folder below the satellite directory
+    /// Read all regulation files (*.json and the JSON entries of *.zip) of the Regulation folder below the
+    /// satellite directory, in the order of the file names
     /// </summary>
+    /// <exception cref="InvalidDataException">A ZIP file is no valid archive</exception>
     internal static RegulationData Read(string satelliteDirectory)
     {
         var data = new RegulationData();
@@ -43,17 +65,8 @@ internal static class RegulationReader
 
         // the first declared namespace applies to all files of the satellite
         string satelliteNamespace = null;
-        foreach (var path in Directory.GetFiles(regulationDirectory, "*.json").OrderBy(f => f, StringComparer.OrdinalIgnoreCase))
+        foreach (var file in Files(regulationDirectory))
         {
-            var bytes = File.ReadAllBytes(path);
-            // offsets are counted without the byte order mark; it is kept to write the file back unchanged
-            var bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
-            var file = new RegulationFile
-            {
-                Path = path,
-                Bom = bom ? bytes[..3] : [],
-                Content = bom ? bytes[3..] : bytes
-            };
             var context = new Context { Data = data, File = file };
             var reader = new Utf8JsonReader(file.Content, ReaderOptions);
             ReadRoot(ref reader, context);
@@ -83,6 +96,44 @@ internal static class RegulationReader
     }
 
     /// <summary>
+    /// Regulation files of the folder: JSON files and the JSON entries of ZIP archives (entries by name)
+    /// </summary>
+    private static IEnumerable<RegulationFile> Files(string regulationDirectory)
+    {
+        var paths = Directory.GetFiles(regulationDirectory)
+            .Where(x => IsExtension(x, ".json") || IsExtension(x, ".zip"))
+            .OrderBy(x => x, StringComparer.OrdinalIgnoreCase);
+        foreach (var path in paths)
+        {
+            if (IsExtension(path, ".json"))
+            {
+                yield return ToRegulationFile(path, null, File.ReadAllBytes(path));
+                continue;
+            }
+            foreach (var (name, bytes) in ArchiveWriter.ReadEntries(path).Where(x => IsExtension(x.Name, ".json")))
+            {
+                yield return ToRegulationFile(path, name, bytes);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Regulation file of the content bytes; offsets are counted without the byte order mark, it is kept to
+    /// write the file back unchanged
+    /// </summary>
+    private static RegulationFile ToRegulationFile(string path, string entryName, byte[] bytes)
+    {
+        var bom = bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF;
+        return new RegulationFile
+        {
+            Path = path,
+            EntryName = entryName,
+            Bom = bom ? bytes[..3] : [],
+            Content = bom ? bytes[3..] : bytes
+        };
+    }
+
+    /// <summary>
     /// Root object: reads the tenants array, skips all other properties
     /// </summary>
     private static void ReadRoot(ref Utf8JsonReader reader, Context context)
@@ -90,11 +141,13 @@ internal static class RegulationReader
         // a file without root object (e.g. an array) holds no regulation
         if (!reader.Read() || reader.TokenType != JsonTokenType.StartObject)
         {
+            context.File.LookupsOnly = false;
             return;
         }
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
             var name = reader.GetString();
+            Observe(context, LookupRootProperties, name);
             reader.Read();
             if (Is(name, "tenants") && reader.TokenType == JsonTokenType.StartArray)
             {
@@ -125,6 +178,7 @@ internal static class RegulationReader
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
             var name = reader.GetString();
+            Observe(context, LookupTenantProperties, name);
             reader.Read();
             if (Is(name, "regulations") && reader.TokenType == JsonTokenType.StartArray)
             {
@@ -158,6 +212,7 @@ internal static class RegulationReader
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
             var name = reader.GetString();
+            Observe(context, LookupRegulationProperties, name);
             reader.Read();
             if (Is(name, "lookups") && reader.TokenType == JsonTokenType.StartArray)
             {
@@ -219,6 +274,8 @@ internal static class RegulationReader
     {
         /// <summary>Lookup value key, null without key</summary>
         internal string Key { get; set; }
+        /// <summary>Key values array, null without</summary>
+        internal JsonElement? KeyValues { get; set; }
         /// <summary>Range value, used as key of range lookups without key</summary>
         internal string RangeValue { get; set; }
         /// <summary>Scalar or JSON text value of the "value" property</summary>
@@ -246,6 +303,8 @@ internal static class RegulationReader
         var insertOffset = 0;
         var valuesOffset = 0;
         var lastValueOffset = -1;
+        var arrayOffset = -1;
+        var arrayLength = 0;
         var pending = new List<PendingValue>();
         while (reader.Read() && reader.TokenType == JsonTokenType.PropertyName)
         {
@@ -256,6 +315,7 @@ internal static class RegulationReader
             {
                 hasValues = true;
                 valuesOffset = nameOffset;
+                arrayOffset = (int)reader.TokenStartIndex;
                 insertOffset = (int)reader.BytesConsumed;
                 while (reader.Read() && reader.TokenType != JsonTokenType.EndArray)
                 {
@@ -270,6 +330,8 @@ internal static class RegulationReader
                         reader.Skip();
                     }
                 }
+                // the whole array is replaced by a text table
+                arrayLength = (int)reader.BytesConsumed - arrayOffset;
             }
             else if (Is(name, "name"))
             {
@@ -293,7 +355,9 @@ internal static class RegulationReader
             HasValues = hasValues,
             InsertOffset = insertOffset,
             ValuesOffset = valuesOffset,
-            LastValueOffset = lastValueOffset
+            LastValueOffset = lastValueOffset,
+            ArrayOffset = arrayOffset,
+            ArrayLength = arrayLength
         };
         context.Data.Lookups.Add(lookup);
         context.Data.LookupCount++;
@@ -306,6 +370,9 @@ internal static class RegulationReader
                 Lookup = lookupName,
                 // range lookups may have no key: the range value identifies the entry
                 Key = item.Key ?? item.RangeValue ?? string.Empty,
+                ValueKey = item.Key,
+                KeyValues = item.KeyValues,
+                RangeValue = item.RangeValue,
                 Object = useObject ? item.ValueObject : null,
                 Scalar = useObject || item.Value == null ? null : ScalarText(item.Value.Value),
                 Owner = lookup,
@@ -319,7 +386,7 @@ internal static class RegulationReader
     }
 
     /// <summary>
-    /// Lookup value object: reads key, rangeValue, value and valueObject with their token locations
+    /// Lookup value object: reads key, keyValues, rangeValue, value and valueObject with their token locations
     /// </summary>
     private static PendingValue ReadValue(ref Utf8JsonReader reader)
     {
@@ -333,6 +400,11 @@ internal static class RegulationReader
             if (Is(name, "key"))
             {
                 value.Key = ScalarText(JsonElement.ParseValue(ref reader), nullAsNull: true);
+            }
+            else if (Is(name, "keyValues"))
+            {
+                var keyValues = JsonElement.ParseValue(ref reader);
+                value.KeyValues = keyValues.ValueKind == JsonValueKind.Array ? keyValues : null;
             }
             else if (Is(name, "rangeValue"))
             {
@@ -359,6 +431,17 @@ internal static class RegulationReader
     }
 
     /// <summary>
+    /// A property outside the header and the lookups: the file holds more than lookups
+    /// </summary>
+    private static void Observe(Context context, HashSet<string> lookupProperties, string name)
+    {
+        if (!lookupProperties.Contains(name))
+        {
+            context.File.LookupsOnly = false;
+        }
+    }
+
+    /// <summary>
     /// Text of the current token, null for a JSON null
     /// </summary>
     private static string Text(ref Utf8JsonReader reader)
@@ -377,6 +460,12 @@ internal static class RegulationReader
             JsonValueKind.Null when nullAsNull => null,
             _ => element.ToString()
         };
+
+    /// <summary>
+    /// File name with the extension, ignoring case
+    /// </summary>
+    private static bool IsExtension(string path, string extension) =>
+        string.Equals(Path.GetExtension(path), extension, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>
     /// Property names are compared ignoring case (regulation files are written by hand)

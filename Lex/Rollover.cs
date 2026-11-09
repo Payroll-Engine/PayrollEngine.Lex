@@ -125,9 +125,10 @@ public static class Rollover
             return result;
         }
 
-        // content files of the entries are renamed, the other files of .lex keep their name (evidence)
+        // content files of the entries are renamed, the other files of .lex keep their name (evidence);
+        // an archive of a content file entry is evidence too: it keeps its name
         var contentFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var entry in manifest.Values.Where(x => x.HasContentFile))
+        foreach (var entry in manifest.Values.Where(x => x.HasContentFile && ContentSource.Split(x.ContentFile).Entry == null))
         {
             contentFiles.Add(Path.GetFullPath(Path.Combine(lexDirectory, entry.ContentFile)));
         }
@@ -179,12 +180,13 @@ public static class Rollover
         {
             regulation = RegulationReader.Read(source);
         }
-        catch (Exception exception) when (exception is JsonException or IOException)
+        catch (Exception exception) when (exception is JsonException or IOException or InvalidDataException)
         {
             result.Error = "Regulation JSON could not be read: " + exception.Message;
             return result;
         }
         // the validFrom tokens are replaced in place, the files keep their formatting
+        // (the tokens of an archive are grouped by its path and belong to its JSON entries)
         var validFromTokens = regulation.ValidFromTokens
             .GroupBy(x => x.File.Path, StringComparer.OrdinalIgnoreCase)
             .ToDictionary(x => x.Key, x => x.ToList(), StringComparer.OrdinalIgnoreCase);
@@ -212,16 +214,35 @@ public static class Rollover
                 // lex.json: new validFrom, renamed content files and keys, all entries marked open (verify again)
                 var editor = ManifestEditor.Parse(File.ReadAllText(file));
                 editor.SetValidFrom(result.ValidFrom);
-                var keys = editor.RollContentFiles(x => RenamePath(x, RenameName), oldTag, newTag);
+                var archiveReferences = new List<string>();
+                var keys = editor.RollContentFiles(x => RollContentFile(x, RenameName, oldTag, newTag, archiveReferences),
+                    oldTag, newTag);
                 result.OpenEntries = editor.OpenEntries();
                 var json = editor.ToJson();
                 result.Changed.Add($"{relative}: validFrom {result.ValidFrom}, {result.OpenEntries} open entries" +
                                    (keys > 0 ? $", {keys} keys with year tag {newTag}" : string.Empty));
+                // the archive of the new cycle is a new download: the previous archive stays as evidence
+                foreach (var reference in archiveReferences)
+                {
+                    result.Notes.Add($"contentFile {reference}: declare the new archive in files[] and fetch it (LexFetch)");
+                }
                 AddMentions(result, relative, json, mention);
                 output.Add((relative, null, Encoding.UTF8.GetBytes(json)));
                 continue;
             }
             var inLex = relative.StartsWith(LexFolder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+            // lookup archives of the Regulation folder: validFrom of their JSON entries
+            if (!inLex && string.Equals(Path.GetExtension(file), ".zip", StringComparison.OrdinalIgnoreCase) &&
+                validFromTokens.TryGetValue(file, out var archiveTokens))
+            {
+                var archive = SetArchiveValidFrom(file, archiveTokens, result.ValidFrom, relative, result.Notes);
+                if (archive != null)
+                {
+                    result.Changed.Add($"{relative}: validFrom");
+                    output.Add((relative, null, archive));
+                    continue;
+                }
+            }
             // evidence and binary files are copied unchanged
             if (inLex || !TextExtensions.Contains(Path.GetExtension(file)))
             {
@@ -326,10 +347,64 @@ public static class Rollover
             newTag, RegexOptions.CultureInvariant);
 
     /// <summary>
+    /// Replace the year of an archive content file reference (archive!entry): the four-digit year and its
+    /// two-digit short form, each without adjacent digit (tables-2026.zip!rates26.txt becomes
+    /// tables-2027.zip!rates27.txt)
+    /// </summary>
+    internal static string RenameArchiveReference(string reference, string oldTag, string newTag)
+    {
+        var renamed = Regex.Replace(reference, $"(?<![0-9]){oldTag}(?![0-9])", newTag, RegexOptions.CultureInvariant);
+        return Regex.Replace(renamed, $"(?<![0-9]){oldTag[2..]}(?![0-9])", newTag[2..], RegexOptions.CultureInvariant);
+    }
+
+    /// <summary>
+    /// New content file reference: a file path is renamed by segments, an archive reference by its years
+    /// </summary>
+    /// <param name="contentFile">Content file reference of lex.json</param>
+    /// <param name="renameName">Rename of a name segment</param>
+    /// <param name="oldTag">Previous year</param>
+    /// <param name="newTag">New year</param>
+    /// <param name="archiveReferences">Renamed archive references (old -> new)</param>
+    private static string RollContentFile(string contentFile, Func<string, string> renameName, string oldTag, string newTag,
+        List<string> archiveReferences)
+    {
+        if (ContentSource.Split(contentFile).Entry == null)
+        {
+            return RenamePath(contentFile, renameName);
+        }
+        var renamed = RenameArchiveReference(contentFile, oldTag, newTag);
+        if (!string.Equals(renamed, contentFile, StringComparison.Ordinal))
+        {
+            archiveReferences.Add($"{contentFile} -> {renamed}");
+        }
+        return renamed;
+    }
+
+    /// <summary>
     /// Renames every segment of a relative path (forward slashes, as written in lex.json)
     /// </summary>
     private static string RenamePath(string path, Func<string, string> renameName) =>
         string.Join('/', path.Replace('\\', '/').Split('/').Select(renameName));
+
+    /// <summary>
+    /// Archive with the new validFrom in its JSON entries, null without change
+    /// </summary>
+    private static byte[] SetArchiveValidFrom(string path, List<RegulationToken> tokens, string validFrom,
+        string relative, List<string> notes)
+    {
+        var replacements = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+        foreach (var group in tokens.GroupBy(x => x.File))
+        {
+            var file = group.Key;
+            var content = SetValidFrom(file.Content, group.ToList(), validFrom,
+                relative + ContentSource.EntrySeparator + file.EntryName, notes, out var count);
+            if (count > 0)
+            {
+                replacements[file.EntryName] = [.. file.Bom, .. content];
+            }
+        }
+        return replacements.Count > 0 ? ArchiveWriter.Replace(path, replacements) : null;
+    }
 
     /// <summary>
     /// Replace the date part of the validFrom tokens, the time part is kept

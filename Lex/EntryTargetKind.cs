@@ -15,5 +15,8 @@ internal enum EntryTargetKind
     Lookup,
 
     /// <summary>Lookup exists, the value is missing</summary>
-    NewValue
+    NewValue,
+
+    /// <summary>All values of a lookup, converted from a text table (content file with content map)</summary>
+    Table
 }

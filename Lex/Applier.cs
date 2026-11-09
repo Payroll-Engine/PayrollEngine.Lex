@@ -11,6 +11,8 @@ namespace PayrollEngine.Lex;
 /// <summary>
 /// Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
 /// Only differing values are replaced in place; descriptions and the formatting of the file are kept.
+/// A text table entry replaces the values array of its lookup; a lookup file with a text table is written as
+/// ZIP archive.
 /// </summary>
 public static class Applier
 {
@@ -67,7 +69,7 @@ public static class Applier
         {
             regulation = RegulationReader.Read(satelliteDirectory);
         }
-        catch (Exception exception) when (exception is JsonException or IOException)
+        catch (Exception exception) when (exception is JsonException or IOException or InvalidDataException)
         {
             result.Error = "Regulation JSON could not be read: " + exception.Message;
             return result;
@@ -84,6 +86,8 @@ public static class Applier
         // all changes are collected first and written per file in one pass: offsets refer to the original content
         var edits = new List<Edit>();
         var additions = new Dictionary<RegulationLookup, List<Addition>>();
+        // lookup JSON files that become a ZIP archive
+        var archived = new HashSet<RegulationFile>();
         foreach (var entry in manifest.Values)
         {
             if (string.IsNullOrEmpty(entry.Key) || Checker.IsReferenceEntry(entry.Key))
@@ -102,6 +106,11 @@ public static class Applier
                 result.Skipped.Add($"{entry.Key}: no regulation lookup");
                 continue;
             }
+            if (target.Kind == EntryTargetKind.Table)
+            {
+                ApplyTable(result, edits, archived, entry, target.Lookup, lexDirectory);
+                continue;
+            }
             string content;
             try
             {
@@ -112,7 +121,7 @@ public static class Applier
                     continue;
                 }
             }
-            catch (IOException exception)
+            catch (Exception exception) when (exception is IOException or InvalidDataException)
             {
                 result.Skipped.Add($"{entry.Key}: {exception.Message}");
                 continue;
@@ -157,6 +166,10 @@ public static class Applier
             });
         }
 
+        // new contents, written after all files are valid
+        var jsonFiles = new List<(string Path, byte[] Content)>();
+        var archiveEntries = new Dictionary<string, Dictionary<string, byte[]>>(StringComparer.OrdinalIgnoreCase);
+        var newArchives = new List<(string JsonPath, string ArchivePath, byte[] Content)>();
         foreach (var group in edits.GroupBy(x => x.File))
         {
             var file = group.Key;
@@ -168,19 +181,127 @@ public static class Applier
             }
             catch (JsonException exception)
             {
-                result.Error = $"{Path.GetFileName(file.Path)}: generated JSON is invalid ({exception.Message}), nothing written";
-                result.WrittenFiles.Clear();
+                result.Error = $"{file.DisplayName}: generated JSON is invalid ({exception.Message}), nothing written";
                 return result;
             }
-            if (!dryRun)
+            // the original byte order mark is kept
+            byte[] content = [.. file.Bom, .. bytes];
+            if (file.IsArchiveEntry)
             {
-                // the original byte order mark is kept
-                File.WriteAllBytes(file.Path, [.. file.Bom, .. bytes]);
-                result.WrittenFiles.Add(file.Path);
+                if (!archiveEntries.TryGetValue(file.Path, out var entries))
+                {
+                    archiveEntries[file.Path] = entries = new Dictionary<string, byte[]>(StringComparer.Ordinal);
+                }
+                entries[file.EntryName] = content;
             }
+            else if (archived.Contains(file))
+            {
+                var archivePath = ArchivePath(file);
+                if (File.Exists(archivePath))
+                {
+                    result.Error = $"{Path.GetFileName(file.Path)} and {Path.GetFileName(archivePath)} both exist: remove one, nothing written";
+                    return result;
+                }
+                newArchives.Add((file.Path, archivePath, content));
+                result.ReplacedFiles.Add($"{Path.GetFileName(file.Path)} -> {Path.GetFileName(archivePath)}");
+            }
+            else
+            {
+                jsonFiles.Add((file.Path, content));
+            }
+        }
+        if (dryRun)
+        {
+            return result;
+        }
+
+        foreach (var (path, content) in jsonFiles)
+        {
+            File.WriteAllBytes(path, content);
+            result.WrittenFiles.Add(path);
+        }
+        foreach (var (path, entries) in archiveEntries)
+        {
+            File.WriteAllBytes(path, ArchiveWriter.Replace(path, entries));
+            result.WrittenFiles.Add(path);
+        }
+        foreach (var (jsonPath, archivePath, content) in newArchives)
+        {
+            // the archive holds the lookup file under its JSON name
+            File.WriteAllBytes(archivePath, ArchiveWriter.Write([(Path.GetFileName(jsonPath), content)]));
+            File.Delete(jsonPath);
+            result.WrittenFiles.Add(archivePath);
         }
         return result;
     }
+
+    /// <summary>
+    /// Replaces the values array of a lookup with the rows of a text table when they differ
+    /// </summary>
+    private static void ApplyTable(ApplyResult result, List<Edit> edits, HashSet<RegulationFile> archived, Entry entry,
+        RegulationLookup lookup, string lexDirectory)
+    {
+        if (!lookup.HasValues)
+        {
+            result.Skipped.Add($"{entry.Key}: lookup {lookup.Name} has no values array");
+            return;
+        }
+        var table = TableComparer.Read(entry, lexDirectory, out var problem);
+        if (table == null)
+        {
+            result.Skipped.Add($"{entry.Key}: {problem}");
+            return;
+        }
+        var difference = TableComparer.Compare(table.Rows, lookup);
+        result.Unchanged += difference.Unchanged;
+        // equal tables are not rewritten: a second run changes nothing
+        if (!difference.HasDifferences)
+        {
+            return;
+        }
+
+        var file = lookup.File;
+        var edit = new Edit
+        {
+            File = file,
+            Offset = lookup.ArrayOffset,
+            Length = lookup.ArrayLength,
+            Text = TableComparer.ValuesText(table.Rows, LineIndent(file.Content, lookup.ValuesOffset), NewLine(file.Content)),
+            EntryKey = entry.Key
+        };
+        var conflict = edits.FirstOrDefault(x => x.File == file && x.Offset < edit.End && edit.Offset < x.End);
+        if (conflict != null)
+        {
+            result.Skipped.Add($"{entry.Key}: overlaps with the change of {conflict.EntryKey}");
+            return;
+        }
+        edits.Add(edit);
+
+        // a lookup file is stored as archive; a file with other regulation objects stays JSON
+        var archive = !file.IsArchiveEntry && file.LookupsOnly;
+        if (archive)
+        {
+            archived.Add(file);
+        }
+        result.Changes.Add(new ApplyChange
+        {
+            EntryKey = entry.Key,
+            File = Path.GetFileName(archive ? ArchivePath(file) : file.Path),
+            Target = lookup.Name,
+            Kind = ApplyChangeKind.Table,
+            Detail = difference.Summary +
+                     (table.Ignored > 0 ? $", {table.Ignored} lines without key or value ignored" : string.Empty),
+            AddedValues = difference.Added,
+            RemovedValues = difference.Removed,
+            ChangedValues = difference.Changed
+        });
+    }
+
+    /// <summary>
+    /// Archive of a lookup JSON file: same folder and name, extension .zip
+    /// </summary>
+    private static string ArchivePath(RegulationFile file) =>
+        Path.ChangeExtension(file.Path, ".zip");
 
     /// <summary>
     /// Replaces the value token (or the property of a split key) when the lex content differs

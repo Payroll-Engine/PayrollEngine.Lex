@@ -55,6 +55,12 @@ public static class Verifier
             {
                 errors.Add($"Value '{value.Key}': content differs from the snapshot");
             }
+            // the snapshot records the map by its local file name
+            var contentMap = value.HasContentMap ? Path.GetFileName(value.ContentMap) : null;
+            if (!string.Equals(contentMap, snapValue.ContentMap, StringComparison.OrdinalIgnoreCase))
+            {
+                errors.Add($"Value '{value.Key}': contentMap differs from the snapshot");
+            }
             if (!string.Equals(value.SourceQuote, snapValue.SourceQuote, StringComparison.Ordinal))
             {
                 errors.Add($"Value '{value.Key}': sourceQuote differs from the snapshot");
@@ -160,18 +166,52 @@ public static class Verifier
             }
             else if (value.HasContentFile)
             {
-                // LexSnapshot copies content files flat into .lex: the copy is hashed
-                var original = ContentHash.ResolvePath(lexDirectory, value.ContentFile);
-                var local = Path.Combine(lexDirectory, Path.GetFileName(original));
-                if (!File.Exists(local))
+                var source = ContentSource.Resolve(lexDirectory, value.ContentFile);
+                if (source.IsArchiveEntry)
                 {
-                    errors.Add($"Value '{value.Key}': content file copy missing in the .lex folder: {Path.GetFileName(original)}");
-                    complete = false;
-                    continue;
+                    // the archive is a declared file in the .lex folder: the entry is hashed in place
+                    var archive = ContentSource.Resolve(lexDirectory,
+                        Path.Combine(lexDirectory, source.FileName) + ContentSource.EntrySeparator + source.EntryName);
+                    var problem = archive.Problem();
+                    if (problem != null)
+                    {
+                        errors.Add($"Value '{value.Key}': {problem}");
+                        complete = false;
+                        continue;
+                    }
+                    input.Append(archive.Hash());
                 }
-                var localHash = ContentHash.FileHash(local);
-                input.Append(localHash);
-                CheckOriginal(errors, $"Value '{value.Key}'", original, local, localHash);
+                else
+                {
+                    // LexSnapshot copies content files flat into .lex: the copy is hashed
+                    var original = source.FilePath;
+                    var local = Path.Combine(lexDirectory, source.FileName);
+                    if (!File.Exists(local))
+                    {
+                        errors.Add($"Value '{value.Key}': content file copy missing in the .lex folder: {source.FileName}");
+                        complete = false;
+                        continue;
+                    }
+                    var localHash = ContentHash.FileHash(local);
+                    input.Append(localHash);
+                    CheckOriginal(errors, $"Value '{value.Key}'", original, local, localHash);
+                }
+
+                if (value.HasContentMap)
+                {
+                    // the map follows the content hash, its copy in .lex is the reference
+                    var original = ContentHash.ResolvePath(lexDirectory, value.ContentMap);
+                    var local = Path.Combine(lexDirectory, Path.GetFileName(original));
+                    if (!File.Exists(local))
+                    {
+                        errors.Add($"Value '{value.Key}': content map copy missing in the .lex folder: {Path.GetFileName(original)}");
+                        complete = false;
+                        continue;
+                    }
+                    var localHash = ContentHash.FileHash(local);
+                    input.Append(localHash);
+                    CheckOriginal(errors, $"Value '{value.Key}'", original, local, localHash);
+                }
             }
             else
             {

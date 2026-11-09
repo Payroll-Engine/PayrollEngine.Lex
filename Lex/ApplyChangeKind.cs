@@ -9,5 +9,8 @@ public enum ApplyChangeKind
     Changed,
 
     /// <summary>New lookup value</summary>
-    Added
+    Added,
+
+    /// <summary>All values of a lookup replaced by a text table</summary>
+    Table
 }

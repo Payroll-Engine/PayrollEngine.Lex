@@ -77,6 +77,13 @@ internal static class CoverageCheck
                 }
                 continue;
             }
+            // a text table covers its lookup; the table is compared as a whole (same comparison as LexApply)
+            if (target.Kind == EntryTargetKind.Table)
+            {
+                coveredLookups.Add(target.BaseKey);
+                CompareTable(result, entry, lexDirectory, target.Lookup);
+                continue;
+            }
             if (Checker.IsReferenceEntry(entry.Key))
             {
                 // reference entry (link to an official calculator), not a regulation value
@@ -85,6 +92,27 @@ internal static class CoverageCheck
             CountOrphan(entry.Key, result, orphanExclusions, usedExclusions);
         }
         return coveredLookups;
+    }
+
+    /// <summary>
+    /// A text table that differs from its lookup is one drift; an unreadable table is a drift with the reason
+    /// </summary>
+    private static void CompareTable(CheckResult result, Entry entry, string lexDirectory, RegulationLookup lookup)
+    {
+        result.Compared++;
+        var table = TableComparer.Read(entry, lexDirectory, out var problem);
+        if (table == null)
+        {
+            result.Drift++;
+            CheckResult.AddSample(result.DriftSamples, $"{entry.Key}: {problem}");
+            return;
+        }
+        var difference = TableComparer.Compare(table.Rows, lookup);
+        if (difference.HasDifferences)
+        {
+            result.Drift++;
+            CheckResult.AddSample(result.DriftSamples, $"{entry.Key}: table {lookup.Name} {difference.Summary}");
+        }
     }
 
     /// <summary>

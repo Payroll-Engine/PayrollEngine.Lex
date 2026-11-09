@@ -24,6 +24,18 @@ internal static class EntryMapping
     /// </summary>
     internal static EntryTarget Resolve(Entry entry, RegulationIndex index, string editionTag)
     {
+        // a text table fills a whole lookup: the key names the lookup (with optional edition tag)
+        if (entry.HasContentMap)
+        {
+            foreach (var (baseKey, remainder) in Splits(entry.Key))
+            {
+                if (index.TryGetLookup(baseKey, out var lookup) && StripEdition(entry, remainder, editionTag).Length == 0)
+                {
+                    return new EntryTarget { Kind = EntryTargetKind.Table, BaseKey = baseKey, Lookup = lookup };
+                }
+            }
+            return new EntryTarget { Kind = EntryTargetKind.None };
+        }
         foreach (var (baseKey, remainder) in Splits(entry.Key))
         {
             if (index.TryGetValues(baseKey, out var values))
@@ -58,7 +70,7 @@ internal static class EntryMapping
     }
 
     /// <summary>
-    /// Content of a lex entry: inline content or the text of a JSON content file
+    /// Content of a lex entry: inline content or the text of a JSON content file (also inside an archive)
     /// </summary>
     /// <returns>Content or null with the reason</returns>
     internal static string Content(Entry entry, string lexDirectory, out string reason)
@@ -73,18 +85,20 @@ internal static class EntryMapping
             }
             return entry.Content;
         }
-        if (!string.Equals(Path.GetExtension(entry.ContentFile), ".json", StringComparison.OrdinalIgnoreCase))
+        // a text table is converted by its map, its text is no lookup value
+        if (entry.HasContentMap)
+        {
+            reason = $"contentFile is a text table: {entry.ContentFile}";
+            return null;
+        }
+        var source = ContentSource.Resolve(lexDirectory, entry.ContentFile);
+        if (!string.Equals(Path.GetExtension(source.ContentName), ".json", StringComparison.OrdinalIgnoreCase))
         {
             reason = $"contentFile is not JSON: {entry.ContentFile}";
             return null;
         }
-        var path = ContentHash.ResolvePath(lexDirectory, entry.ContentFile);
-        if (!File.Exists(path))
-        {
-            reason = $"contentFile missing: {entry.ContentFile}";
-            return null;
-        }
-        return File.ReadAllText(path);
+        reason = source.Problem();
+        return reason == null ? source.ReadAllText() : null;
     }
 
     /// <summary>

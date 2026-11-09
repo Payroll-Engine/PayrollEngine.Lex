@@ -199,6 +199,9 @@
       "type": "object",
       "required": ["key"],
       "additionalProperties": false,
+      "dependentRequired": {
+        "contentMap": ["contentFile"]
+      },
       "properties": {
         "key": {
           "type": "string",
@@ -210,7 +213,14 @@
         },
         "contentFile": {
           "type": "string",
-          "description": "Relative path to a source file to copy into the .lex folder. Mutually exclusive with content."
+          "pattern": "^[^!]+(![^!]+)?$",
+          "description": "Relative path to a source file to copy into the .lex folder, or a file inside a ZIP archive written as '<archive>!<entry>' (e.g. 'tariffs.zip!tariff-a.txt'); the archive must be declared in files[] and is not extracted. Without contentMap the file must be JSON. Mutually exclusive with content.",
+          "examples": ["Rates.2026.json", "tariffs-2026.zip!tariff-a.txt"]
+        },
+        "contentMap": {
+          "type": "string",
+          "description": "Text table map (JSON, relative to the .lex folder) that converts the text file of contentFile into the values of the whole lookup (LexApply). The map holds key or keys, an optional rangeValue, value or values and optional filters. Only together with contentFile.",
+          "examples": ["Tariff.map.json"]
         },
         "documentRef": {
           "type": "string",

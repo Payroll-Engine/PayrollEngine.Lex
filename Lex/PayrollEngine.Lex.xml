@@ -8,6 +8,8 @@
             <summary>
             Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
             Only differing values are replaced in place; descriptions and the formatting of the file are kept.
+            A text table entry replaces the values array of its lookup; a lookup file with a text table is written as
+            ZIP archive.
             </summary>
         </member>
         <member name="F:PayrollEngine.Lex.Applier.StringOptions">
@@ -53,6 +55,16 @@
             <param name="manifest">Manifest (lex.json)</param>
             <param name="lexPath">Full path of lex.json</param>
             <param name="dryRun">Report the changes without writing</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.ApplyTable(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Edit},System.Collections.Generic.HashSet{PayrollEngine.Lex.RegulationFile},PayrollEngine.Lex.Entry,PayrollEngine.Lex.RegulationLookup,System.String)">
+            <summary>
+            Replaces the values array of a lookup with the rows of a text table when they differ
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.ArchivePath(PayrollEngine.Lex.RegulationFile)">
+            <summary>
+            Archive of a lookup JSON file: same folder and name, extension .zip
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Applier.Replace(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Edit},System.String,PayrollEngine.Lex.RegulationValue,System.String,System.String)">
             <summary>
@@ -121,13 +133,22 @@
             <summary>Regulation file name</summary>
         </member>
         <member name="P:PayrollEngine.Lex.ApplyChange.Target">
-            <summary>Regulation target: Lookup.Key with optional /property path</summary>
+            <summary>Regulation target: Lookup.Key with optional /property path, the lookup name of a table</summary>
         </member>
         <member name="P:PayrollEngine.Lex.ApplyChange.Kind">
             <summary>Kind of change</summary>
         </member>
         <member name="P:PayrollEngine.Lex.ApplyChange.Detail">
             <summary>Difference before the change</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.AddedValues">
+            <summary>Table rows without lookup value (kind Table)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.RemovedValues">
+            <summary>Lookup values without table row (kind Table)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.ChangedValues">
+            <summary>Table rows with a different lookup value (kind Table)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.ApplyChangeKind">
             <summary>
@@ -139,6 +160,9 @@
         </member>
         <member name="F:PayrollEngine.Lex.ApplyChangeKind.Added">
             <summary>New lookup value</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyChangeKind.Table">
+            <summary>All values of a lookup replaced by a text table</summary>
         </member>
         <member name="T:PayrollEngine.Lex.ApplyResult">
             <summary>
@@ -163,11 +187,43 @@
         <member name="P:PayrollEngine.Lex.ApplyResult.WrittenFiles">
             <summary>Regulation files written</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.ReplacedFiles">
+            <summary>Regulation JSON files replaced by a ZIP archive (text tables), as <c>old.json -> new.zip</c>;
+            the references in regulation-package.json, the project file and the setup are updated by hand</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.ApplyResult.Note">
             <summary>Information without changes (e.g. no lookups in the regulation JSON)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.ApplyResult.Error">
             <summary>Error that prevented the apply action</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ArchiveWriter">
+            <summary>
+            Reads and writes ZIP archives of the Regulation folder. An archive is written deterministically: entries
+            sorted by name, fixed timestamp and compression, so the same content gives the same bytes and git sees
+            no changes without a content change.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ArchiveWriter.EntryTime">
+            <summary>Timestamp of all entries (start of the ZIP date range)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ArchiveWriter.ReadEntries(System.String)">
+            <summary>
+            Entries of an archive with their uncompressed content, ordered by name (ordinal)
+            </summary>
+            <exception cref="T:System.IO.InvalidDataException">The file is no valid archive</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.ArchiveWriter.Write(System.Collections.Generic.IEnumerable{System.ValueTuple{System.String,System.Byte[]}})">
+            <summary>
+            Archive bytes of the entries
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ArchiveWriter.Replace(System.String,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Byte[]})">
+            <summary>
+            Archive bytes with replaced entries; the other entries are kept
+            </summary>
+            <param name="path">Existing archive</param>
+            <param name="replacements">New content by entry name</param>
         </member>
         <member name="T:PayrollEngine.Lex.AttestResult">
             <summary>
@@ -513,6 +569,81 @@
             Resolve a path relative to a base directory
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.ContentSource">
+            <summary>
+            Content file of a lex entry: a file or a file inside a ZIP archive (<c>archive.zip!entry.txt</c>).
+            An archive entry is read in place; the archive is the evidence copy and is not extracted.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ContentSource.EntrySeparator">
+            <summary>Separator between the archive path and the entry name</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.Reference">
+            <summary>Content file reference as written in lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.FilePath">
+            <summary>Full path of the file, or of the archive for an archive entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.EntryName">
+            <summary>Name of the entry inside the archive, null for a plain file</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.IsArchiveEntry">
+            <summary>The content is an entry of a ZIP archive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.FileName">
+            <summary>File name of the file or archive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.ContentName">
+            <summary>Name of the content: the entry name of an archive entry, else the file name</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Resolve(System.String,System.String)">
+            <summary>
+            Resolve a content file reference relative to the .lex folder
+            </summary>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <param name="contentFile">Content file reference (file path or archive!entry)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Split(System.String)">
+            <summary>
+            Split a reference into the file path and the archive entry name (null without separator)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ContentSource.LocalReference">
+            <summary>
+            Reference with the same entry and the archive file name only, as recorded in the snapshot
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Problem">
+            <summary>
+            Why the content cannot be read, null when it exists
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.ReadAllBytes">
+            <summary>
+            Content bytes of the file or archive entry
+            </summary>
+            <exception cref="T:System.IO.FileNotFoundException">File, archive or entry missing</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Open">
+            <summary>
+            Content stream of the file or archive entry (in memory for an archive entry)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.ReadAllText">
+            <summary>
+            Content text (UTF-8, a byte order mark selects the encoding)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Hash">
+            <summary>
+            SHA-256 of the content as lower-case hex: of the file, or of the uncompressed archive entry
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ContentSource.Find(System.IO.Compression.ZipArchive)">
+            <summary>
+            The archive entry by its full name (forward slashes, case-sensitive)
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.CoverageCheck">
             <summary>
             Coverage of the regulation lookup values by lex entries, exclusions, zero values and reference years
@@ -529,6 +660,11 @@
             the entries without regulation value
             </summary>
             <returns>Lookups covered as a whole by an entry with content file</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CompareTable(PayrollEngine.Lex.CheckResult,PayrollEngine.Lex.Entry,System.String,PayrollEngine.Lex.RegulationLookup)">
+            <summary>
+            A text table that differs from its lookup is one drift; an unreadable table is a drift with the reason
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.CoverageCheck.CountOrphan(System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{PayrollEngine.Lex.Exclusion},System.Collections.Generic.HashSet{PayrollEngine.Lex.Exclusion})">
             <summary>
@@ -660,7 +796,14 @@
         </member>
         <member name="P:PayrollEngine.Lex.Entry.ContentFile">
             <summary>
-            Relative path to a source file to copy into the .lex folder (mutually exclusive with Content)
+            Relative path to a source file to copy into the .lex folder (mutually exclusive with Content),
+            or a file inside a ZIP archive declared in files[] (<c>archive.zip!entry.txt</c>, not copied)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Entry.ContentMap">
+            <summary>
+            Text table map (JSON, relative to the .lex folder) that converts the text file of
+            <see cref="P:PayrollEngine.Lex.Entry.ContentFile"/> into the values of the whole lookup; only together with ContentFile
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.DocumentRef">
@@ -745,6 +888,11 @@
             Returns true if this value references an external file
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.Entry.HasContentMap">
+            <summary>
+            Returns true if the content file is a text table converted by a map
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.Entry.Urls">
             <summary>
             The non-empty source URLs, in declaration order
@@ -767,7 +915,7 @@
         </member>
         <member name="M:PayrollEngine.Lex.EntryMapping.Content(PayrollEngine.Lex.Entry,System.String,System.String@)">
             <summary>
-            Content of a lex entry: inline content or the text of a JSON content file
+            Content of a lex entry: inline content or the text of a JSON content file (also inside an archive)
             </summary>
             <returns>Content or null with the reason</returns>
         </member>
@@ -885,6 +1033,9 @@
         <member name="F:PayrollEngine.Lex.EntryTargetKind.NewValue">
             <summary>Lookup exists, the value is missing</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.EntryTargetKind.Table">
+            <summary>All values of a lookup, converted from a text table (content file with content map)</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.EvidenceCheck">
             <summary>
             Evidence files of a lex manifest: declaration, snapshot, git tracking and usage
@@ -903,7 +1054,7 @@
         </member>
         <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckEntryFiles(PayrollEngine.Lex.Manifest,System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.HashSet{System.String},System.Collections.Generic.List{System.String})">
             <summary>
-            A documentRef must be declared and exist, a content file must exist
+            A documentRef must be declared and exist, a content file (or archive entry) and a content map must exist
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.EvidenceCheck.CheckRepositoryState(System.String,PayrollEngine.Lex.CheckResult,System.Collections.Generic.List{System.String})">
@@ -914,8 +1065,9 @@
         <member name="M:PayrollEngine.Lex.EvidenceCheck.UnusedEvidence(PayrollEngine.Lex.Manifest,System.String)">
             <summary>
             Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
-            source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
-            without declaration in files[] is unused too (not frozen in the snapshot).
+            source URL of an entry, as contentFile (or archive of a contentFile entry), as contentMap or as evidence
+            of a verification record. A file in the .lex folder without declaration in files[] is unused too
+            (not frozen in the snapshot).
             An unused file is never read by LexVerifySource: its entries count as without local evidence.
             </summary>
             <param name="manifest">Manifest</param>
@@ -1706,11 +1858,18 @@
             Verification of all entries of a lex manifest against their local or live sources
             </summary>
         </member>
+        <member name="P:PayrollEngine.Lex.ManifestVerifier.FileIdentityMethod">
+            <summary>
+            Verification method of a text table verified by file identity, e.g. LexVerifySource 1.3.0; file identity
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)">
             <summary>
             Verify the entries of a manifest with source URLs (inline content and JSON content files) against the local
             evidence files or, with a live loader, against the source URLs. Per source URL the local evidence is the
             documentRef for the first URL, otherwise the declared file with the same URL.
+            A text table (content map) is verified by file identity: its file (or archive) is declared in files[] with
+            source URLs and present in the .lex folder; it is not downloaded, also not with a live loader.
             Entries that reference an official calculator are skipped. The languages of the manifest
             (<see cref="P:PayrollEngine.Lex.Manifest.Languages"/>, default: all available languages) read the number and year words.
             </summary>
@@ -1721,6 +1880,19 @@
             <param name="languageDirectory">Folder of additional language files (see <see cref="M:PayrollEngine.Lex.LanguageSet.Get(System.Collections.Generic.IEnumerable{System.String},System.String)"/>),
             null for the package languages only</param>
             <exception cref="T:System.ArgumentException">A language of the manifest without language file</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestVerifier.FileIdentityVerification(System.DateOnly,System.String)">
+            <summary>
+            Automatic verification record of a text table verified by file identity
+            </summary>
+            <param name="verifiedOn">Verification date</param>
+            <param name="evidence">File or archive of the text table (declared in files[])</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestVerifier.VerifyFileIdentity(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.Entry,System.String,System.Collections.Generic.List{System.String})">
+            <summary>
+            A text table is the authority file itself: its file (the archive of an archive entry) must be declared in
+            files[] with source URLs and be present in the .lex folder. The numbers are not looked up.
+            </summary>
         </member>
         <member name="M:PayrollEngine.Lex.ManifestVerifier.LocalEvidence(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.Entry,System.String,System.Boolean,System.String)">
             <summary>
@@ -1963,17 +2135,29 @@
         </member>
         <member name="T:PayrollEngine.Lex.RegulationFile">
             <summary>
-            Regulation JSON file with its content (without byte order mark)
+            Regulation JSON file with its content (without byte order mark): a JSON file or a JSON entry of a ZIP archive
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationFile.Path">
-            <summary>Full path of the file</summary>
+            <summary>Full path of the file, or of the archive for an archive entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.EntryName">
+            <summary>Name of the JSON entry inside the archive, null for a JSON file</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationFile.Bom">
             <summary>Byte order mark of the file, empty without</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationFile.Content">
             <summary>File content without byte order mark; token offsets refer to it</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.LookupsOnly">
+            <summary>The file holds lookups only (besides the tenant and regulation header): it may become an archive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.IsArchiveEntry">
+            <summary>The file is a JSON entry of a ZIP archive</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationFile.DisplayName">
+            <summary>File name for reports: archive and entry name for an archive entry</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationIndex">
             <summary>
@@ -2035,16 +2219,32 @@
         <member name="P:PayrollEngine.Lex.RegulationLookup.LastValueOffset">
             <summary>Offset of the last value object</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.ArrayOffset">
+            <summary>Offset of the values array (opening bracket), -1 without values array</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.ArrayLength">
+            <summary>Byte length of the values array including both brackets</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.RegulationLookup.Values">
             <summary>Values of the lookup</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationReader">
             <summary>
-            Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value
+            Reads the lookup values of the regulation JSON files of a satellite with the byte location of each value.
+            The JSON entries of ZIP archives in the Regulation folder are read like files.
             </summary>
         </member>
         <member name="F:PayrollEngine.Lex.RegulationReader.ReaderOptions">
             <summary>Reader options: regulation files may contain comments and trailing commas</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationReader.LookupRootProperties">
+            <summary>Root properties of a file that holds lookups only</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationReader.LookupTenantProperties">
+            <summary>Tenant properties of a file that holds lookups only</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.RegulationReader.LookupRegulationProperties">
+            <summary>Regulation properties of a file that holds lookups only</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationReader.Context">
             <summary>State of reading one regulation file</summary>
@@ -2060,7 +2260,20 @@
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.Read(System.String)">
             <summary>
-            Read all regulation files (*.json) of the Regulation folder below the satellite directory
+            Read all regulation files (*.json and the JSON entries of *.zip) of the Regulation folder below the
+            satellite directory, in the order of the file names
+            </summary>
+            <exception cref="T:System.IO.InvalidDataException">A ZIP file is no valid archive</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.Files(System.String)">
+            <summary>
+            Regulation files of the folder: JSON files and the JSON entries of ZIP archives (entries by name)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.ToRegulationFile(System.String,System.String,System.Byte[])">
+            <summary>
+            Regulation file of the content bytes; offsets are counted without the byte order mark, it is kept to
+            write the file back unchanged
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.ReadRoot(System.Text.Json.Utf8JsonReader@,PayrollEngine.Lex.RegulationReader.Context)">
@@ -2086,6 +2299,9 @@
         </member>
         <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.Key">
             <summary>Lookup value key, null without key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.KeyValues">
+            <summary>Key values array, null without</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationReader.PendingValue.RangeValue">
             <summary>Range value, used as key of range lookups without key</summary>
@@ -2115,7 +2331,12 @@
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.ReadValue(System.Text.Json.Utf8JsonReader@)">
             <summary>
-            Lookup value object: reads key, rangeValue, value and valueObject with their token locations
+            Lookup value object: reads key, keyValues, rangeValue, value and valueObject with their token locations
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.Observe(PayrollEngine.Lex.RegulationReader.Context,System.Collections.Generic.HashSet{System.String},System.String)">
+            <summary>
+            A property outside the header and the lookups: the file holds more than lookups
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.Text(System.Text.Json.Utf8JsonReader@)">
@@ -2126,6 +2347,11 @@
         <member name="M:PayrollEngine.Lex.RegulationReader.ScalarText(System.Text.Json.JsonElement,System.Boolean)">
             <summary>
             Text of a scalar element: strings unquoted, numbers and booleans in their JSON spelling
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RegulationReader.IsExtension(System.String,System.String)">
+            <summary>
+            File name with the extension, ignoring case
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.RegulationReader.Is(System.String,System.String)">
@@ -2163,6 +2389,15 @@
         </member>
         <member name="P:PayrollEngine.Lex.RegulationValue.Key">
             <summary>Value key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.ValueKey">
+            <summary>Key property as written, null without key (range lookups)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.KeyValues">
+            <summary>Key values array, null without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationValue.RangeValue">
+            <summary>Range value as written (JSON text), null without</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationValue.Scalar">
             <summary>Scalar value, null for a structured value</summary>
@@ -2268,9 +2503,31 @@
             of the folder (e.g. 2026b) is dropped in the new cycle
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.Rollover.RenameArchiveReference(System.String,System.String,System.String)">
+            <summary>
+            Replace the year of an archive content file reference (archive!entry): the four-digit year and its
+            two-digit short form, each without adjacent digit (tables-2026.zip!rates26.txt becomes
+            tables-2027.zip!rates27.txt)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.RollContentFile(System.String,System.Func{System.String,System.String},System.String,System.String,System.Collections.Generic.List{System.String})">
+            <summary>
+            New content file reference: a file path is renamed by segments, an archive reference by its years
+            </summary>
+            <param name="contentFile">Content file reference of lex.json</param>
+            <param name="renameName">Rename of a name segment</param>
+            <param name="oldTag">Previous year</param>
+            <param name="newTag">New year</param>
+            <param name="archiveReferences">Renamed archive references (old -> new)</param>
+        </member>
         <member name="M:PayrollEngine.Lex.Rollover.RenamePath(System.String,System.Func{System.String,System.String})">
             <summary>
             Renames every segment of a relative path (forward slashes, as written in lex.json)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Rollover.SetArchiveValidFrom(System.String,System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String})">
+            <summary>
+            Archive with the new validFrom in its JSON entries, null without change
             </summary>
         </member>
         <member name="M:PayrollEngine.Lex.Rollover.SetValidFrom(System.Byte[],System.Collections.Generic.List{PayrollEngine.Lex.RegulationToken},System.String,System.String,System.Collections.Generic.List{System.String},System.Int32@)">
@@ -2865,6 +3122,10 @@
         <member name="P:PayrollEngine.Lex.SourceResult.Languages">
             <summary>Languages of the verification with the hash of their profiles (<see cref="P:PayrollEngine.Lex.LanguageSet.Label"/>)</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.SourceResult.FileIdentity">
+            <summary>Text table verified by file identity: the table is the authority file declared with its source URLs;
+            no numbers are looked up (see <see cref="M:PayrollEngine.Lex.ManifestVerifier.FileIdentityVerification(System.DateOnly,System.String)"/>)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.SourceResult.ExcludedReason">
             <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
         </member>
@@ -3105,6 +3366,368 @@
             </summary>
             <param name="stream">The spreadsheet stream (the format is detected from the content)</param>
         </member>
+        <member name="T:PayrollEngine.Lex.TableComparer">
+            <summary>
+            Text table entries: reads the rows of the table, compares them with the values of the regulation lookup
+            and writes the values array. Shared by LexApply and LexCheck.
+            A row is identified by key, key values and range value; numbers are compared numerically.
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TableComparer.StringOptions">
+            <summary>String escaping as written by hand: umlauts, accents and symbols stay readable</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TableComparer.IdentitySeparator">
+            <summary>Separator of the identity parts (not part of a JSON text)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Read(PayrollEngine.Lex.Entry,System.String,System.String@)">
+            <summary>
+            Rows of the text table of an entry
+            </summary>
+            <param name="entry">Entry with content file and content map</param>
+            <param name="lexDirectory">Folder of lex.json</param>
+            <param name="problem">Why the table cannot be read, null on success</param>
+            <returns>Table, null with a problem</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Compare(System.Collections.Generic.List{PayrollEngine.Lex.TextTableRow},PayrollEngine.Lex.RegulationLookup)">
+            <summary>
+            Compares the rows with the values of the lookup
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.ValuesText(System.Collections.Generic.List{PayrollEngine.Lex.TextTableRow},System.String,System.String)">
+            <summary>
+            JSON text of the values array: one value per line (key, keyValues, rangeValue, value, valueObject),
+            numbers in invariant notation without trailing zeros
+            </summary>
+            <param name="rows">Table rows</param>
+            <param name="indent">Indentation of the line with the values property</param>
+            <param name="newLine">Line break of the file</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Duplicate(System.Collections.Generic.List{PayrollEngine.Lex.TextTableRow})">
+            <summary>
+            First duplicate row identity, null without
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.AppendValue(System.Text.StringBuilder,PayrollEngine.Lex.TextTableRow)">
+            <summary>
+            Value object of a row
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Content(PayrollEngine.Lex.TextTableRow)">
+            <summary>
+            Compared content of a row: the value object, else the value
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.ObjectText(System.Collections.Generic.Dictionary{System.String,System.Object})">
+            <summary>
+            JSON object of the named values, in the order of the map
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Identity(PayrollEngine.Lex.TextTableRow)">
+            <summary>
+            Identity of a row: key, key values and range value
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Identity(PayrollEngine.Lex.RegulationValue)">
+            <summary>
+            Identity of a regulation value, in the form of <see cref="M:PayrollEngine.Lex.TableComparer.Identity(PayrollEngine.Lex.TextTableRow)"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Literal(System.Object)">
+            <summary>
+            JSON literal of a converted table value
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Literal(System.Text.Json.JsonElement)">
+            <summary>
+            JSON literal of a regulation element, numbers in the notation of <see cref="M:PayrollEngine.Lex.TableComparer.Number(System.Decimal)"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.NumberText(System.String)">
+            <summary>
+            Number text in the notation of <see cref="M:PayrollEngine.Lex.TableComparer.Number(System.Decimal)"/>, other text unchanged
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.Number(System.Decimal)">
+            <summary>
+            Invariant notation without trailing zeros (1.00 is written as 1, 0.0125 stays 0.0125)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TableComparer.JsonString(System.String)">
+            <summary>
+            JSON string literal of a text
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TableDifference">
+            <summary>
+            Difference between the rows of a text table and the values of a regulation lookup
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.Added">
+            <summary>Rows without regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.Removed">
+            <summary>Regulation values without row</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.Changed">
+            <summary>Rows with a different regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.Unchanged">
+            <summary>Rows equal to their regulation value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.HasDifferences">
+            <summary>The lookup values differ from the table</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TableDifference.Summary">
+            <summary>Counts for reports, e.g. +3 added, -0 removed, ~1 changed</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTable">
+            <summary>
+            Converts the lines of a text table (fixed columns or tab-delimited) into lookup values
+            according to a <see cref="T:PayrollEngine.Lex.TextTableMap"/>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.Read(System.IO.Stream,PayrollEngine.Lex.TextTableMap)">
+            <summary>
+            Read the lookup values of a text table
+            </summary>
+            <param name="stream">Text table (UTF-8, a byte order mark selects the encoding)</param>
+            <param name="map">Valid map (see <see cref="M:PayrollEngine.Lex.TextTableMap.Validate"/>)</param>
+            <exception cref="T:System.FormatException">A fixed column of the map has no length</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.Read(System.IO.TextReader,PayrollEngine.Lex.TextTableMap)">
+            <summary>
+            Read the lookup values of a text table
+            </summary>
+            <param name="reader">Text table reader</param>
+            <param name="map">Valid map (see <see cref="M:PayrollEngine.Lex.TextTableMap.Validate"/>)</param>
+            <exception cref="T:System.FormatException">A fixed column of the map has no length</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.Accepted(System.String,System.Collections.Generic.List{PayrollEngine.Lex.TextTableFilter},PayrollEngine.Lex.TextTableFormat)">
+            <summary>
+            All filters of the map match the line
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.ConvertLine(System.String,System.Int32,PayrollEngine.Lex.TextTableMap,PayrollEngine.Lex.TextTableFormat)">
+            <summary>
+            Lookup value of a line, null without key or without value
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.RangeValue(System.Object)">
+            <summary>
+            Range value of a converted column: numbers as they are, text parsed invariant
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.ConvertValue(System.String,PayrollEngine.Lex.TextTableField,PayrollEngine.Lex.TextTableFormat)">
+            <summary>
+            Typed value of a column, null for an empty or unparsable column
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.ConvertDecimal(System.String,System.Int32)">
+            <summary>
+            Decimal value with implied decimal places: the raw number is divided by 10^n
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTable.Extract(System.String,System.Int32,System.Int32,PayrollEngine.Lex.TextTableFormat,System.String)">
+            <summary>
+            Trimmed text of a column, null if the line is empty or shorter than the column start
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableField">
+            <summary>
+            Column of a text table line mapped to a lookup key or value part
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableField.Name">
+            <summary>
+            Property name in the value object (required in the values map)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableField.ValueType">
+            <summary>
+            Value type (default: text)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableField.Start">
+            <summary>
+            0-based character index of a fixed column, column index of a tab-delimited line
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableField.Length">
+            <summary>
+            Character count of a fixed column (required), ignored for tab-delimited lines
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableField.DecimalPlaces">
+            <summary>
+            Implied decimal places of a decimal value: the raw number is divided by 10^n (default: 0)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableField.ToString">
+            <inheritdoc />
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableFilter">
+            <summary>
+            Line filter of a text table: the column value must be one of the values (e.g. a record type)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableFilter.Start">
+            <summary>
+            0-based character index of a fixed column, column index of a tab-delimited line
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableFilter.Length">
+            <summary>
+            Character count of a fixed column (required), ignored for tab-delimited lines
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableFilter.Values">
+            <summary>
+            Accepted column values, compared with the trimmed column text (case-sensitive)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableFilter.ToString">
+            <inheritdoc />
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableFormat">
+            <summary>
+            Line format of a text table
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextTableFormat.FixedColumns">
+            <summary>Fixed columns: start is a character index, length is required</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextTableFormat.TabDelimited">
+            <summary>Tab-delimited columns: start is the column index</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableMap">
+            <summary>
+            Mapping of text table lines to lookup values: key or composite keys, optional range value,
+            a scalar value or the properties of a value object, and optional line filters
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextTableMap.ReadOptions">
+            <summary>Tolerant reading of handwritten map files</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextTableMap.MaxDecimalPlaces">
+            <summary>Highest number of implied decimal places of a decimal value</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.Key">
+            <summary>
+            Lookup value key
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.Keys">
+            <summary>
+            Composite key, written to the key values of the lookup value
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.RangeValue">
+            <summary>
+            Range value of a range lookup
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.Value">
+            <summary>
+            Scalar lookup value
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.Values">
+            <summary>
+            Properties of the lookup value object
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableMap.Filters">
+            <summary>
+            Line filters, all must match; lines that do not match are skipped without warning
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableMap.Parse(System.String)">
+            <summary>
+            Parse a map from JSON
+            </summary>
+            <param name="json">Map JSON</param>
+            <exception cref="T:System.Text.Json.JsonException">Invalid JSON</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableMap.Load(System.String)">
+            <summary>
+            Load a map from a JSON file
+            </summary>
+            <param name="path">Map file</param>
+            <exception cref="T:System.Text.Json.JsonException">Invalid JSON</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableMap.Validate">
+            <summary>
+            Structural errors of the map (empty = valid)
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.TextTableMap.ValidateField(System.Collections.Generic.List{System.String},System.String,PayrollEngine.Lex.TextTableField)">
+            <summary>
+            Position and decimal places of a field
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableResult">
+            <summary>
+            Lookup values of a text table with the line counters
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.Rows">
+            <summary>Converted lookup values in line order</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.Format">
+            <summary>Line format, detected from the lines until the first converted line</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.Lines">
+            <summary>Number of lines read</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.Filtered">
+            <summary>Lines skipped by a filter of the map</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.Ignored">
+            <summary>Lines without key or without value (e.g. header and trailer records without filter)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableResult.IgnoredLines">
+            <summary>Text of the ignored lines</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextTableRow">
+            <summary>
+            Lookup value converted from a text table line
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.LineNumber">
+            <summary>1-based line number in the text table</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.Key">
+            <summary>Lookup value key, null without key mapping</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.KeyValues">
+            <summary>Composite key values (text, decimal, integer or boolean), null without keys mapping</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.RangeValue">
+            <summary>Range value, null without range value mapping</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.Value">
+            <summary>Scalar value, null without value mapping</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.TextTableRow.ValueObject">
+            <summary>Value object properties (text, decimal, integer or boolean), null without values mapping</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.TextValueType">
+            <summary>
+            Type of value read from a text table column
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextValueType.Text">
+            <summary>Text value (trimmed)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextValueType.Decimal">
+            <summary>Decimal value, optionally with implied decimal places</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextValueType.Integer">
+            <summary>Integer value</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.TextValueType.Boolean">
+            <summary>Boolean value (true/false)</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.TraceabilityCheck">
             <summary>
             Traceability fields of lex entries: sources, legal reference, location, verification and validFrom
@@ -3245,6 +3868,17 @@
             </summary>
             <param name="manifest">Manifest to validate</param>
             <param name="manifestDirectory">Directory containing lex.json (used to resolve relative ContentFile paths)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.Validator.ValidateContentFile(System.Collections.Generic.List{System.String},PayrollEngine.Lex.Entry,System.String,System.Collections.Generic.HashSet{System.String})">
+            <summary>
+            A content file must exist; an archive entry must exist in an archive that is declared in files[]
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Validator.ValidateContentMap(System.String,System.String,System.Collections.Generic.Dictionary{System.String,System.String})">
+            <summary>
+            A content map must exist and be a valid text table map
+            </summary>
+            <returns>Error text, null for a valid map</returns>
         </member>
         <member name="M:PayrollEngine.Lex.Validator.ValidateLanguages(System.Collections.Generic.List{System.String},System.Collections.Generic.List{System.String})">
             <summary>

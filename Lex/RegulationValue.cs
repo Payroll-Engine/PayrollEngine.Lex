@@ -13,6 +13,12 @@ internal sealed class RegulationValue
     internal string LookupAlias { get; set; }
     /// <summary>Value key</summary>
     internal string Key { get; init; }
+    /// <summary>Key property as written, null without key (range lookups)</summary>
+    internal string ValueKey { get; init; }
+    /// <summary>Key values array, null without</summary>
+    internal JsonElement? KeyValues { get; init; }
+    /// <summary>Range value as written (JSON text), null without</summary>
+    internal string RangeValue { get; init; }
     /// <summary>Scalar value, null for a structured value</summary>
     internal string Scalar { get; init; }
     /// <summary>Structured value (object or array), null for a scalar</summary>

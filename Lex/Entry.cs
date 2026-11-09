@@ -22,9 +22,16 @@ public sealed class Entry
     public string Content { get; init; }
 
     /// <summary>
-    /// Relative path to a source file to copy into the .lex folder (mutually exclusive with Content)
+    /// Relative path to a source file to copy into the .lex folder (mutually exclusive with Content),
+    /// or a file inside a ZIP archive declared in files[] (<c>archive.zip!entry.txt</c>, not copied)
     /// </summary>
     public string ContentFile { get; init; }
+
+    /// <summary>
+    /// Text table map (JSON, relative to the .lex folder) that converts the text file of
+    /// <see cref="ContentFile"/> into the values of the whole lookup; only together with ContentFile
+    /// </summary>
+    public string ContentMap { get; init; }
 
     /// <summary>
     /// Reference to a local evidence document in the files[] array (e.g. "tax-rates-2026.pdf").
@@ -113,6 +120,12 @@ public sealed class Entry
     /// </summary>
     [JsonIgnore]
     public bool HasContentFile => ContentFile != null;
+
+    /// <summary>
+    /// Returns true if the content file is a text table converted by a map
+    /// </summary>
+    [JsonIgnore]
+    public bool HasContentMap => ContentMap != null;
 
     /// <summary>
     /// The non-empty source URLs, in declaration order

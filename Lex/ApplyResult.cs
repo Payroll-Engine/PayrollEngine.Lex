@@ -25,6 +25,10 @@ public sealed class ApplyResult
     /// <summary>Regulation files written</summary>
     public List<string> WrittenFiles { get; } = [];
 
+    /// <summary>Regulation JSON files replaced by a ZIP archive (text tables), as <c>old.json -> new.zip</c>;
+    /// the references in regulation-package.json, the project file and the setup are updated by hand</summary>
+    public List<string> ReplacedFiles { get; } = [];
+
     /// <summary>Information without changes (e.g. no lookups in the regulation JSON)</summary>
     public string Note { get; internal set; }
 

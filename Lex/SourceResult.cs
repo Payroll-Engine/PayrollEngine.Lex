@@ -53,6 +53,10 @@ public sealed class SourceResult
     /// <summary>Languages of the verification with the hash of their profiles (<see cref="LanguageSet.Label"/>)</summary>
     public string Languages { get; internal set; }
 
+    /// <summary>Text table verified by file identity: the table is the authority file declared with its source URLs;
+    /// no numbers are looked up (see <see cref="ManifestVerifier.FileIdentityVerification"/>)</summary>
+    public bool FileIdentity { get; internal init; }
+
     /// <summary>Reason of the autoVerification exclusion that matches the entry, null when not excluded</summary>
     public string ExcludedReason { get; internal set; }
 

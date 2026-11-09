@@ -63,7 +63,7 @@ public static class EvidenceCheck
     }
 
     /// <summary>
-    /// A documentRef must be declared and exist, a content file must exist
+    /// A documentRef must be declared and exist, a content file (or archive entry) and a content map must exist
     /// </summary>
     private static void CheckEntryFiles(Manifest manifest, string lexDirectory, CheckResult result,
         HashSet<string> declared, List<string> paths)
@@ -83,14 +83,27 @@ public static class EvidenceCheck
             }
             if (value.HasContentFile)
             {
-                var path = ContentHash.ResolvePath(lexDirectory, value.ContentFile);
+                var source = ContentSource.Resolve(lexDirectory, value.ContentFile);
+                if (File.Exists(source.FilePath))
+                {
+                    paths.Add(source.FilePath);
+                }
+                var problem = source.Problem();
+                if (problem != null)
+                {
+                    result.FileProblems.Add(problem);
+                }
+            }
+            if (value.HasContentMap)
+            {
+                var path = ContentHash.ResolvePath(lexDirectory, value.ContentMap);
                 if (File.Exists(path))
                 {
                     paths.Add(path);
                 }
                 else
                 {
-                    result.FileProblems.Add($"contentFile missing: {value.ContentFile}");
+                    result.FileProblems.Add($"contentMap missing: {value.ContentMap}");
                 }
             }
         }
@@ -124,8 +137,9 @@ public static class EvidenceCheck
 
     /// <summary>
     /// Evidence files in the .lex folder that back no entry: a declared file is used by a documentRef, by a
-    /// source URL of an entry, as contentFile or as evidence of a verification record. A file in the .lex folder
-    /// without declaration in files[] is unused too (not frozen in the snapshot).
+    /// source URL of an entry, as contentFile (or archive of a contentFile entry), as contentMap or as evidence
+    /// of a verification record. A file in the .lex folder without declaration in files[] is unused too
+    /// (not frozen in the snapshot).
     /// An unused file is never read by LexVerifySource: its entries count as without local evidence.
     /// </summary>
     /// <param name="manifest">Manifest</param>
@@ -149,7 +163,11 @@ public static class EvidenceCheck
             }
             if (value.HasContentFile)
             {
-                contentFiles.Add(Path.GetFullPath(ContentHash.ResolvePath(lexDirectory, value.ContentFile)));
+                contentFiles.Add(Path.GetFullPath(ContentSource.Resolve(lexDirectory, value.ContentFile).FilePath));
+            }
+            if (value.HasContentMap)
+            {
+                contentFiles.Add(Path.GetFullPath(ContentHash.ResolvePath(lexDirectory, value.ContentMap)));
             }
             urls.UnionWith(value.Urls);
         }

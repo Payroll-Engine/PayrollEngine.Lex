@@ -60,9 +60,90 @@ public sealed class SnapshotWriter
         bool keepLocalFiles = false,
         Func<string, Task<SourceDocument>> loadLiveSource = null)
     {
+        // explicit files[] first: an archive with content file entries must be present before the values are hashed;
+        // the source hash keeps the order values, files
+        var files = new List<SnapshotFile>();
+        var filesHashInput = new StringBuilder();
+        foreach (var file in manifest.Files)
+        {
+            // a file comes from its source path, a kept local copy, a download or the .lex folder (in this order)
+            var localName = file.FileName;
+            var targetPath = Path.Combine(targetDirectory, localName);
+
+            if (!string.IsNullOrWhiteSpace(file.SourcePath))
+            {
+                var sourcePath = ResolvePath(manifestDirectory, file.SourcePath);
+                if (!dryRun && !string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(sourcePath, targetPath, overwrite: true);
+                }
+
+                AddFileToSnapshot(files, filesHashInput, sourcePath, localName, file.Description);
+            }
+            else if (file.Urls.Any() && keepLocalFiles &&
+                     File.Exists(Path.Combine(manifestDirectory, localName)))
+            {
+                var localPath = Path.Combine(manifestDirectory, localName);
+                if (!dryRun && !string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
+                {
+                    File.Copy(localPath, targetPath, overwrite: true);
+                }
+                AddFileToSnapshot(files, filesHashInput, localPath, localName, file.Description);
+            }
+            else if (file.Urls.Any())
+            {
+                var localPath = Path.Combine(manifestDirectory, localName);
+
+                writeFile?.Invoke(localName, dryRun);
+                if (!dryRun)
+                {
+                    // the download is stored in the manifest directory and becomes the evidence copy
+                    var bytes = await DownloadAsync(file.Urls.ToList());
+                    await File.WriteAllBytesAsync(localPath, bytes);
+
+                    if (!string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(localPath, targetPath, overwrite: true);
+                    }
+
+                    AddFileToSnapshot(files, filesHashInput, localPath, localName, file.Description);
+                }
+                else
+                {
+                    // dry run: an existing copy is hashed, a missing file is listed without hash
+                    if (File.Exists(localPath))
+                    {
+                        AddFileToSnapshot(files, filesHashInput, localPath, localName, file.Description);
+                    }
+                    else
+                    {
+                        files.Add(new SnapshotFile
+                        {
+                            FileName = localName,
+                            ContentFile = localName,
+                            ContentType = GetContentType(localName),
+                            Description = file.Description
+                        });
+                    }
+                }
+            }
+            else
+            {
+                var localPath = Path.Combine(manifestDirectory, localName);
+                if (File.Exists(localPath))
+                {
+                    AddFileToSnapshot(files, filesHashInput, localPath, localName, file.Description);
+                }
+            }
+        }
+
         var snapshotFiles = new List<SnapshotFile>();
         // all content, file hashes and verification data are concatenated into the source hash
         var hashInput = new StringBuilder();
+        // a text table map is shared by many entries: copied and listed once
+        var declaredNames = new HashSet<string>(manifest.Files.Select(x => x.FileName).Where(x => x != null),
+            StringComparer.OrdinalIgnoreCase);
+        var mapNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
         // process values with contentFile
         var resolvedValues = new List<Entry>();
@@ -75,34 +156,75 @@ public sealed class SnapshotWriter
             }
             else
             {
-                // a content file is copied flat into the target directory
-                var sourcePath = ResolvePath(manifestDirectory, value.ContentFile);
-                var localName = Path.GetFileName(sourcePath);
-                var targetPath = Path.Combine(targetDirectory, localName);
-
-                var fileHash = ComputeFileHash(sourcePath);
-                hashInput.Append(fileHash);
-
-                if (!dryRun && !string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                var source = ContentSource.Resolve(manifestDirectory, value.ContentFile);
+                if (source.IsArchiveEntry)
                 {
-                    File.Copy(sourcePath, targetPath, overwrite: true);
+                    // the archive entry is read in place: the archive is a declared file, nothing is copied;
+                    // in a dry run the archive may not be downloaded yet
+                    if (!dryRun || source.Problem() == null)
+                    {
+                        hashInput.Append(source.Hash());
+                    }
+                }
+                else
+                {
+                    // a content file is copied flat into the target directory
+                    var sourcePath = source.FilePath;
+                    var localName = source.FileName;
+                    var targetPath = Path.Combine(targetDirectory, localName);
+
+                    var fileHash = ComputeFileHash(sourcePath);
+                    hashInput.Append(fileHash);
+
+                    if (!dryRun && !string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
+                    {
+                        File.Copy(sourcePath, targetPath, overwrite: true);
+                    }
+
+                    var fileInfo = new FileInfo(sourcePath);
+                    snapshotFiles.Add(new SnapshotFile
+                    {
+                        FileName = localName,
+                        ContentFile = localName,
+                        ContentType = GetContentType(localName),
+                        Sha256 = fileHash,
+                        FileSizeBytes = fileInfo.Length,
+                        Description = value.Description
+                    });
                 }
 
-                var fileInfo = new FileInfo(sourcePath);
-                snapshotFiles.Add(new SnapshotFile
+                string contentMap = null;
+                if (value.HasContentMap)
                 {
-                    FileName = localName,
-                    ContentFile = localName,
-                    ContentType = GetContentType(localName),
-                    Sha256 = fileHash,
-                    FileSizeBytes = fileInfo.Length,
-                    Description = value.Description
-                });
+                    // the map changes the converted table: its hash follows the content hash
+                    var mapPath = ResolvePath(manifestDirectory, value.ContentMap);
+                    contentMap = Path.GetFileName(mapPath);
+                    var mapHash = ComputeFileHash(mapPath);
+                    hashInput.Append(mapHash);
+                    if (!declaredNames.Contains(contentMap) && mapNames.Add(contentMap))
+                    {
+                        var targetPath = Path.Combine(targetDirectory, contentMap);
+                        if (!dryRun && !string.Equals(mapPath, targetPath, StringComparison.OrdinalIgnoreCase))
+                        {
+                            File.Copy(mapPath, targetPath, overwrite: true);
+                        }
+                        snapshotFiles.Add(new SnapshotFile
+                        {
+                            FileName = contentMap,
+                            ContentFile = contentMap,
+                            ContentType = GetContentType(contentMap),
+                            Sha256 = mapHash,
+                            FileSizeBytes = new FileInfo(mapPath).Length,
+                            Description = "Text table map"
+                        });
+                    }
+                }
 
                 resolvedValues.Add(new Entry
                 {
                     Key = value.Key,
-                    ContentFile = localName,
+                    ContentFile = source.LocalReference,
+                    ContentMap = contentMap,
                     DocumentRef = value.DocumentRef,
                     Unit = value.Unit,
                     SourceUrls = value.SourceUrls,
@@ -129,79 +251,8 @@ public sealed class SnapshotWriter
             }
         }
 
-        // process explicit files[]
-        foreach (var file in manifest.Files)
-        {
-            // a file comes from its source path, a kept local copy, a download or the .lex folder (in this order)
-            var localName = file.FileName;
-            var targetPath = Path.Combine(targetDirectory, localName);
-
-            if (!string.IsNullOrWhiteSpace(file.SourcePath))
-            {
-                var sourcePath = ResolvePath(manifestDirectory, file.SourcePath);
-                if (!dryRun && !string.Equals(sourcePath, targetPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Copy(sourcePath, targetPath, overwrite: true);
-                }
-
-                AddFileToSnapshot(snapshotFiles, hashInput, sourcePath, localName, file.Description);
-            }
-            else if (file.Urls.Any() && keepLocalFiles &&
-                     File.Exists(Path.Combine(manifestDirectory, localName)))
-            {
-                var localPath = Path.Combine(manifestDirectory, localName);
-                if (!dryRun && !string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
-                {
-                    File.Copy(localPath, targetPath, overwrite: true);
-                }
-                AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
-            }
-            else if (file.Urls.Any())
-            {
-                var localPath = Path.Combine(manifestDirectory, localName);
-
-                writeFile?.Invoke(localName, dryRun);
-                if (!dryRun)
-                {
-                    // the download is stored in the manifest directory and becomes the evidence copy
-                    var bytes = await DownloadAsync(file.Urls.ToList());
-                    await File.WriteAllBytesAsync(localPath, bytes);
-
-                    if (!string.Equals(manifestDirectory, targetDirectory, StringComparison.OrdinalIgnoreCase))
-                    {
-                        File.Copy(localPath, targetPath, overwrite: true);
-                    }
-
-                    AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
-                }
-                else
-                {
-                    // dry run: an existing copy is hashed, a missing file is listed without hash
-                    if (File.Exists(localPath))
-                    {
-                        AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
-                    }
-                    else
-                    {
-                        snapshotFiles.Add(new SnapshotFile
-                        {
-                            FileName = localName,
-                            ContentFile = localName,
-                            ContentType = GetContentType(localName),
-                            Description = file.Description
-                        });
-                    }
-                }
-            }
-            else
-            {
-                var localPath = Path.Combine(manifestDirectory, localName);
-                if (File.Exists(localPath))
-                {
-                    AddFileToSnapshot(snapshotFiles, hashInput, localPath, localName, file.Description);
-                }
-            }
-        }
+        hashInput.Append(filesHashInput);
+        snapshotFiles.AddRange(files);
 
         var sourceHash = "sha256:" + ComputeStringHash(hashInput.ToString());
         // text hashes of the live sources, used by LexCheck to detect changed publications

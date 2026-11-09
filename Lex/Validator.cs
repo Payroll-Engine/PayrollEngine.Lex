@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Text.Json;
 
 namespace PayrollEngine.Lex;
 
@@ -39,8 +40,20 @@ public static class Validator
 
         ValidateLanguages(errors, manifest.Languages);
 
+        // files — collect names first for the documentRef and archive cross-validation
+        var declaredFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var file in manifest.Files)
+        {
+            if (!string.IsNullOrWhiteSpace(file.FileName))
+            {
+                declaredFileNames.Add(file.FileName);
+            }
+        }
+
         // values
         var seenKeys = new HashSet<string>(StringComparer.Ordinal);
+        // a map is shared by many entries: it is read and validated once
+        var maps = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var value in manifest.Values)
         {
             if (string.IsNullOrWhiteSpace(value.Key))
@@ -69,10 +82,20 @@ public static class Validator
             }
             else if (hasContentFile)
             {
-                var resolved = ResolvePath(manifestDirectory, value.ContentFile);
-                if (!File.Exists(resolved))
+                ValidateContentFile(errors, value, manifestDirectory, declaredFileNames);
+            }
+
+            // a text table map converts the content file, it is meaningless without one
+            if (value.HasContentMap)
+            {
+                if (!hasContentFile)
                 {
-                    errors.Add($"Value '{value.Key}': contentFile not found: {resolved}");
+                    errors.Add($"Value '{value.Key}': 'contentMap' requires 'contentFile'");
+                }
+                var mapError = ValidateContentMap(value.ContentMap, manifestDirectory, maps);
+                if (mapError != null)
+                {
+                    errors.Add($"Value '{value.Key}': {mapError}");
                 }
             }
 
@@ -125,16 +148,6 @@ public static class Validator
             {
                 errors.Add($"Exclusion (notApplicable) '{exclusion.Pattern}' addresses the whole entry: a notApplicable exclusion " +
                            "needs a property with the value 0 (Lookup.Key.Property)");
-            }
-        }
-
-        // files — collect names first for documentRef cross-validation
-        var declaredFileNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        foreach (var file in manifest.Files)
-        {
-            if (!string.IsNullOrWhiteSpace(file.FileName))
-            {
-                declaredFileNames.Add(file.FileName);
             }
         }
 
@@ -230,6 +243,73 @@ public static class Validator
         }
 
         return errors;
+    }
+
+    /// <summary>
+    /// A content file must exist; an archive entry must exist in an archive that is declared in files[]
+    /// </summary>
+    private static void ValidateContentFile(List<string> errors, Entry value, string manifestDirectory,
+        HashSet<string> declaredFileNames)
+    {
+        var source = ContentSource.Resolve(manifestDirectory, value.ContentFile);
+        if (!source.IsArchiveEntry)
+        {
+            if (!File.Exists(source.FilePath))
+            {
+                errors.Add($"Value '{value.Key}': contentFile not found: {source.FilePath}");
+            }
+            return;
+        }
+        // the archive is the evidence copy of the authority download: it must be frozen by the snapshot
+        if (!declaredFileNames.Contains(source.FileName) ||
+            !string.Equals(Path.GetDirectoryName(source.FilePath), Path.GetFullPath(manifestDirectory), StringComparison.OrdinalIgnoreCase))
+        {
+            errors.Add($"Value '{value.Key}': contentFile archive '{source.FileName}' must be declared in files[] and lie in the .lex folder");
+        }
+        var problem = source.Problem();
+        if (problem != null)
+        {
+            errors.Add($"Value '{value.Key}': {problem}");
+        }
+    }
+
+    /// <summary>
+    /// A content map must exist and be a valid text table map
+    /// </summary>
+    /// <returns>Error text, null for a valid map</returns>
+    private static string ValidateContentMap(string contentMap, string manifestDirectory, Dictionary<string, string> maps)
+    {
+        if (string.IsNullOrWhiteSpace(contentMap))
+        {
+            return "contentMap is empty";
+        }
+        var path = ResolvePath(manifestDirectory, contentMap);
+        if (maps.TryGetValue(path, out var cached))
+        {
+            return cached;
+        }
+        string error = null;
+        if (!File.Exists(path))
+        {
+            error = $"contentMap not found: {path}";
+        }
+        else
+        {
+            try
+            {
+                var mapErrors = TextTableMap.Load(path).Validate();
+                if (mapErrors.Count > 0)
+                {
+                    error = $"contentMap {contentMap} is invalid: {string.Join("; ", mapErrors)}";
+                }
+            }
+            catch (JsonException exception)
+            {
+                error = $"contentMap {contentMap} is not valid JSON: {exception.Message}";
+            }
+        }
+        maps[path] = error;
+        return error;
     }
 
     /// <summary>

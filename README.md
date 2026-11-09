@@ -21,7 +21,10 @@ The library provides:
   large tables (`SourceVerifier`, `ManifestVerifier`, `SourceDocument`)
 - Release gate: entry-specific locations, official main sources, no weak automatic matches, no zero values
   without justification (`Checker`)
-- Transfer of the lex values into the lookup values of the regulation (`Applier`)
+- Conversion of official text tables (fixed columns or tab-delimited, also inside a ZIP archive) into lookup values
+  (`TextTable`, `TextTableMap`, `ContentSource`)
+- Transfer of the lex values into the lookup values of the regulation, large tables as deterministic ZIP archive
+  (`Applier`)
 - Rollover of a satellite to the next cycle (`Rollover`)
 
 Besides the .NET base class library, the library uses [PdfPig](https://github.com/UglyToad/PdfPig) (Apache-2.0)
@@ -29,7 +32,7 @@ to read PDF sources and [ExcelDataReader](https://github.com/ExcelDataReader/Exc
 Excel workbooks (see [Third-Party Notices](THIRD-PARTY-NOTICES.md)). It is used by the Lex commands of the
 [Payroll Console](https://github.com/Payroll-Engine/PayrollEngine.PayrollConsole)
 (`LexFetch`, `LexAdd`, `LexVerifySource`, `LexAttest`, `LexSnapshot`, `LexVerify`, `LexCheck`, `LexApply`,
-`LexRollover`).
+`LexRollover`) and by its `LookupTextImport` command.
 
 ---
 
@@ -213,6 +216,79 @@ An entry taken from the previous cycle by `Rollover` is **open** (`"open": true`
 record until it is verified again, and a new record removes the flag. The checker reports open entries,
 the applier skips them. The flag is part of the snapshot hash.
 
+## Text Tables
+
+Some authorities publish a complete tariff as text file (fixed columns or tab-delimited), often inside a ZIP
+archive with one file per region. Such a table is the authority file itself: it is not retyped into the manifest,
+an entry references it with `contentFile` and converts it with a map in `contentMap`. The entry key is the lookup
+name, optionally with an edition tag (`TariffA` or `TariffA.2026`):
+
+```json
+{
+  "files": [
+    { "fileName": "tariffs-2026.zip", "sourceUrls": ["https://example.org/tariffs-2026.zip"] }
+  ],
+  "values": [
+    {
+      "key": "TariffA",
+      "contentFile": "tariffs-2026.zip!tariff-a.txt",
+      "contentMap": "tariff.map.json",
+      "sourceUrls": ["https://example.org/tariffs-2026.zip"],
+      "legalReference": "Tariff ordinance, annex 1"
+    }
+  ]
+}
+```
+
+`contentFile` addresses a file of the `.lex` folder or an entry of a ZIP archive there (`archive.zip!entry.txt`,
+`ContentSource`); an archive entry is read in place, never extracted. The archive must be declared in `files[]`.
+The map is a JSON file next to `lex.json` (or a path relative to it) with the columns of the lookup value:
+
+```json
+{
+  "filters": [ { "start": 0, "length": 2, "values": ["06", "11"] } ],
+  "key":        { "valueType": "text",    "start": 6,  "length": 10 },
+  "rangeValue": { "valueType": "decimal", "start": 24, "length": 9, "decimalPlaces": 2 },
+  "values": [
+    { "name": "Code",    "valueType": "text",    "start": 6,  "length": 10 },
+    { "name": "TaxRate", "valueType": "decimal", "start": 54, "length": 5, "decimalPlaces": 4 }
+  ]
+}
+```
+
+| Property | Content |
+|:--|:--|
+| `key` or `keys` | Lookup key, or the composite key written to the key values |
+| `rangeValue` | Range value of a range lookup (optional) |
+| `value` or `values` | Scalar value, or the named properties of the value object |
+| `filters` | Line filters (optional): the trimmed column text must be one of `values` (case-sensitive); all filters must match |
+
+A field has `valueType` (`text`, `decimal`, `integer`, `boolean`), `start` (character index, column index for a
+tab-delimited line) and `length` (required for fixed columns). `decimalPlaces` divides the raw number of a decimal
+column by 10^n (implied decimals: `00125` with 4 places is `0.0125`). The line format is taken from the first
+lines: a line with a tab is tab-delimited. A line rejected by a filter (header, trailer, other record types) is
+skipped without warning; a line without key or value is ignored and reported. `TextTableMap.Validate` lists the
+structural errors of a map, `TextTable.Read` converts a stream (UTF-8, a byte order mark selects the encoding).
+The same classes convert the text file in the `LookupTextImport` command of the Payroll Console.
+
+**Snapshot and verification.** The snapshot hashes the text file (for an archive entry the entry content) and the
+map; the map is copied into the `.lex` folder when it lies outside. `Verifier` reports a changed table, a changed
+map and a missing map copy. `LexVerifySource` verifies a text table by **file identity**: the file (or the archive
+of an archive entry) is declared in `files[]` with source URLs and present in the `.lex` folder. No numbers are
+looked up and nothing is downloaded, also not with a live loader; the `auto` record has the method
+`LexVerifySource x.y.z; file identity` (`ManifestVerifier.FileIdentityVerification`) and the file as evidence.
+
+**Check and apply.** `LexCheck` compares the converted table with the lookup: rows are identified by key, key values
+and range value; numbers are compared numerically, text case-insensitive. A difference is reported as
+`table <lookup> +added, -removed, ~changed`, a duplicate row as problem. `LexApply` replaces all values of the lookup
+when the table differs, one value per line. A lookup file that holds lookups only (no wage types, collectors or
+cases) is written as ZIP archive: `Regulation/Lookups.Name.json` becomes `Regulation/Lookups.Name.zip` with the entry
+`Lookups.Name.json` (`ApplyResult.ReplacedFiles`); the references of the regulation package (install files, project
+file, setup script) are updated by hand. A file with other objects stays JSON. The archive is deterministic
+(entries in ordinal order, fixed timestamp), so the same table gives the same bytes and a second run changes nothing.
+`RegulationReader` reads `Regulation/*.json` and the JSON entries of `Regulation/*.zip`; `LexApply` writes nothing
+when a JSON file and an archive with the same name both exist.
+
 ## Rollover
 
 `Rollover.Run` copies the satellite of the previous cycle into a new folder for the cycle start:
@@ -222,6 +298,10 @@ year-based version are set, and all entries become open. Build output and `snaps
 an existing target is never overwritten. Values are not changed: lines still mentioning the previous year
 are returned for review (`RolloverResult.YearMentions`). The cycle start is passed by the caller, e.g.
 from the payroll calendar of a tenant.
+
+A text table archive keeps its name in the new folder; the `contentFile` reference is renamed to the new year
+(`tariffs-2026.zip!tariff-a26.txt` becomes `tariffs-2027.zip!tariff-a27.txt`), and a note asks to declare the new
+archive in `files[]` and to fetch it. `validFrom` is also set in the JSON entries of `Regulation/*.zip`.
 
 ---
 
@@ -260,7 +340,9 @@ PayrollEngine.Lex/
 │   ├── ManifestVerifier.cs           # LexVerifySource: SourceVerifier, YearAnalyzer, EntryNumbers, SourceLocation
 │   ├── SourceDocument.cs             # Source readers: HtmlReader, PdfReader, SpreadsheetReader, OfficeXmlReader
 │   ├── LanguageSet.cs                # Language profiles of the source verification
-│   ├── Applier.cs, RegulationReader.cs # LexApply and reading of the regulation lookups
+│   ├── TextTable.cs, TextTableMap.cs # Text tables: conversion and map, ContentSource (archive entries)
+│   ├── Applier.cs, RegulationReader.cs # LexApply and reading of the regulation lookups (JSON and ZIP)
+│   ├── TableComparer.cs, ArchiveWriter.cs # Table differences, deterministic ZIP archives
 │   ├── Rollover.cs                   # LexRollover
 │   └── LexVocabulary/                # Language files
 ├── Lex.Tests/                    # Unit tests
@@ -280,9 +362,11 @@ Data.Tax/
 ├── .lex/
 │   ├── lex.json                  # Manifest
 │   ├── snapshot.json             # Snapshot (created by SnapshotWriter)
-│   └── *.pdf, *.xlsx, ...        # Evidence files
+│   ├── *.map.json                # Text table maps
+│   └── *.pdf, *.xlsx, *.zip, ... # Evidence files, text table archives
 └── Regulation/
-    └── *.json                    # Regulation with lookups
+    ├── *.json                    # Regulation with lookups
+    └── *.zip                     # Large lookups as ZIP archive (written by LexApply)
 ```
 
 ---
@@ -312,6 +396,11 @@ var results = await ManifestVerifier.VerifyManifest(manifest, lexDirectory);
 
 // write the lex values into the regulation lookups (dry run: differences only)
 var applied = Applier.Apply(manifest, lexPath, dryRun: true);
+
+// convert a text table with its map
+var map = TextTableMap.Load("tariff.map.json");
+await using var stream = File.OpenRead("tariff-a.txt");
+var table = TextTable.Read(stream, map);
 
 // download a source document into the .lex folder
 using var client = SourceDocument.CreateHttpClient();

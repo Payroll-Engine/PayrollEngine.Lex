@@ -26,6 +26,12 @@ internal sealed class RegulationLookup
     /// <summary>Offset of the last value object</summary>
     internal int LastValueOffset { get; set; } = -1;
 
+    /// <summary>Offset of the values array (opening bracket), -1 without values array</summary>
+    internal int ArrayOffset { get; set; } = -1;
+
+    /// <summary>Byte length of the values array including both brackets</summary>
+    internal int ArrayLength { get; set; }
+
     /// <summary>Values of the lookup</summary>
     internal List<RegulationValue> Values { get; } = [];
 }
