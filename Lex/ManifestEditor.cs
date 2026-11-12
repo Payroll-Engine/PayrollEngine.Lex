@@ -216,6 +216,133 @@ public sealed class ManifestEditor
     }
 
     /// <summary>
+    /// Change fields of an existing entry. Properties set to null in <paramref name="update"/> stay as they are;
+    /// a changed property keeps its position, a new property is inserted at its place in the entry layout,
+    /// unknown properties and the verification record are not touched. A changed value does not renew
+    /// the verification record: the caller decides about re-verification.
+    /// </summary>
+    /// <param name="key">Entry key</param>
+    /// <param name="update">Fields to change</param>
+    /// <returns>Updated, Unchanged when all values already match, NotFound for an unknown key</returns>
+    /// <exception cref="ArgumentException">A value is not valid (empty content, legal reference or source URLs,
+    /// content that is not valid JSON, reference year out of range)</exception>
+    /// <exception cref="InvalidOperationException">Content for an entry that uses a content file</exception>
+    public EntryUpdateResult UpdateEntry(string key, EntryUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        ValidateUpdate(update);
+        var entry = Entry(key);
+        if (entry == null)
+        {
+            return EntryUpdateResult.NotFound;
+        }
+        if (update.Content != null && entry["contentFile"] != null)
+        {
+            throw new InvalidOperationException($"Entry {key} uses a content file: content cannot be set");
+        }
+
+        var changed = SetText(entry, "content", update.Content);
+        if (update.SourceUrls != null)
+        {
+            var urls = update.SourceUrls.Select(x => x.Trim()).ToList();
+            var existing = (entry["sourceUrls"] as JsonArray)?
+                .Select(x => x is JsonValue v && v.TryGetValue<string>(out var text) ? text : null).ToList();
+            if (existing == null || !existing.SequenceEqual(urls, StringComparer.Ordinal))
+            {
+                SetProperty(entry, "sourceUrls", new JsonArray(urls.Select(x => (JsonNode)x).ToArray()));
+                changed = true;
+            }
+        }
+        changed |= SetText(entry, "sourceQuote", update.SourceQuote, removeEmpty: true);
+        if (update.RemoveReferenceYear)
+        {
+            changed |= entry.Remove("referenceYear");
+        }
+        else if (update.ReferenceYear != null)
+        {
+            var current = entry["referenceYear"] is JsonValue v && v.TryGetValue<int>(out var year) ? year : (int?)null;
+            if (current != update.ReferenceYear)
+            {
+                SetProperty(entry, "referenceYear", update.ReferenceYear.Value);
+                changed = true;
+            }
+        }
+        changed |= SetText(entry, "legalReference", update.LegalReference);
+        changed |= SetText(entry, "description", update.Description, removeEmpty: true);
+
+        if (!changed)
+        {
+            return EntryUpdateResult.Unchanged;
+        }
+        Changes++;
+        return EntryUpdateResult.Updated;
+    }
+
+    /// <summary>
+    /// Test if an exclusion with the kind and pattern exists
+    /// </summary>
+    /// <param name="kind">Exclusion kind</param>
+    /// <param name="pattern">Exclusion pattern</param>
+    public bool HasExclusion(string kind, string pattern) =>
+        Items("exclusions").OfType<JsonObject>().Any(x =>
+            string.Equals(Text(x, "kind"), kind, StringComparison.Ordinal) &&
+            string.Equals(Text(x, "pattern"), pattern?.Trim(), StringComparison.Ordinal));
+
+    /// <summary>
+    /// Append an exclusion. The kind must be known, pattern and reason are mandatory; a derived or notApplicable
+    /// exclusion addresses a property of an existing entry (<c>Lookup.Key.Property</c>), never a whole entry.
+    /// </summary>
+    /// <param name="exclusion">Exclusion to add</param>
+    /// <returns>True if the exclusion was added, false if an exclusion with the same kind and pattern exists</returns>
+    /// <exception cref="ArgumentException">Unknown kind, missing pattern or reason, or an invalid property pattern</exception>
+    public bool AddExclusion(Exclusion exclusion)
+    {
+        ArgumentNullException.ThrowIfNull(exclusion);
+        if (!ExclusionKinds.Contains(exclusion.Kind))
+        {
+            throw new ArgumentException($"Unknown exclusion kind '{exclusion.Kind}'", nameof(exclusion));
+        }
+        var pattern = exclusion.Pattern?.Trim();
+        if (string.IsNullOrWhiteSpace(pattern))
+        {
+            throw new ArgumentException("Exclusion pattern expected", nameof(exclusion));
+        }
+        if (string.IsNullOrWhiteSpace(exclusion.Reason))
+        {
+            throw new ArgumentException("Exclusion reason expected", nameof(exclusion));
+        }
+        if (DerivedProperties.IsPropertyKind(exclusion.Kind))
+        {
+            var keys = Values().Select(x => Text(x, "key")).Where(x => !string.IsNullOrEmpty(x)).ToHashSet(StringComparer.Ordinal);
+            var (entryKey, path) = DerivedProperties.Resolve(pattern, keys);
+            if (entryKey == null)
+            {
+                throw new ArgumentException(
+                    $"Exclusion ({exclusion.Kind}) '{pattern}' addresses no entry: a property pattern starts with an entry key (Lookup.Key.Property)",
+                    nameof(exclusion));
+            }
+            if (string.IsNullOrEmpty(path))
+            {
+                throw new ArgumentException(
+                    $"Exclusion ({exclusion.Kind}) '{pattern}' addresses the whole entry: a property is required (Lookup.Key.Property)",
+                    nameof(exclusion));
+            }
+        }
+        if (HasExclusion(exclusion.Kind, pattern))
+        {
+            return false;
+        }
+        Items("exclusions", create: true).Add(new JsonObject
+        {
+            ["kind"] = exclusion.Kind,
+            ["pattern"] = pattern,
+            ["reason"] = exclusion.Reason
+        });
+        Changes++;
+        return true;
+    }
+
+    /// <summary>
     /// Declare a file in files[]
     /// </summary>
     /// <param name="file">File declaration</param>
@@ -386,6 +513,99 @@ public sealed class ManifestEditor
     // ReSharper disable once UnusedMember.Global
     public Task SaveAsync(string path) =>
         File.WriteAllTextAsync(path, ToJson(), new UTF8Encoding(false));
+
+    private static readonly string[] ExclusionKinds =
+    [
+        Exclusion.KindCoverage, Exclusion.KindSourceLocation, Exclusion.KindOrphan,
+        Exclusion.KindAutoVerification, Exclusion.KindDerived, Exclusion.KindNotApplicable
+    ];
+
+    /// <summary>Property order of an entry; a new property follows the nearest preceding property that is present</summary>
+    private static readonly string[] EntryLayout =
+    [
+        "key", "content", "contentFile", "contentMap", "unit", "sourceUrls", "sourceLocation", "sourceQuote",
+        "referenceYear", "legalReference", "documentRef", "description", "verification", "open"
+    ];
+
+    private static void ValidateUpdate(EntryUpdate update)
+    {
+        if (update.Content != null)
+        {
+            if (string.IsNullOrWhiteSpace(update.Content))
+            {
+                throw new ArgumentException("Entry content must not be empty", nameof(update));
+            }
+            var error = EntryRules.ContentError(update.Content);
+            if (error != null)
+            {
+                throw new ArgumentException(error, nameof(update));
+            }
+        }
+        if (update.LegalReference != null && string.IsNullOrWhiteSpace(update.LegalReference))
+        {
+            throw new ArgumentException("Legal reference must not be empty", nameof(update));
+        }
+        if (update.SourceUrls != null &&
+            (update.SourceUrls.Count == 0 || update.SourceUrls.Any(string.IsNullOrWhiteSpace)))
+        {
+            throw new ArgumentException("Source URLs must not be empty", nameof(update));
+        }
+        if (update.ReferenceYear is < 1990 or > 2100)
+        {
+            throw new ArgumentException($"Reference year {update.ReferenceYear} is not a year from 1990 to 2100", nameof(update));
+        }
+        if (update.RemoveReferenceYear && update.ReferenceYear != null)
+        {
+            throw new ArgumentException("Reference year cannot be set and removed", nameof(update));
+        }
+    }
+
+    private static string Text(JsonObject item, string name) =>
+        item[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;
+
+    /// <summary>
+    /// Set a text property: null leaves it, an empty text removes it when allowed, an equal text is no change
+    /// </summary>
+    private static bool SetText(JsonObject entry, string name, string value, bool removeEmpty = false)
+    {
+        if (value == null)
+        {
+            return false;
+        }
+        if (removeEmpty && value.Length == 0)
+        {
+            return entry.Remove(name);
+        }
+        if (string.Equals(Text(entry, name), value, StringComparison.Ordinal))
+        {
+            return false;
+        }
+        SetProperty(entry, name, value);
+        return true;
+    }
+
+    /// <summary>
+    /// Replace a property in place, or insert a new one after the nearest preceding property of the entry layout
+    /// </summary>
+    private static void SetProperty(JsonObject entry, string name, JsonNode value)
+    {
+        if (entry.ContainsKey(name))
+        {
+            entry[name] = value;
+            return;
+        }
+        var index = 0;
+        for (var i = Array.IndexOf(EntryLayout, name) - 1; i >= 0; i--)
+        {
+            var before = entry.IndexOf(EntryLayout[i]);
+            if (before >= 0)
+            {
+                index = before + 1;
+                break;
+            }
+        }
+        entry.Insert(index, name, value);
+    }
 
     private JsonObject Entry(string key) =>
         Values().FirstOrDefault(x => x["key"]?.GetValue<string>() == key);

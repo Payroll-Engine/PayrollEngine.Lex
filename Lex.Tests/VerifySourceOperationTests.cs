@@ -5,7 +5,6 @@ namespace PayrollEngine.Lex.Tests;
 
 public class VerifySourceOperationTests
 {
-    private const string Url = "https://example.org/limits";
     private static readonly DateOnly Today = new(2026, 11, 12);
 
     private const string EditorJson = """

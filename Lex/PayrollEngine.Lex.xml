@@ -1231,6 +1231,47 @@
         <member name="F:PayrollEngine.Lex.EntryTargetKind.Table">
             <summary>All values of a lookup, converted from a text table (content file with content map)</summary>
         </member>
+        <member name="T:PayrollEngine.Lex.EntryUpdate">
+            <summary>
+            Fields of an existing entry to change (<see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateEntry(System.String,PayrollEngine.Lex.EntryUpdate)"/>); a property set to null
+            stays as it is
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.Content">
+            <summary>New inline content (not for an entry with a content file)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.LegalReference">
+            <summary>New legal norm reference</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.SourceUrls">
+            <summary>New source URLs, main source first; replaces the list</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.SourceQuote">
+            <summary>New source quote; an empty text removes the quote</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.ReferenceYear">
+            <summary>New reference year (1990 to 2100)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.RemoveReferenceYear">
+            <summary>Remove the reference year (not together with <see cref="P:PayrollEngine.Lex.EntryUpdate.ReferenceYear"/>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.Description">
+            <summary>New description; an empty text removes the description</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EntryUpdateResult">
+            <summary>
+            Outcome of <see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateEntry(System.String,PayrollEngine.Lex.EntryUpdate)"/>
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryUpdateResult.Updated">
+            <summary>At least one property was changed</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryUpdateResult.Unchanged">
+            <summary>All given values already match the entry</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.EntryUpdateResult.NotFound">
+            <summary>No entry with the key</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.EvidenceCheck">
             <summary>
             Evidence files of a lex manifest: declaration, snapshot, git tracking and usage
@@ -1573,6 +1614,43 @@
             Element name of a tag and whether it is an end tag
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.ILexSource">
+            <summary>
+            Read access to lex manifests, independent of where they are stored. <see cref="T:PayrollEngine.Lex.WorkspaceLexSource"/> reads
+            the lex.json files of a folder tree; other implementations may read packaged snapshots.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ILexSource.ListManifestsAsync(System.Threading.CancellationToken)">
+            <summary>
+            Summaries of all manifests of the source; a manifest that cannot be read is listed with its error
+            </summary>
+            <param name="cancellationToken">Cancellation token</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ILexSource.GetManifestAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            Summary of one manifest
+            </summary>
+            <param name="manifestId">Manifest identifier (<see cref="P:PayrollEngine.Lex.LexManifestInfo.Id"/>)</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>The summary, null for an unknown manifest</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ILexSource.GetEntriesAsync(System.String,System.Threading.CancellationToken)">
+            <summary>
+            All entries of a manifest in document order
+            </summary>
+            <param name="manifestId">Manifest identifier</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>The entries, null for an unknown or unreadable manifest</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ILexSource.GetEntryAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <summary>
+            One entry of a manifest
+            </summary>
+            <param name="manifestId">Manifest identifier</param>
+            <param name="key">Entry key</param>
+            <param name="cancellationToken">Cancellation token</param>
+            <returns>The entry, null for an unknown manifest or key</returns>
+        </member>
         <member name="T:PayrollEngine.Lex.KeyPattern">
             <summary>
             Key pattern of lex entries: an exact key, a name that also matches all keys below it (<c>Name.*</c>),
@@ -1817,6 +1895,52 @@
         <member name="P:PayrollEngine.Lex.LanguageSet.YearRange">
             <summary>Range of years (e.g. 2025-2026, 2025/26)</summary>
         </member>
+        <member name="T:PayrollEngine.Lex.LexEntryInfo">
+            <summary>
+            An entry with the context a reader needs (<see cref="T:PayrollEngine.Lex.ILexSource"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.ManifestId">
+            <summary>Identifier of the manifest</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.Key">
+            <summary>Entry key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.Entry">
+            <summary>The entry with content, source URLs, location, quote, legal reference and verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.Sources">
+            <summary>The declared sources whose URL is listed in the source URLs of the entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.Review">
+            <summary>Review rule of the sources: FourEyes when a source requires it, null without rule</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.Exclusions">
+            <summary>The exclusions of the manifest that address the entry, including property exclusions</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.SnapshotState">
+            <summary>State against the snapshot</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexEntryInfo.ContentHash">
+            <summary>Content hash of lex.json the entry was read from (<see cref="T:PayrollEngine.Lex.ManifestHash"/>)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexEntrySnapshotState">
+            <summary>
+            State of one entry against the snapshot of its manifest
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexEntrySnapshotState.NoSnapshot">
+            <summary>The manifest has no readable snapshot</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexEntrySnapshotState.NotInSnapshot">
+            <summary>The entry is not in the snapshot</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexEntrySnapshotState.Changed">
+            <summary>The entry differs from the snapshot (content, content map, quote, reference year or verification record)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexEntrySnapshotState.Current">
+            <summary>The entry matches the snapshot</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LexJson">
             <summary>
             JSON options shared by the lex checks
@@ -1833,6 +1957,85 @@
         </member>
         <member name="F:PayrollEngine.Lex.LexJson.StrictManifestOptions">
             <summary>Strict reading of lex.json for the snapshot: comments and trailing commas are errors</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexManifestInfo">
+            <summary>
+            Summary of a manifest (<see cref="T:PayrollEngine.Lex.ILexSource"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Id">
+            <summary>Identifier of the manifest in its source; the full path of lex.json for a workspace</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Satellite">
+            <summary>Name of the satellite folder that holds the .lex folder; the workspace source only</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Error">
+            <summary>Error text when lex.json cannot be read; all other values are empty then</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Authority">
+            <summary>Country or jurisdiction code</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Regulation">
+            <summary>Regulation identifier</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.ValidFrom">
+            <summary>Effective date (yyyy-MM-dd)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Provider">
+            <summary>Issuing authority</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Languages">
+            <summary>Languages of the sources</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Entries">
+            <summary>Number of entries</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.OpenEntries">
+            <summary>Entries taken from the previous cycle that need a new verification</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.AutoVerified">
+            <summary>Entries with an automatic verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.ManualVerified">
+            <summary>Entries with a manual verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.WithoutVerification">
+            <summary>Entries without verification record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Sources">
+            <summary>Number of declared sources</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Files">
+            <summary>Number of declared evidence files</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.Exclusions">
+            <summary>Number of exclusions</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.SnapshotState">
+            <summary>State of the snapshot</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.SnapshotDifferences">
+            <summary>Differences between manifest and snapshot (empty unless <see cref="P:PayrollEngine.Lex.LexManifestInfo.SnapshotState"/> is Stale)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.LexManifestInfo.ContentHash">
+            <summary>Content hash of lex.json (<see cref="T:PayrollEngine.Lex.ManifestHash"/>)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.LexSnapshotState">
+            <summary>
+            State of the snapshot of a manifest against the manifest and the files in the .lex folder
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSnapshotState.Missing">
+            <summary>No snapshot.json</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSnapshotState.Current">
+            <summary>The snapshot matches the manifest and the files (<see cref="T:PayrollEngine.Lex.Verifier"/> reports no difference)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSnapshotState.Stale">
+            <summary>The snapshot differs from the manifest or the files</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexSnapshotState.Unreadable">
+            <summary>snapshot.json cannot be read</summary>
         </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
@@ -1997,6 +2200,36 @@
             <param name="value">Entry to add</param>
             <exception cref="T:System.InvalidOperationException">An entry with the key exists</exception>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.UpdateEntry(System.String,PayrollEngine.Lex.EntryUpdate)">
+            <summary>
+            Change fields of an existing entry. Properties set to null in <paramref name="update"/> stay as they are;
+            a changed property keeps its position, a new property is inserted at its place in the entry layout,
+            unknown properties and the verification record are not touched. A changed value does not renew
+            the verification record: the caller decides about re-verification.
+            </summary>
+            <param name="key">Entry key</param>
+            <param name="update">Fields to change</param>
+            <returns>Updated, Unchanged when all values already match, NotFound for an unknown key</returns>
+            <exception cref="T:System.ArgumentException">A value is not valid (empty content, legal reference or source URLs,
+            content that is not valid JSON, reference year out of range)</exception>
+            <exception cref="T:System.InvalidOperationException">Content for an entry that uses a content file</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.HasExclusion(System.String,System.String)">
+            <summary>
+            Test if an exclusion with the kind and pattern exists
+            </summary>
+            <param name="kind">Exclusion kind</param>
+            <param name="pattern">Exclusion pattern</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.AddExclusion(PayrollEngine.Lex.Exclusion)">
+            <summary>
+            Append an exclusion. The kind must be known, pattern and reason are mandatory; a derived or notApplicable
+            exclusion addresses a property of an existing entry (<c>Lookup.Key.Property</c>), never a whole entry.
+            </summary>
+            <param name="exclusion">Exclusion to add</param>
+            <returns>True if the exclusion was added, false if an exclusion with the same kind and pattern exists</returns>
+            <exception cref="T:System.ArgumentException">Unknown kind, missing pattern or reason, or an invalid property pattern</exception>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.AddFile(PayrollEngine.Lex.EvidenceFile)">
             <summary>
             Declare a file in files[]
@@ -2053,6 +2286,46 @@
             Write the document (UTF-8 without BOM)
             </summary>
             <param name="path">Target path</param>
+        </member>
+        <member name="F:PayrollEngine.Lex.ManifestEditor.EntryLayout">
+            <summary>Property order of an entry; a new property follows the nearest preceding property that is present</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetText(System.Text.Json.Nodes.JsonObject,System.String,System.String,System.Boolean)">
+            <summary>
+            Set a text property: null leaves it, an empty text removes it when allowed, an equal text is no change
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetProperty(System.Text.Json.Nodes.JsonObject,System.String,System.Text.Json.Nodes.JsonNode)">
+            <summary>
+            Replace a property in place, or insert a new one after the nearest preceding property of the entry layout
+            </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ManifestHash">
+            <summary>
+            Content hash of a lex.json file: SHA-256 over the bytes of the file, as <c>sha256:</c> and lower-case hex.
+            A writer that read a manifest compares the hash before it writes (optimistic concurrency).
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ManifestHash.Prefix">
+            <summary>Prefix of the hash text</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestHash.OfBytes(System.Byte[])">
+            <summary>
+            Hash of the bytes of a manifest file
+            </summary>
+            <param name="bytes">File content</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestHash.OfText(System.String)">
+            <summary>
+            Hash of a manifest text as it is written by the editor (UTF-8 without BOM)
+            </summary>
+            <param name="text">Manifest text</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestHash.OfFile(System.String)">
+            <summary>
+            Hash of a manifest file
+            </summary>
+            <param name="lexPath">Path of lex.json</param>
         </member>
         <member name="T:PayrollEngine.Lex.ManifestVerifier">
             <summary>
@@ -4484,6 +4757,46 @@
             <param name="results">Verification results of the manifest entries</param>
             <param name="refresh">Replace source locations written by the source verification</param>
             <param name="verifiedOn">Date of the verification records</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.WorkspaceLexSource">
+            <summary>
+            Reads the lex.json files of a folder tree. The manifest identifier is the full path of lex.json.
+            Nothing is cached: every call reads the files, so changes made by other tools are seen at once.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.#ctor(System.Collections.Generic.IEnumerable{System.String})">
+            <summary>
+            A source over a fixed list of manifest files
+            </summary>
+            <param name="lexPaths">Paths of lex.json files</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.FromRoot(System.String,System.String,System.String,System.Boolean)">
+            <summary>
+            A source over the lex.json files below a root folder; the files are searched on every call
+            (<see cref="M:PayrollEngine.Lex.FileResolver.Resolve(System.String,System.String,System.String,System.Boolean)"/>)
+            </summary>
+            <param name="root">Root folder that contains the repository folders</param>
+            <param name="repoMask">Mask of the repository folder names, default all</param>
+            <param name="fileMask">File name or mask relative to a repository folder, default lex.json</param>
+            <param name="recursive">Search all subfolders of a repository folder</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.ListManifestsAsync(System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.GetManifestAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.GetEntriesAsync(System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.GetEntryAsync(System.String,System.String,System.Threading.CancellationToken)">
+            <inheritdoc />
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.Find(System.String)">
+            <summary>The manifest file of an identifier, null when the source does not hold it</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.WorkspaceLexSource.Loaded.EntryState(PayrollEngine.Lex.Entry)">
+            <summary>The fields of the snapshot hash, the same rules as <see cref="T:PayrollEngine.Lex.Verifier"/></summary>
         </member>
         <member name="T:PayrollEngine.Lex.YearAnalyzer">
             <summary>
