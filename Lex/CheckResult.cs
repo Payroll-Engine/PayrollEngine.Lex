@@ -205,6 +205,9 @@ public sealed class CheckResult
     /// <summary>Problems of the evidence files</summary>
     public List<string> FileProblems { get; } = [];
 
+    /// <summary>Checks that could not run (e.g. git is not available): no finding, but the result is incomplete</summary>
+    public List<string> Warnings { get; } = [];
+
     // validFrom
     /// <summary>validFrom of the manifest</summary>
     public string LexValidFrom { get; internal set; }

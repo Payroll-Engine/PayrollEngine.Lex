@@ -125,8 +125,14 @@ public static class EvidenceCheck
         var untrackedTask = Task.Run(() => GitList(lexDirectory, false));
         var ignoredTask = Task.Run(() => GitList(lexDirectory, true));
         Task.WaitAll(untrackedTask, ignoredTask);
-        var untracked = untrackedTask.Result;
-        var ignored = ignoredTask.Result;
+        var untracked = untrackedTask.Result.Files;
+        var ignored = ignoredTask.Result.Files;
+        // without git (or outside a repository) nothing is listed: say so instead of passing silently
+        var problem = untrackedTask.Result.Problem ?? ignoredTask.Result.Problem;
+        if (problem != null)
+        {
+            result.Warnings.Add($"{problem}: evidence versioning not checked");
+        }
         foreach (var path in paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (ignored.Contains(path))
@@ -247,9 +253,10 @@ public static class EvidenceCheck
     }
 
     /// <summary>
-    /// Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
+    /// Lists untracked (or ignored) files below a directory using git. Without git or outside a repository the
+    /// file set is empty and the problem says why (the check reports it as a warning).
     /// </summary>
-    private static HashSet<string> GitList(string directory, bool ignored)
+    private static GitListing GitList(string directory, bool ignored)
     {
         var info = new ProcessStartInfo("git");
         // git ls-files -o [-i] --exclude-standard: untracked (or ignored) files below the folder
@@ -261,8 +268,11 @@ public static class EvidenceCheck
         }
         info.ArgumentList.Add("--exclude-standard");
         info.ArgumentList.Add(".");
-        return ListFiles(info, directory, GitTimeout);
+        return RunListing(info, directory, GitTimeout);
     }
+
+    /// <summary>Result of a file listing: the files, or the reason why nothing could be listed</summary>
+    internal sealed record GitListing(HashSet<string> Files, string Problem);
 
     /// <summary>Hard limit of a git call: a stalled child process must not stall the check</summary>
     private static readonly TimeSpan GitTimeout = TimeSpan.FromSeconds(30);
@@ -273,9 +283,20 @@ public static class EvidenceCheck
     /// The child process neither inherits nor reads the standard input of the host (an MCP server talks over it),
     /// and standard output and standard error are read at the same time.
     /// </summary>
-    internal static HashSet<string> ListFiles(ProcessStartInfo info, string directory, TimeSpan timeout)
+    internal static HashSet<string> ListFiles(ProcessStartInfo info, string directory, TimeSpan timeout) =>
+        RunListing(info, directory, timeout).Files;
+
+    /// <summary>
+    /// Like <see cref="ListFiles"/>, with the reason when nothing could be listed: command not available, folder not
+    /// in a repository, timeout. Never throws.
+    /// </summary>
+    internal static GitListing RunListing(ProcessStartInfo info, string directory, TimeSpan timeout)
     {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        if (!Directory.Exists(directory))
+        {
+            return new GitListing(set, "folder not found, git state not read");
+        }
         try
         {
             info.WorkingDirectory = directory;
@@ -287,7 +308,7 @@ public static class EvidenceCheck
             using var process = Process.Start(info);
             if (process == null)
             {
-                return set;
+                return new GitListing(set, "git not available");
             }
             // nothing to send: close the input at once
             try
@@ -310,24 +331,37 @@ public static class EvidenceCheck
                 {
                     // already ended
                 }
-                return set;
+                return new GitListing(set, $"git did not answer within {(int)timeout.TotalSeconds} seconds");
             }
             // the exit is signalled: drain the pipes
             Task.WaitAll([outputTask, errorTask], timeout);
-            if (process.ExitCode != 0 || !outputTask.IsCompletedSuccessfully)
+            if (process.ExitCode != 0)
             {
-                return set;
+                var error = errorTask.IsCompletedSuccessfully ? errorTask.Result : string.Empty;
+                return new GitListing(set, error.Contains("not a git repository", StringComparison.OrdinalIgnoreCase)
+                    ? "not inside a git repository"
+                    : $"git failed with exit code {process.ExitCode}");
+            }
+            if (!outputTask.IsCompletedSuccessfully)
+            {
+                return new GitListing(set, "git output could not be read");
             }
             var text = outputTask.Result;
             foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 set.Add(Path.GetFullPath(Path.Combine(directory, line.Trim())));
             }
+            return new GitListing(set, null);
         }
-        catch
+        catch (System.ComponentModel.Win32Exception)
         {
-            // git is optional: without it the git state is not checked
+            // the executable is not found
+            return new GitListing(set, "git not available");
         }
-        return set;
+        catch (Exception exception)
+        {
+            // git is optional: it never stops the check
+            return new GitListing(set, $"git could not be run ({exception.GetType().Name})");
+        }
     }
 }

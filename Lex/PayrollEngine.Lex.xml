@@ -722,6 +722,9 @@
         <member name="P:PayrollEngine.Lex.CheckResult.FileProblems">
             <summary>Problems of the evidence files</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.Warnings">
+            <summary>Checks that could not run (e.g. git is not available): no finding, but the result is incomplete</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.LexValidFrom">
             <summary>validFrom of the manifest</summary>
         </member>
@@ -1329,8 +1332,15 @@
         </member>
         <member name="M:PayrollEngine.Lex.EvidenceCheck.GitList(System.String,System.Boolean)">
             <summary>
-            Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
+            Lists untracked (or ignored) files below a directory using git. Without git or outside a repository the
+            file set is empty and the problem says why (the check reports it as a warning).
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.EvidenceCheck.GitListing">
+            <summary>Result of a file listing: the files, or the reason why nothing could be listed</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.GitListing.#ctor(System.Collections.Generic.HashSet{System.String},System.String)">
+            <summary>Result of a file listing: the files, or the reason why nothing could be listed</summary>
         </member>
         <member name="F:PayrollEngine.Lex.EvidenceCheck.GitTimeout">
             <summary>Hard limit of a git call: a stalled child process must not stall the check</summary>
@@ -1341,6 +1351,12 @@
             is not available, fails or does not finish within the timeout (the process is then ended).
             The child process neither inherits nor reads the standard input of the host (an MCP server talks over it),
             and standard output and standard error are read at the same time.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.RunListing(System.Diagnostics.ProcessStartInfo,System.String,System.TimeSpan)">
+            <summary>
+            Like <see cref="M:PayrollEngine.Lex.EvidenceCheck.ListFiles(System.Diagnostics.ProcessStartInfo,System.String,System.TimeSpan)"/>, with the reason when nothing could be listed: command not available, folder not
+            in a repository, timeout. Never throws.
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.EvidenceFile">
