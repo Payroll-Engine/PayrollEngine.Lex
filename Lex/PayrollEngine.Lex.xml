@@ -1326,6 +1326,17 @@
             Lists untracked (or ignored) files below a directory using git. Returns an empty set without git or outside a repository.
             </summary>
         </member>
+        <member name="F:PayrollEngine.Lex.EvidenceCheck.GitTimeout">
+            <summary>Hard limit of a git call: a stalled child process must not stall the check</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.EvidenceCheck.ListFiles(System.Diagnostics.ProcessStartInfo,System.String,System.TimeSpan)">
+            <summary>
+            Runs a file listing command (one path per line) in a directory. Returns an empty set when the command
+            is not available, fails or does not finish within the timeout (the process is then ended).
+            The child process neither inherits nor reads the standard input of the host (an MCP server talks over it),
+            and standard output and standard error are read at the same time.
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.EvidenceFile">
             <summary>
             Source document to copy into the .lex folder

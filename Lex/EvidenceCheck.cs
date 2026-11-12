@@ -4,6 +4,7 @@ using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Text.Json;
+using System.Threading.Tasks;
 
 namespace PayrollEngine.Lex;
 
@@ -120,8 +121,12 @@ public static class EvidenceCheck
         {
             paths.Add(Path.Combine(lexDirectory, "snapshot.json"));
         }
-        var untracked = GitList(lexDirectory, false);
-        var ignored = GitList(lexDirectory, true);
+        // both queries are independent: run them side by side
+        var untrackedTask = Task.Run(() => GitList(lexDirectory, false));
+        var ignoredTask = Task.Run(() => GitList(lexDirectory, true));
+        Task.WaitAll(untrackedTask, ignoredTask);
+        var untracked = untrackedTask.Result;
+        var ignored = ignoredTask.Result;
         foreach (var path in paths.Select(Path.GetFullPath).Distinct(StringComparer.OrdinalIgnoreCase))
         {
             if (ignored.Contains(path))
@@ -246,37 +251,74 @@ public static class EvidenceCheck
     /// </summary>
     private static HashSet<string> GitList(string directory, bool ignored)
     {
+        var info = new ProcessStartInfo("git");
+        // git ls-files -o [-i] --exclude-standard: untracked (or ignored) files below the folder
+        info.ArgumentList.Add("ls-files");
+        info.ArgumentList.Add("-o");
+        if (ignored)
+        {
+            info.ArgumentList.Add("-i");
+        }
+        info.ArgumentList.Add("--exclude-standard");
+        info.ArgumentList.Add(".");
+        return ListFiles(info, directory, GitTimeout);
+    }
+
+    /// <summary>Hard limit of a git call: a stalled child process must not stall the check</summary>
+    private static readonly TimeSpan GitTimeout = TimeSpan.FromSeconds(30);
+
+    /// <summary>
+    /// Runs a file listing command (one path per line) in a directory. Returns an empty set when the command
+    /// is not available, fails or does not finish within the timeout (the process is then ended).
+    /// The child process neither inherits nor reads the standard input of the host (an MCP server talks over it),
+    /// and standard output and standard error are read at the same time.
+    /// </summary>
+    internal static HashSet<string> ListFiles(ProcessStartInfo info, string directory, TimeSpan timeout)
+    {
         var set = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         try
         {
-            var info = new ProcessStartInfo("git")
-            {
-                WorkingDirectory = directory,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false
-            };
-            // git ls-files -o [-i] --exclude-standard: untracked (or ignored) files below the folder
-            info.ArgumentList.Add("ls-files");
-            info.ArgumentList.Add("-o");
-            if (ignored)
-            {
-                info.ArgumentList.Add("-i");
-            }
-            info.ArgumentList.Add("--exclude-standard");
-            info.ArgumentList.Add(".");
+            info.WorkingDirectory = directory;
+            info.RedirectStandardInput = true;
+            info.RedirectStandardOutput = true;
+            info.RedirectStandardError = true;
+            info.UseShellExecute = false;
+            info.CreateNoWindow = true;
             using var process = Process.Start(info);
             if (process == null)
             {
                 return set;
             }
-            var text = process.StandardOutput.ReadToEnd();
-            process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            if (process.ExitCode != 0)
+            // nothing to send: close the input at once
+            try
+            {
+                process.StandardInput.Close();
+            }
+            catch (IOException)
+            {
+                // the process has already ended
+            }
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(timeout))
+            {
+                try
+                {
+                    process.Kill(true);
+                }
+                catch (Exception exception) when (exception is InvalidOperationException or System.ComponentModel.Win32Exception)
+                {
+                    // already ended
+                }
+                return set;
+            }
+            // the exit is signalled: drain the pipes
+            Task.WaitAll([outputTask, errorTask], timeout);
+            if (process.ExitCode != 0 || !outputTask.IsCompletedSuccessfully)
             {
                 return set;
             }
+            var text = outputTask.Result;
             foreach (var line in text.Split('\n', StringSplitOptions.RemoveEmptyEntries))
             {
                 set.Add(Path.GetFullPath(Path.Combine(directory, line.Trim())));
