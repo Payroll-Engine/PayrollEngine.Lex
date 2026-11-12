@@ -4,6 +4,52 @@
         <name>PayrollEngine.Lex</name>
     </assembly>
     <members>
+        <member name="T:PayrollEngine.Lex.AddEntryOperation">
+            <summary>
+            Adds an entry to a manifest file. The entry must be new, its source URLs declared in sources[] and its
+            document in files[]; missing required fields are written empty and reported by the check.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.AddEntryOperation.Validate(PayrollEngine.Lex.ManifestEditor,PayrollEngine.Lex.Entry)">
+            <summary>
+            Validate a new entry against the manifest: key and content format, existing key,
+            source URL not declared in sources[], document not declared in files[]
+            </summary>
+            <param name="editor">Editor of the manifest</param>
+            <param name="entry">New entry</param>
+            <returns>Errors, empty when the entry can be added</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.AddEntryOperation.MissingFields(PayrollEngine.Lex.Entry)">
+            <summary>
+            Required fields of the entry that are empty: content, sourceUrls, sourceLocation, legalReference
+            </summary>
+            <param name="entry">Entry</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.AddEntryOperation.AddAsync(System.String,PayrollEngine.Lex.Entry)">
+            <summary>
+            Add the entry to the manifest and save it
+            </summary>
+            <param name="lex">Path of lex.json or of its folder (default: lex.json or .lex/lex.json in the current folder)</param>
+            <param name="entry">New entry</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.AddEntryResult">
+            <summary>
+            Result of adding an entry to a manifest (<see cref="T:PayrollEngine.Lex.AddEntryOperation"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AddEntryResult.LexPath">
+            <summary>Full path of lex.json, null when no manifest was found</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AddEntryResult.Errors">
+            <summary>Errors that prevented the entry; nothing written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AddEntryResult.Missing">
+            <summary>Required fields written empty, reported by the check until they are filled
+            (content, sourceUrls, sourceLocation, legalReference)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AddEntryResult.Added">
+            <summary>The entry was added and the manifest saved</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.Applier">
             <summary>
             Writes the lex values into the lookup values of the data regulation (Lookup.Key mapping as in the check).
@@ -164,6 +210,35 @@
         <member name="F:PayrollEngine.Lex.ApplyChangeKind.Table">
             <summary>All values of a lookup replaced by a text table</summary>
         </member>
+        <member name="T:PayrollEngine.Lex.ApplyOperation">
+            <summary>
+            Applies a manifest file to its data regulation: the manifest is read and validated, then the lex values
+            are written into the regulation lookups (<see cref="T:PayrollEngine.Lex.Applier"/>)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ApplyOperation.CheckHint">
+            <summary>Next step after applied changes</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ApplyOperation.ApplyFileAsync(System.String,System.Boolean)">
+            <summary>
+            Apply a manifest file; a manifest that cannot be read or is invalid gives an error and writes nothing
+            </summary>
+            <param name="lexPath">Path of lex.json</param>
+            <param name="dryRun">Report the differences without writing</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ApplyOperation.ReplacedFileHint(System.String)">
+            <summary>
+            Hint for a regulation JSON file replaced by a ZIP archive (<see cref="P:PayrollEngine.Lex.ApplyResult.ReplacedFiles"/>):
+            its references are updated by hand
+            </summary>
+            <param name="replaced">Replaced file, <c>old.json -> new.zip</c></param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ApplyOperation.ReplacedFileHints(PayrollEngine.Lex.ApplyResult)">
+            <summary>
+            Hints for all regulation JSON files of the result replaced by a ZIP archive
+            </summary>
+            <param name="result">Apply result</param>
+        </member>
         <member name="T:PayrollEngine.Lex.ApplyResult">
             <summary>
             Result of applying a lex manifest to its data regulation satellite
@@ -197,6 +272,38 @@
         <member name="P:PayrollEngine.Lex.ApplyResult.Error">
             <summary>Error that prevented the apply action</summary>
         </member>
+        <member name="T:PayrollEngine.Lex.ApplySummary">
+            <summary>
+            Totals of the apply results of several manifests (<see cref="T:PayrollEngine.Lex.ApplyOperation"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Changed">
+            <summary>Regulation values replaced</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Added">
+            <summary>Regulation values added</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Tables">
+            <summary>Lookups replaced by a text table</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Unchanged">
+            <summary>Regulation values equal to the lex content</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Skipped">
+            <summary>Lex entries that could not be applied</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Failed">
+            <summary>Manifests that could not be applied (invalid lex.json or regulation)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplySummary.Applied">
+            <summary>Changes of the regulation values (changed, added and tables)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ApplySummary.Add(PayrollEngine.Lex.ApplyResult)">
+            <summary>
+            Add the result of one manifest
+            </summary>
+            <param name="result">Apply result</param>
+        </member>
         <member name="T:PayrollEngine.Lex.ArchiveWriter">
             <summary>
             Reads and writes ZIP archives of the Regulation folder. An archive is written deterministically: entries
@@ -224,6 +331,93 @@
             </summary>
             <param name="path">Existing archive</param>
             <param name="replacements">New content by entry name</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.AttestationResult">
+            <summary>
+            Result of an attestation of manifest entries (<see cref="T:PayrollEngine.Lex.AttestOperation"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.LexPath">
+            <summary>Full path of lex.json, null when no manifest was found</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.Error">
+            <summary>Error that prevented the attestation, nothing written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.Entries">
+            <summary>Result per matched entry, in document order</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.Written">
+            <summary>Records written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.Unchanged">
+            <summary>Records equal to the existing record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestationResult.Skipped">
+            <summary>Entries skipped (existing record or review, no manual record to review)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.AttestEntryResult">
+            <summary>
+            Attestation result of one entry
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestEntryResult.Key">
+            <summary>Entry key</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestEntryResult.Result">
+            <summary>Result of the record</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestEntryResult.ReviewNotRequired">
+            <summary>A review was written although no source of the entry requires a review (<see cref="F:PayrollEngine.Lex.Source.ReviewFourEyes"/>)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.AttestOperation">
+            <summary>
+            Records the manual verification of manifest entries or the second review of a manual verification.
+            An automatic record is replaced, a manual record or a review only with overwrite.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.AttestOperation.AttestAsync(System.String,PayrollEngine.Lex.AttestRequest)">
+            <summary>
+            Attest the entries matched by the key or key pattern and save the manifest when something changed
+            </summary>
+            <param name="lex">Path of lex.json or of its folder (default: lex.json or .lex/lex.json in the current folder)</param>
+            <param name="request">Attestation</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.AttestRequest">
+            <summary>
+            Manual verification of entries (verified by, date, evidence) or the second review of a manual verification
+            (reviewed by, date); the two are separate steps
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.Key">
+            <summary>Entry key or key pattern (<see cref="T:PayrollEngine.Lex.KeyPattern"/>)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.VerifiedBy">
+            <summary>Person who verified the values against the evidence</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.VerifiedOn">
+            <summary>Verification date yyyy-MM-dd (default: today)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.Evidence">
+            <summary>Evidence document, declared in files[] and present in the .lex folder</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.ReviewedBy">
+            <summary>Second person who reviewed the manual verification (four-eyes)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.ReviewedOn">
+            <summary>Review date yyyy-MM-dd (default: today)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.Overwrite">
+            <summary>Replace an existing manual record or review</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.AttestRequest.IsReview">
+            <summary>Review mode: the second confirmation of an existing manual record</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.AttestRequest.Test">
+            <summary>
+            Parameter rules: a key is required; a review takes the reviewer only, a verification the person and
+            the evidence; dates in the format yyyy-MM-dd
+            </summary>
+            <returns>Error message, null if valid</returns>
         </member>
         <member name="T:PayrollEngine.Lex.AttestResult">
             <summary>
@@ -1634,6 +1828,12 @@
         <member name="F:PayrollEngine.Lex.LexJson.SnapshotOptions">
             <summary>Reading of snapshot.json</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.LexJson.ManifestOptions">
+            <summary>Tolerant reading of lex.json (comments, trailing commas)</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.LexJson.StrictManifestOptions">
+            <summary>Strict reading of lex.json for the snapshot: comments and trailing commas are errors</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.LiveSource">
             <summary>
             Live state of a source URL in the snapshot: hash of the normalized text, used to detect source changes
@@ -2551,6 +2751,39 @@
             Removes a partially written satellite folder
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.RolloverCycle">
+            <summary>
+            Cycle of the payroll calendar that contains the rollover date: its start is the validFrom of the new
+            satellite (<see cref="M:PayrollEngine.Lex.Rollover.Run(System.String,System.DateTime,System.Boolean)"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverCycle.Start">
+            <summary>Cycle start</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverCycle.End">
+            <summary>Cycle end</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.RolloverCycle.GetAsync(System.String,System.DateTime,System.Func{System.String,System.Threading.Tasks.Task{System.Nullable{System.Int32}}},System.Func{System.Int32,System.DateTime,System.Threading.Tasks.Task{PayrollEngine.Lex.RolloverCycle}})">
+            <summary>
+            Query the cycle of a tenant calendar that contains the date
+            </summary>
+            <param name="tenant">Tenant identifier</param>
+            <param name="date">Date within the new cycle</param>
+            <param name="getTenantId">Returns the id of a tenant identifier, null when unknown</param>
+            <param name="getCycle">Returns the calendar cycle of the tenant id that contains the date, null without cycle</param>
+            <returns>The cycle, or an error for an unknown tenant or a missing cycle</returns>
+        </member>
+        <member name="T:PayrollEngine.Lex.RolloverCycleResult">
+            <summary>
+            Result of the cycle query of a rollover (<see cref="M:PayrollEngine.Lex.RolloverCycle.GetAsync(System.String,System.DateTime,System.Func{System.String,System.Threading.Tasks.Task{System.Nullable{System.Int32}}},System.Func{System.Int32,System.DateTime,System.Threading.Tasks.Task{PayrollEngine.Lex.RolloverCycle}})"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverCycleResult.Cycle">
+            <summary>Cycle that contains the rollover date, null on error</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RolloverCycleResult.Error">
+            <summary>Unknown tenant or no cycle for the date</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.RolloverResult">
             <summary>
             Result of a rollover of one data regulation satellite
@@ -2705,6 +2938,77 @@
             <summary>
             Human-readable description
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SnapshotFileResult">
+            <summary>
+            Result of the snapshot of one manifest (<see cref="T:PayrollEngine.Lex.SnapshotOperation"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.LexPath">
+            <summary>Path of lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.SnapshotPath">
+            <summary>Path of snapshot.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.DryRun">
+            <summary>Dry run: nothing written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.Status">
+            <summary>Outcome</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.ParseError">
+            <summary>lex.json could not be parsed (status failed)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.ValidationErrors">
+            <summary>Validation errors of the manifest (status failed)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.Error">
+            <summary>The snapshot could not be written (status failed)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.Snapshot">
+            <summary>Created snapshot, null unless the status is created</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.LiveSourcesHashed">
+            <summary>Live sources with a text hash</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SnapshotFileResult.LiveSourcesUnreadable">
+            <summary>Live sources that could not be read (no change detection)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SnapshotOperation">
+            <summary>
+            Snapshot of one manifest file with skip, overwrite and dry-run handling: an existing snapshot.json is kept
+            unless overwrite is set; the manifest is validated before the snapshot is written
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotOperation.SnapshotFileName">
+            <summary>File name of the snapshot</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.SnapshotOperation.RunAsync(System.String,System.String,System.Boolean,System.Boolean,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Action{System.String})">
+            <summary>
+            Create the snapshot of a manifest file
+            </summary>
+            <param name="lexPath">Path of lex.json</param>
+            <param name="targetPath">Folder of snapshot.json and the copied files, null or blank for the folder of lex.json</param>
+            <param name="dryRun">Validate and report without writing anything</param>
+            <param name="overwrite">Regenerate an existing snapshot.json; files with source URLs and an existing local copy
+            are not downloaded again</param>
+            <param name="loadLive">Loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>) for the text hash of
+            the source URLs, null without live hashes; not called in dry-run mode</param>
+            <param name="downloading">Called with the file name before a source file is downloaded; not called in dry-run mode</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.SnapshotStatus">
+            <summary>
+            Outcome of the snapshot of one manifest (<see cref="T:PayrollEngine.Lex.SnapshotOperation"/>)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotStatus.Created">
+            <summary>Snapshot created, in dry-run mode validated without writing</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotStatus.Skipped">
+            <summary>snapshot.json exists and overwrite is off: nothing done</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SnapshotStatus.Failed">
+            <summary>lex.json not readable, invalid or the snapshot could not be written</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SnapshotWriter">
             <summary>
@@ -3351,6 +3655,39 @@
             <summary>
             Ambiguity of year-weak numbers; a bundle lists the affected numbers
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceWriteMode">
+            <summary>
+            Write mode of the source verification (<see cref="T:PayrollEngine.Lex.VerifySourceOperation"/>)
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceWriteMode.ReportOnly">
+            <summary>Report only, the manifest is not changed</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceWriteMode.WriteLocations">
+            <summary>Write the found source location into entries without sourceLocation and the automatic
+            verification record into entries whose numbers were all found</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceWriteMode.RefreshLocations">
+            <summary>Like <see cref="F:PayrollEngine.Lex.SourceWriteMode.WriteLocations"/>, and also replace the source locations written by the
+            source verification (<see cref="M:PayrollEngine.Lex.SourceLocation.IsToolLocation(System.String)"/>); locations written by a person are kept</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceWriteResult">
+            <summary>
+            Result of writing the source verification into a manifest
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceWriteResult.Locations">
+            <summary>Source locations written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceWriteResult.Verifications">
+            <summary>Automatic verification records written</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceWriteResult.Saved">
+            <summary>The manifest file was saved (at least one location or record written)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceWriteResult.Changes">
+            <summary>Number of changes of the manifest</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SpreadsheetReader">
             <summary>
@@ -4057,6 +4394,96 @@
             <summary>
             An original outside .lex that changed after the snapshot is reported; a missing original is fine
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.VerifySourceFileResult">
+            <summary>
+            Result of the source verification of one manifest (<see cref="T:PayrollEngine.Lex.VerifySourceOperation"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.LexPath">
+            <summary>Full path of lex.json</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Json">
+            <summary>lex.json text as read, the base of the write step</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Manifest">
+            <summary>Manifest</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Results">
+            <summary>Result per verified entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.UnusedEvidence">
+            <summary>Evidence files in the .lex folder that back no entry</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Write">
+            <summary>Result of the write step, null when nothing was written (report only)</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.VerifySourceFileResult.Count(PayrollEngine.Lex.SourceMatch)">
+            <summary>Number of entries with the verification state</summary>
+            <param name="match">Verification state</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Problems">
+            <summary>Entries with numbers or quote missing in the source (partial, not found, quote not found)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Ambiguous">
+            <summary>Entries with ambiguous evidence</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.FileIdentities">
+            <summary>Entries verified by file identity (text tables)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.VerifySourceFileResult.Languages">
+            <summary>Languages of the verification, null when no entry read number words (text tables only)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.VerifySourceOperation">
+            <summary>
+            Source verification of a manifest file with its write rules: the numbers of every entry are looked up in
+            the sources; on request the found source locations and the automatic verification records are written
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.VerifySourceOperation.VocabularyVariable">
+            <summary>Environment variable of the host with the folder of additional language files</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.VerifySourceOperation.ResolveVocabulary(System.String,System.Func{System.String,System.String})">
+            <summary>
+            Folder of additional language files: the given folder, otherwise the value of <see cref="F:PayrollEngine.Lex.VerifySourceOperation.VocabularyVariable"/>.
+            The library reads no environment variable itself: the host passes its variable reader.
+            </summary>
+            <param name="vocabulary">Folder given by the caller, null or blank for none</param>
+            <param name="getVariable">Reader of a host variable (e.g. <see cref="M:System.Environment.GetEnvironmentVariable(System.String)"/>),
+            null without variable</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.VerifySourceOperation.VerifyFileAsync(System.String,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument})">
+            <summary>
+            Verify the entries of a manifest file against their sources; the manifest is not changed
+            </summary>
+            <param name="lexPath">Path of lex.json</param>
+            <param name="vocabulary">Folder of additional language files, null for the package languages only</param>
+            <param name="loadLive">Loader of a live source URL (e.g. <see cref="M:PayrollEngine.Lex.SourceDocument.LoadLive(System.String,System.Net.Http.HttpClient,System.Collections.Generic.IReadOnlyDictionary{System.String,System.Func{System.IO.Stream,System.Collections.Generic.List{System.ValueTuple{System.String,System.String}}}})"/>), null for the local evidence</param>
+            <param name="documents">Loaded documents, shared over several manifests</param>
+            <exception cref="T:System.Text.Json.JsonException">lex.json is not valid JSON</exception>
+            <exception cref="T:System.ArgumentException">A language of the manifest without language file</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.VerifySourceOperation.WriteAsync(PayrollEngine.Lex.VerifySourceFileResult,PayrollEngine.Lex.SourceWriteMode,System.Nullable{System.DateOnly})">
+            <summary>
+            Write the results of a verification into its manifest file; the file is saved only when something changed.
+            The result is also stored in <see cref="P:PayrollEngine.Lex.VerifySourceFileResult.Write"/>.
+            </summary>
+            <param name="file">Verification of the manifest file</param>
+            <param name="mode">Write mode; <see cref="F:PayrollEngine.Lex.SourceWriteMode.ReportOnly"/> writes nothing and returns null</param>
+            <param name="verifiedOn">Date of the verification records (default: today)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.VerifySourceOperation.Write(PayrollEngine.Lex.ManifestEditor,System.Collections.Generic.IEnumerable{PayrollEngine.Lex.SourceResult},System.Boolean,System.DateOnly)">
+            <summary>
+            Write rules: the source location of found entries without one (with refresh also a location written by the
+            source verification) and the automatic verification record of found entries. Ambiguous entries, entries
+            with missing numbers and entries with an autoVerification exclusion are not written
+            (<see cref="P:PayrollEngine.Lex.SourceResult.CanWrite"/>); a manual verification record is never replaced.
+            A text table verified by file identity gets the file identity record.
+            </summary>
+            <param name="editor">Editor of the manifest</param>
+            <param name="results">Verification results of the manifest entries</param>
+            <param name="refresh">Replace source locations written by the source verification</param>
+            <param name="verifiedOn">Date of the verification records</param>
         </member>
         <member name="T:PayrollEngine.Lex.YearAnalyzer">
             <summary>

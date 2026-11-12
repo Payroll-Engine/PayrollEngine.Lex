@@ -324,6 +324,41 @@ The Lex commands of the Payroll Console follow the life cycle of a data regulati
 A changed value runs through steps 3 to 8 again: a changed manifest no longer matches its snapshot, and
 `LexCheck` reports the difference until a new snapshot is written.
 
+### Operations
+
+The operations hold the rules of the workflow steps on manifest files and return result models; hosts such as the
+console or a tool server only present the results:
+
+| Operation | Rules | Result |
+|:---|:---|:---|
+| `VerifySourceOperation` | Verify a manifest file; write the source locations and automatic records of found entries (ambiguous and excluded entries are never written, a manual record is never replaced, refresh replaces tool-written locations only); folder of additional language files from the host variable `PAYROLL_ENGINE_LEX_VOCABULARY` | `VerifySourceFileResult`, `SourceWriteResult` |
+| `AddEntryOperation` | Key and content format, existing key, source URL not declared in `sources[]`, document not declared in `files[]`; empty required fields | `AddEntryResult` |
+| `AttestOperation` | Parameter rules of manual records and reviews (`AttestRequest.Test`), evidence declared and present; overwrite of a manual record or review | `AttestationResult` |
+| `SnapshotOperation` | Skip an existing snapshot unless overwrite, validation before writing, dry run | `SnapshotFileResult` |
+| `ApplyOperation` | Read and validate the manifest before applying; totals over several manifests; hints for lookup files replaced by a ZIP archive | `ApplyResult`, `ApplySummary` |
+| `RolloverCycle` | Cycle of the tenant calendar that contains the rollover date (calendar access passed by the host) | `RolloverCycleResult` |
+
+```csharp
+// verify and write the locations and automatic records
+var vocabulary = VerifySourceOperation.ResolveVocabulary(null, Environment.GetEnvironmentVariable);
+var verified = await VerifySourceOperation.VerifyFileAsync(lexPath, vocabulary);
+var written = await VerifySourceOperation.WriteAsync(verified, SourceWriteMode.WriteLocations);
+
+// add an entry and attest it
+var added = await AddEntryOperation.AddAsync(lexDirectory, entry);
+var attested = await AttestOperation.AttestAsync(lexDirectory, new AttestRequest
+{
+    Key = "Rates.Standard", VerifiedBy = "Jane Doe", Evidence = "tax-rates-2026.pdf"
+});
+
+// snapshot (existing snapshot kept unless overwrite) and apply
+var snapshot = await SnapshotOperation.RunAsync(lexPath, overwrite: true);
+var applied = await ApplyOperation.ApplyFileAsync(lexPath, dryRun: true);
+
+// cycle of the next satellite
+var cycle = await RolloverCycle.GetAsync("XX.Test", new DateTime(2027, 1, 1), getTenantId, getCycle);
+```
+
 ---
 
 ## Project Structure
@@ -343,7 +378,8 @@ PayrollEngine.Lex/
 │   ├── TextTable.cs, TextTableMap.cs # Text tables: conversion and map, ContentSource (archive entries)
 │   ├── Applier.cs, RegulationReader.cs # LexApply and reading of the regulation lookups (JSON and ZIP)
 │   ├── TableComparer.cs, ArchiveWriter.cs # Table differences, deterministic ZIP archives
-│   ├── Rollover.cs                   # LexRollover
+│   ├── Rollover.cs, RolloverCycle.cs # LexRollover
+│   ├── *Operation.cs                 # Workflow operations with result models
 │   └── LexVocabulary/                # Language files
 ├── Lex.Tests/                    # Unit tests
 ├── Directory.Build.props         # Shared build properties
