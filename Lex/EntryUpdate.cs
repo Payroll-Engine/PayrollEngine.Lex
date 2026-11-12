@@ -28,4 +28,12 @@ public sealed class EntryUpdate
 
     /// <summary>New description; an empty text removes the description</summary>
     public string Description { get; init; }
+
+    /// <summary>
+    /// True when a successful update should clear the verification record:
+    /// content, source URLs, source quote or reference year; not description or legal reference alone
+    /// </summary>
+    public bool InvalidatesVerification =>
+        Content != null || SourceUrls != null || SourceQuote != null ||
+        ReferenceYear != null || RemoveReferenceYear;
 }

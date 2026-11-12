@@ -1258,6 +1258,12 @@
         <member name="P:PayrollEngine.Lex.EntryUpdate.Description">
             <summary>New description; an empty text removes the description</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.InvalidatesVerification">
+            <summary>
+            True when a successful update should clear the verification record:
+            content, source URLs, source quote or reference year; not description or legal reference alone
+            </summary>
+        </member>
         <member name="T:PayrollEngine.Lex.EntryUpdateResult">
             <summary>
             Outcome of <see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateEntry(System.String,PayrollEngine.Lex.EntryUpdate)"/>
@@ -2237,6 +2243,13 @@
             <param name="file">File declaration</param>
             <returns>True if the file was added, false if a file with the name is declared</returns>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RemoveVerification(System.String)">
+            <summary>
+            Remove the verification record of an entry. Unknown keys and entries without a record are not an error.
+            </summary>
+            <param name="key">Entry key</param>
+            <returns>The removed record, or null when the entry is missing or had no verification record</returns>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SetManualVerification(System.String,PayrollEngine.Lex.Verification,System.Boolean)">
             <summary>
             Set the manual verification record of an entry. An automatic record is replaced,
@@ -2931,6 +2944,20 @@
             Start year of the tax year that holds a date of the year: the year from the start day on, otherwise the year
             before; null when the date has no day in the start month and the tax year does not start on the 1st
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RemovedVerification">
+            <summary>
+            Verification record removed from an entry (<see cref="M:PayrollEngine.Lex.ManifestEditor.RemoveVerification(System.String)"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RemovedVerification.Mode">
+            <summary>Verification mode: auto or manual</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RemovedVerification.VerifiedBy">
+            <summary>Person who verified the value (manual mode only)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RemovedVerification.VerifiedOn">
+            <summary>Verification date in YYYY-MM-DD format</summary>
         </member>
         <member name="T:PayrollEngine.Lex.Rollover">
             <summary>

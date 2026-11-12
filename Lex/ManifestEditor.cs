@@ -363,6 +363,29 @@ public sealed class ManifestEditor
     }
 
     /// <summary>
+    /// Remove the verification record of an entry. Unknown keys and entries without a record are not an error.
+    /// </summary>
+    /// <param name="key">Entry key</param>
+    /// <returns>The removed record, or null when the entry is missing or had no verification record</returns>
+    public RemovedVerification RemoveVerification(string key)
+    {
+        var entry = Entry(key);
+        if (entry == null || entry["verification"] is not JsonObject verification)
+        {
+            return null;
+        }
+        var removed = new RemovedVerification
+        {
+            Mode = verification["mode"]?.GetValue<string>(),
+            VerifiedBy = verification["verifiedBy"]?.GetValue<string>(),
+            VerifiedOn = verification["verifiedOn"]?.GetValue<string>()
+        };
+        entry.Remove("verification");
+        Changes++;
+        return removed;
+    }
+
+    /// <summary>
     /// Set the manual verification record of an entry. An automatic record is replaced,
     /// a manual record only with overwrite.
     /// </summary>
