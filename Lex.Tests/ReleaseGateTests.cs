@@ -167,6 +167,66 @@ public class ReleaseGateTests
         Assert.True(result.HasFindings);
     }
 
+    private const string Danish = """
+        {
+          "language": "da",
+          "name": "Danish",
+          "percentWords": ["procent"],
+          "enumerationWords": ["og", "eller"],
+          "rangeWords": ["til"],
+          "validityBefore": ["med virkning fra"],
+          "months": [["januar"], ["februar"], ["marts"], ["april"], ["maj"], ["juni"], ["juli"], ["august"],
+            ["september"], ["oktober"], ["november"], ["december"]]
+        }
+        """;
+
+    [Fact]
+    public async Task CheckSources_AdditionalLanguage_NeedsVocabulary()
+    {
+        using var s = Satellite(("A", "7.5"), ("B", "10"), ("C", "12.75"));
+        using var folder = new LanguageFolder(("da.json", Danish));
+        var manifest = new Manifest
+        {
+            Authority = "XX", Regulation = "Data.Test", ValidFrom = "2026-01-01", Provider = "Test Authority",
+            Sources = [new Source { Url = DocUrl, Description = "Test source" }],
+            Files = [new EvidenceFile { FileName = "rates.html" }],
+            Languages = ["da"],
+            Values = [Value("Rates.A", "7.5", Manual()), Value("Rates.B", "10", Manual()), Value("Rates.C", "12.75", Auto())]
+        };
+
+        // without the vocabulary folder the language has no file (behavior unchanged)
+        var without = Checker.Check(manifest, s.LexPath, release: true);
+        await Assert.ThrowsAsync<ArgumentException>(() => Checker.CheckSources(manifest, without));
+        Assert.False(without.SourcesVerified);
+
+        var with = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, with, folder.Path);
+        Assert.True(with.SourcesVerified);
+        Assert.Equal(0, with.Ambiguous);
+        Assert.Equal(0, with.QuoteNotFound);
+        Assert.Equal(0, with.NotVerifiable);
+    }
+
+    [Fact]
+    public async Task CheckSources_PrecomputedSources_GiveTheSameResult()
+    {
+        using var s = Satellite(("A", "7.5"), ("B", "10"), ("C", "12.75"));
+        var manifest = Manifest(Value("Rates.A", "7.5", Auto()), Value("Rates.B", "10", Manual()), Value("Rates.C", "12.75", Auto()));
+
+        var own = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, own);
+        var sources = await ManifestVerifier.VerifyManifest(manifest, s.LexDirectory);
+        var shared = Checker.Check(manifest, s.LexPath, release: true);
+        await Checker.CheckSources(manifest, shared, sources: sources);
+
+        Assert.True(shared.SourcesVerified);
+        Assert.Equal(own.Ambiguous, shared.Ambiguous);
+        Assert.Equal(own.QuoteNotFound, shared.QuoteNotFound);
+        Assert.Equal(own.NotVerifiable, shared.NotVerifiable);
+        Assert.Equal(own.ManualVerificationSamples, shared.ManualVerificationSamples);
+        Assert.Equal(1, shared.Ambiguous);
+    }
+
     [Fact]
     public void SecondaryMainSource_IsFindingOnlyInRelease()
     {

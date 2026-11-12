@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Threading.Tasks;
@@ -97,14 +98,22 @@ public static class Checker
     /// </summary>
     /// <param name="manifest">Manifest (lex.json)</param>
     /// <param name="result">Result of <see cref="Check"/></param>
-    public static async Task CheckSources(Manifest manifest, CheckResult result)
+    /// <param name="vocabulary">Folder of additional language files for the languages of the manifest
+    /// (see <see cref="VerifySourceOperation.ResolveVocabulary"/>), null for the package languages only</param>
+    /// <param name="sources">Local verification of the manifest already computed by the caller
+    /// (<see cref="ManifestVerifier.VerifyManifest"/> without live loader, with the same vocabulary),
+    /// null to verify here</param>
+    /// <exception cref="ArgumentException">A language of the manifest without language file</exception>
+    public static async Task CheckSources(Manifest manifest, CheckResult result, string vocabulary = null,
+        IReadOnlyList<SourceResult> sources = null)
     {
         var manual = manifest.Values
             .Where(x => x.Key != null && x.Verification?.Mode == Verification.ModeManual)
             .Select(x => x.Key)
             .ToHashSet(StringComparer.Ordinal);
         var readableLive = UrlChecker.ReadBaseline(result.LexPath);
-        var sources = await ManifestVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!);
+        sources ??= await ManifestVerifier.VerifyManifest(manifest, Path.GetDirectoryName(result.LexPath)!,
+            languageDirectory: vocabulary);
         foreach (var source in sources.Where(x => !manual.Contains(x.Key)))
         {
             switch (source.Match)

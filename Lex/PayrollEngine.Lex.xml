@@ -465,9 +465,9 @@
             <param name="release">Release gate: includes <paramref name="requireLocation"/> and <paramref name="requireVerification"/>,
             a secondary main source, an entry excluded from auto verification with an automatic record and a zero property
             without notApplicable exclusion are findings.
-            The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)"/>.</param>
+            The entries that need a manual verification are found by <see cref="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult,System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.SourceResult})"/>.</param>
         </member>
-        <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
+        <member name="M:PayrollEngine.Lex.Checker.CheckSources(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult,System.String,System.Collections.Generic.IReadOnlyList{PayrollEngine.Lex.SourceResult})">
             <summary>
             Release gate: verify the entries without manual verification against their local evidence
             (<see cref="M:PayrollEngine.Lex.ManifestVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/>); an ambiguous entry and an entry whose quote is not found
@@ -476,6 +476,12 @@
             </summary>
             <param name="manifest">Manifest (lex.json)</param>
             <param name="result">Result of <see cref="M:PayrollEngine.Lex.Checker.Check(PayrollEngine.Lex.Manifest,System.String,System.Boolean,System.Boolean,System.Boolean)"/></param>
+            <param name="vocabulary">Folder of additional language files for the languages of the manifest
+            (see <see cref="M:PayrollEngine.Lex.VerifySourceOperation.ResolveVocabulary(System.String,System.Func{System.String,System.String})"/>), null for the package languages only</param>
+            <param name="sources">Local verification of the manifest already computed by the caller
+            (<see cref="M:PayrollEngine.Lex.ManifestVerifier.VerifyManifest(PayrollEngine.Lex.Manifest,System.String,System.Func{System.String,System.Threading.Tasks.Task{PayrollEngine.Lex.SourceDocument}},System.Collections.Generic.IDictionary{System.String,PayrollEngine.Lex.SourceDocument},System.String)"/> without live loader, with the same vocabulary),
+            null to verify here</param>
+            <exception cref="T:System.ArgumentException">A language of the manifest without language file</exception>
         </member>
         <member name="T:PayrollEngine.Lex.CheckReport">
             <summary>
