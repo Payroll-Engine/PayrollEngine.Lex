@@ -2201,6 +2201,16 @@
             </summary>
             <param name="url">Source URL</param>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.AddSource(PayrollEngine.Lex.Source)">
+            <summary>
+            Declare a source in sources[]. The properties follow the schema order (url, description, legalBasis, review,
+            official); a missing sources array is created before values[].
+            </summary>
+            <param name="source">Source to declare: url is mandatory, review is SingleAuthor or FourEyes,
+            official is written only when set (the schema default is true)</param>
+            <returns>True if the source was added, false if a source with the URL is already declared (nothing changes)</returns>
+            <exception cref="T:System.ArgumentException">Missing or relative URL, or an unknown review rule</exception>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SourceReview(System.String)">
             <summary>
             Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
@@ -2313,6 +2323,12 @@
         </member>
         <member name="F:PayrollEngine.Lex.ManifestEditor.EntryLayout">
             <summary>Property order of an entry; a new property follows the nearest preceding property that is present</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ManifestEditor.RootLayout">
+            <summary>Property order of the manifest header and the arrays</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.InsertRootProperty(System.String,System.Text.Json.Nodes.JsonNode)">
+            <summary>Insert a new root property after the nearest preceding property of the root layout</summary>
         </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SetText(System.Text.Json.Nodes.JsonObject,System.String,System.String,System.Boolean)">
             <summary>

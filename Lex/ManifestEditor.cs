@@ -148,6 +148,58 @@ public sealed class ManifestEditor
             string.Equals(x["url"]?.GetValue<string>(), url, StringComparison.Ordinal));
 
     /// <summary>
+    /// Declare a source in sources[]. The properties follow the schema order (url, description, legalBasis, review,
+    /// official); a missing sources array is created before values[].
+    /// </summary>
+    /// <param name="source">Source to declare: url is mandatory, review is SingleAuthor or FourEyes,
+    /// official is written only when set (the schema default is true)</param>
+    /// <returns>True if the source was added, false if a source with the URL is already declared (nothing changes)</returns>
+    /// <exception cref="ArgumentException">Missing or relative URL, or an unknown review rule</exception>
+    public bool AddSource(Source source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        var url = source.Url?.Trim();
+        if (string.IsNullOrWhiteSpace(url) || !Uri.TryCreate(url, UriKind.Absolute, out _))
+        {
+            throw new ArgumentException("Source URL expected (absolute URI)", nameof(source));
+        }
+        if (source.Review != null && source.Review != Source.ReviewSingleAuthor && source.Review != Source.ReviewFourEyes)
+        {
+            throw new ArgumentException(
+                $"Review must be '{Source.ReviewSingleAuthor}' or '{Source.ReviewFourEyes}'", nameof(source));
+        }
+        if (HasSource(url))
+        {
+            return false;
+        }
+        var item = new JsonObject { ["url"] = url };
+        if (!string.IsNullOrWhiteSpace(source.Description))
+        {
+            item["description"] = source.Description.Trim();
+        }
+        if (!string.IsNullOrWhiteSpace(source.LegalBasis))
+        {
+            item["legalBasis"] = source.LegalBasis.Trim();
+        }
+        if (source.Review != null)
+        {
+            item["review"] = source.Review;
+        }
+        if (source.Official != null)
+        {
+            item["official"] = source.Official.Value;
+        }
+        if (root["sources"] is not JsonArray sources)
+        {
+            sources = [];
+            InsertRootProperty("sources", sources);
+        }
+        sources.Add(item);
+        Changes++;
+        return true;
+    }
+
+    /// <summary>
     /// Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
     /// FourEyes when any source requires it
     /// </summary>
@@ -549,6 +601,32 @@ public sealed class ManifestEditor
         "key", "content", "contentFile", "contentMap", "unit", "sourceUrls", "sourceLocation", "sourceQuote",
         "referenceYear", "legalReference", "documentRef", "description", "verification", "open"
     ];
+
+    /// <summary>Property order of the manifest header and the arrays</summary>
+    private static readonly string[] RootLayout =
+    [
+        "$schema", "authority", "regulation", "validFrom", "provider", "languages", "sources", "values", "files", "exclusions"
+    ];
+
+    /// <summary>Insert a new root property after the nearest preceding property of the root layout</summary>
+    private void InsertRootProperty(string name, JsonNode value)
+    {
+        if (root is not JsonObject header)
+        {
+            throw new InvalidOperationException("The manifest is not a JSON object");
+        }
+        var index = 0;
+        for (var i = Array.IndexOf(RootLayout, name) - 1; i >= 0; i--)
+        {
+            var before = header.IndexOf(RootLayout[i]);
+            if (before >= 0)
+            {
+                index = before + 1;
+                break;
+            }
+        }
+        header.Insert(index, name, value);
+    }
 
     private static void ValidateUpdate(EntryUpdate update)
     {
