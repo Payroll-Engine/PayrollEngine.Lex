@@ -298,6 +298,7 @@ internal static class RegulationReader
     private static void ReadLookup(ref Utf8JsonReader reader, Context context)
     {
         string lookupName = null;
+        string rangeMode = null;
         var hasValues = false;
         // insertOffset: end of the last value (or of the opening bracket), where LexApply appends a new value
         var insertOffset = 0;
@@ -337,6 +338,10 @@ internal static class RegulationReader
             {
                 lookupName = Text(ref reader);
             }
+            else if (Is(name, "rangeMode"))
+            {
+                rangeMode = Text(ref reader);
+            }
             else
             {
                 reader.Skip();
@@ -352,6 +357,7 @@ internal static class RegulationReader
         {
             Name = lookupName,
             File = context.File,
+            RangeMode = rangeMode,
             HasValues = hasValues,
             InsertOffset = insertOffset,
             ValuesOffset = valuesOffset,

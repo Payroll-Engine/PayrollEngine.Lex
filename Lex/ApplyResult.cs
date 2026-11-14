@@ -19,6 +19,11 @@ public sealed class ApplyResult
     /// <summary>Lex entries that could not be applied, with reason</summary>
     public List<string> Skipped { get; } = [];
 
+    /// <summary>New rows of range lookups without a range value: the key is no date (yyyy-MM-dd) and the entry
+    /// names no rangeValue; one text per entry (<see cref="Applier.RangeValueMissingCode"/>). The apply action
+    /// fails and writes nothing while the list is not empty</summary>
+    public List<string> RangeValueMissing { get; } = [];
+
     /// <summary>Regulation values equal to the lex content</summary>
     public int Unchanged { get; internal set; }
 

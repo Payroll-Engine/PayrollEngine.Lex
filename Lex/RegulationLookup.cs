@@ -14,6 +14,15 @@ internal sealed class RegulationLookup
     /// <summary>File of the lookup</summary>
     internal RegulationFile File { get; init; }
 
+    /// <summary>Text of the rangeMode property, null without</summary>
+    internal string RangeMode { get; init; }
+
+    /// <summary>Range lookup: a rangeMode other than None; every value needs a rangeValue</summary>
+    internal bool IsRange =>
+        !string.IsNullOrWhiteSpace(RangeMode) &&
+        !string.Equals(RangeMode, "None", System.StringComparison.OrdinalIgnoreCase) &&
+        RangeMode != "0";
+
     /// <summary>Lookup has a values array</summary>
     internal bool HasValues { get; set; }
 

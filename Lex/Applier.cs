@@ -48,6 +48,29 @@ public static class Applier
         internal string Content { get; init; }
         /// <summary>True: JSON content written as valueObject, false: text written as value</summary>
         internal bool Structured { get; init; }
+        /// <summary>Range value of the new row, null for a lookup without range mode</summary>
+        internal decimal? RangeValue { get; init; }
+    }
+
+    /// <summary>Error code of a new row in a range lookup without range value</summary>
+    public const string RangeValueMissingCode = "rangeValueMissing";
+
+    /// <summary>
+    /// Range value of a new row: the range value named by the entry, else the key in the format yyyy-MM-dd as
+    /// the number yyyyMMdd; any other key gives null (the value is never guessed)
+    /// </summary>
+    /// <param name="valueKey">Key of the new row</param>
+    /// <param name="explicitValue">Range value of the lex entry, null without</param>
+    internal static decimal? RangeValueOf(string valueKey, decimal? explicitValue)
+    {
+        if (explicitValue != null)
+        {
+            return explicitValue;
+        }
+        return DateOnly.TryParseExact(valueKey, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+            System.Globalization.DateTimeStyles.None, out var date)
+            ? date.Year * 10000 + date.Month * 100 + date.Day
+            : null;
     }
 
     /// <summary>
@@ -148,9 +171,16 @@ public static class Applier
                     break;
                 // an entry for a missing key of an existing lookup becomes a new value at the end of the values array
                 case EntryTargetKind.NewValue:
-                    Add(result, additions, entry.Key, target.Lookup, target.Remainder, content);
+                    Add(result, additions, entry.Key, entry.RangeValue, target.Lookup, target.Remainder, content);
                     break;
             }
+        }
+
+        // a new row of a range lookup without range value would sort and resolve wrongly: nothing is written
+        if (result.RangeValueMissing.Count > 0)
+        {
+            result.Error = $"{RangeValueMissingCode}: {string.Join("; ", result.RangeValueMissing)}; nothing written";
+            return result;
         }
 
         // the new values of a lookup are inserted together after its last value
@@ -393,7 +423,7 @@ public static class Applier
     /// Registers a new lookup value; its form (value or valueObject) must match the existing values of the lookup
     /// </summary>
     private static void Add(ApplyResult result, Dictionary<RegulationLookup, List<Addition>> additions,
-        string entryKey, RegulationLookup lookup, string valueKey, string content)
+        string entryKey, decimal? entryRangeValue, RegulationLookup lookup, string valueKey, string content)
     {
         if (!lookup.HasValues)
         {
@@ -419,14 +449,27 @@ public static class Applier
             result.Skipped.Add($"{entryKey}: value {lookup.Name}.{valueKey} is added by another entry");
             return;
         }
-        items.Add(new Addition { Key = valueKey, Content = content, Structured = structured });
+        // a row of a range lookup is identified by its range value: derived from a date key, never guessed
+        decimal? rangeValue = null;
+        if (lookup.IsRange)
+        {
+            rangeValue = RangeValueOf(valueKey, entryRangeValue);
+            if (rangeValue == null)
+            {
+                result.RangeValueMissing.Add(
+                    $"{entryKey}: the key '{valueKey}' of range lookup {lookup.Name} is not a date (yyyy-MM-dd): set rangeValue on the lex entry");
+                return;
+            }
+        }
+        items.Add(new Addition { Key = valueKey, Content = content, Structured = structured, RangeValue = rangeValue });
         result.Changes.Add(new ApplyChange
         {
             EntryKey = entryKey,
             File = Path.GetFileName(lookup.File.Path),
             Target = lookup.Name + "." + valueKey,
             Kind = ApplyChangeKind.Added,
-            Detail = "new value"
+            Detail = rangeValue == null ? "new value" : $"new value, rangeValue {TableComparer.Number(rangeValue.Value)}",
+            RangeValue = rangeValue
         });
     }
 
@@ -553,6 +596,11 @@ public static class Applier
             }
             builder.Append(newLine).Append(itemIndent).Append('{').Append(newLine);
             builder.Append(inner).Append("\"key\": ").Append(JsonString(item.Key)).Append(',').Append(newLine);
+            if (item.RangeValue != null)
+            {
+                builder.Append(inner).Append("\"rangeValue\": ").Append(TableComparer.Number(item.RangeValue.Value))
+                    .Append(',').Append(newLine);
+            }
             var value = item.Structured
                 ? Reindent(item.Content.Trim(), inner, newLine)
                 : JsonString(item.Content);

@@ -274,6 +274,10 @@ public sealed class ManifestEditor
             ["key"] = value.Key,
             ["content"] = value.Content ?? string.Empty
         };
+        if (value.RangeValue != null)
+        {
+            entry["rangeValue"] = RangeNode(value.RangeValue.Value);
+        }
         if (value.Unit != null)
         {
             entry["unit"] = value.Unit;
@@ -340,6 +344,19 @@ public sealed class ManifestEditor
             }
         }
         changed |= SetText(entry, "sourceQuote", update.SourceQuote, removeEmpty: true);
+        if (update.RemoveRangeValue)
+        {
+            changed |= entry.Remove("rangeValue");
+        }
+        else if (update.RangeValue != null)
+        {
+            var current = entry["rangeValue"] is JsonValue r && r.TryGetValue<decimal>(out var range) ? range : (decimal?)null;
+            if (current != update.RangeValue)
+            {
+                SetProperty(entry, "rangeValue", RangeNode(update.RangeValue.Value));
+                changed = true;
+            }
+        }
         if (update.RemoveReferenceYear)
         {
             changed |= entry.Remove("referenceYear");
@@ -633,7 +650,7 @@ public sealed class ManifestEditor
     /// <summary>Property order of an entry; a new property follows the nearest preceding property that is present</summary>
     private static readonly string[] EntryLayout =
     [
-        "key", "content", "contentFile", "contentMap", "unit", "sourceUrls", "sourceLocation", "sourceQuote",
+        "key", "content", "contentFile", "contentMap", "rangeValue", "unit", "sourceUrls", "sourceLocation", "sourceQuote",
         "referenceYear", "legalReference", "documentRef", "description", "verification", "open"
     ];
 
@@ -697,7 +714,15 @@ public sealed class ManifestEditor
         {
             throw new ArgumentException("Reference year cannot be set and removed", nameof(update));
         }
+        if (update.RemoveRangeValue && update.RangeValue != null)
+        {
+            throw new ArgumentException("Range value cannot be set and removed", nameof(update));
+        }
     }
+
+    /// <summary>JSON number of a range value in invariant notation without trailing zeros</summary>
+    private static JsonNode RangeNode(decimal value) =>
+        JsonNode.Parse(TableComparer.Number(value))!;
 
     private static string Text(JsonObject item, string name) =>
         item[name] is JsonValue value && value.TryGetValue<string>(out var text) ? text : null;

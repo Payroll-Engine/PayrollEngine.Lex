@@ -246,7 +246,7 @@ internal static class TableComparer
     /// <summary>
     /// Invariant notation without trailing zeros (1.00 is written as 1, 0.0125 stays 0.0125)
     /// </summary>
-    private static string Number(decimal value) =>
+    internal static string Number(decimal value) =>
         (value / 1.0000000000000000000000000000m).ToString(CultureInfo.InvariantCulture);
 
     /// <summary>

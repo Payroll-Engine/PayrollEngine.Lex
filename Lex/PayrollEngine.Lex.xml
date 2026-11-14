@@ -94,6 +94,20 @@
         <member name="P:PayrollEngine.Lex.Applier.Addition.Structured">
             <summary>True: JSON content written as valueObject, false: text written as value</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.Applier.Addition.RangeValue">
+            <summary>Range value of the new row, null for a lookup without range mode</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.Applier.RangeValueMissingCode">
+            <summary>Error code of a new row in a range lookup without range value</summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Applier.RangeValueOf(System.String,System.Nullable{System.Decimal})">
+            <summary>
+            Range value of a new row: the range value named by the entry, else the key in the format yyyy-MM-dd as
+            the number yyyyMMdd; any other key gives null (the value is never guessed)
+            </summary>
+            <param name="valueKey">Key of the new row</param>
+            <param name="explicitValue">Range value of the lex entry, null without</param>
+        </member>
         <member name="M:PayrollEngine.Lex.Applier.Apply(PayrollEngine.Lex.Manifest,System.String,System.Boolean)">
             <summary>
             Apply one manifest
@@ -117,7 +131,7 @@
             Replaces the value token (or the property of a split key) when the lex content differs
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.Applier.Add(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.Dictionary{PayrollEngine.Lex.RegulationLookup,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Addition}},System.String,PayrollEngine.Lex.RegulationLookup,System.String,System.String)">
+        <member name="M:PayrollEngine.Lex.Applier.Add(PayrollEngine.Lex.ApplyResult,System.Collections.Generic.Dictionary{PayrollEngine.Lex.RegulationLookup,System.Collections.Generic.List{PayrollEngine.Lex.Applier.Addition}},System.String,System.Nullable{System.Decimal},PayrollEngine.Lex.RegulationLookup,System.String,System.String)">
             <summary>
             Registers a new lookup value; its form (value or valueObject) must match the existing values of the lookup
             </summary>
@@ -187,6 +201,9 @@
         <member name="P:PayrollEngine.Lex.ApplyChange.Detail">
             <summary>Difference before the change</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.ApplyChange.RangeValue">
+            <summary>Range value written into a new row of a range lookup (kind Added), null without</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.ApplyChange.AddedValues">
             <summary>Table rows without lookup value (kind Table)</summary>
         </member>
@@ -255,6 +272,11 @@
         </member>
         <member name="P:PayrollEngine.Lex.ApplyResult.Skipped">
             <summary>Lex entries that could not be applied, with reason</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ApplyResult.RangeValueMissing">
+            <summary>New rows of range lookups without a range value: the key is no date (yyyy-MM-dd) and the entry
+            names no rangeValue; one text per entry (<see cref="F:PayrollEngine.Lex.Applier.RangeValueMissingCode"/>). The apply action
+            fails and writes nothing while the list is not empty</summary>
         </member>
         <member name="P:PayrollEngine.Lex.ApplyResult.Unchanged">
             <summary>Regulation values equal to the lex content</summary>
@@ -648,6 +670,13 @@
         <member name="P:PayrollEngine.Lex.CheckResult.UnjustifiedZeroSamples">
             <summary>Samples of bundle entries with zero properties without justification</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.RangeValueMissing">
+            <summary>Values of range lookups (rangeMode other than None) without a rangeValue: such a row sorts and
+            resolves wrongly; a finding only in the release mode</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.RangeValueMissingSamples">
+            <summary>Samples of range lookup values without a rangeValue (Lookup.Key)</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.OtherReferenceYear">
             <summary>Entries with a reference year other than the validFrom year (information)</summary>
         </member>
@@ -886,6 +915,12 @@
             a notApplicable property must have the value 0
             </summary>
         </member>
+        <member name="M:PayrollEngine.Lex.CoverageCheck.CheckRangeValues(PayrollEngine.Lex.RegulationData,PayrollEngine.Lex.CheckResult)">
+            <summary>
+            A value of a range lookup without rangeValue sorts and resolves wrongly (LexApply writes the range value
+            of a new row, an existing row is never recomputed); a finding only in the release mode
+            </summary>
+        </member>
         <member name="M:PayrollEngine.Lex.CoverageCheck.CheckReferenceYears(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.CheckResult)">
             <summary>
             Entries whose reference year differs from the validFrom year: listed as information for the review
@@ -1008,6 +1043,14 @@
             <summary>
             Text table map (JSON, relative to the .lex folder) that converts the text file of
             <see cref="P:PayrollEngine.Lex.Entry.ContentFile"/> into the values of the whole lookup; only together with ContentFile
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.Entry.RangeValue">
+            <summary>
+            Technical range value of a new row in a range lookup (rangeMode other than None). LexApply derives it from
+            a key in the format yyyy-MM-dd (as the number yyyyMMdd); this field names it for keys without a date.
+            It is a technical key, not a compliance value: it does not change the verification of the entry and
+            never replaces the range value of an existing row.
             </summary>
         </member>
         <member name="P:PayrollEngine.Lex.Entry.DocumentRef">
@@ -1257,6 +1300,13 @@
         </member>
         <member name="P:PayrollEngine.Lex.EntryUpdate.SourceQuote">
             <summary>New source quote; an empty text removes the quote</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.RangeValue">
+            <summary>New range value (technical key of a new row in a range lookup); not a compliance value, it does not
+            invalidate the verification</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.RemoveRangeValue">
+            <summary>Remove the range value (not together with <see cref="P:PayrollEngine.Lex.EntryUpdate.RangeValue"/>)</summary>
         </member>
         <member name="P:PayrollEngine.Lex.EntryUpdate.ReferenceYear">
             <summary>New reference year (1990 to 2100)</summary>
@@ -2379,6 +2429,9 @@
         <member name="M:PayrollEngine.Lex.ManifestEditor.InsertRootProperty(System.String,System.Text.Json.Nodes.JsonNode)">
             <summary>Insert a new root property after the nearest preceding property of the root layout</summary>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RangeNode(System.Decimal)">
+            <summary>JSON number of a range value in invariant notation without trailing zeros</summary>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SetText(System.Text.Json.Nodes.JsonObject,System.String,System.String,System.Boolean,System.String[])">
             <summary>
             Set a text property: null leaves it, an empty text removes it when allowed, an equal text is no change
@@ -2769,6 +2822,12 @@
         </member>
         <member name="P:PayrollEngine.Lex.RegulationLookup.File">
             <summary>File of the lookup</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.RangeMode">
+            <summary>Text of the rangeMode property, null without</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLookup.IsRange">
+            <summary>Range lookup: a rangeMode other than None; every value needs a rangeValue</summary>
         </member>
         <member name="P:PayrollEngine.Lex.RegulationLookup.HasValues">
             <summary>Lookup has a values array</summary>

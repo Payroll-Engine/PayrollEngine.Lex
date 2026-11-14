@@ -289,6 +289,14 @@ file, setup script) are updated by hand. A file with other objects stays JSON. T
 `RegulationReader` reads `Regulation/*.json` and the JSON entries of `Regulation/*.zip`; `LexApply` writes nothing
 when a JSON file and an archive with the same name both exist.
 
+**Range lookups.** A new row that `LexApply` adds to a lookup with a `rangeMode` other than `None` gets a
+`rangeValue` (`ApplyChange.RangeValue`, also in the dry-run detail): the key in the format `yyyy-MM-dd` as the number
+`yyyyMMdd`, or the optional `rangeValue` of the lex entry for another key. A new row with another key and no
+`rangeValue` is not guessed: the result carries the error `rangeValueMissing` (`ApplyResult.RangeValueMissing`) and
+nothing is written. The `rangeValue` of an existing row is never recomputed, so a second run changes nothing.
+`LexCheck` reports a value of a range lookup without `rangeValue` (`CheckResult.RangeValueMissing`), a finding in the
+release mode.
+
 ## Rollover
 
 `Rollover.Run` copies the satellite of the previous cycle into a new folder for the cycle start:

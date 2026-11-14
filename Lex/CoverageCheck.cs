@@ -210,6 +210,22 @@ internal static class CoverageCheck
     }
 
     /// <summary>
+    /// A value of a range lookup without rangeValue sorts and resolves wrongly (LexApply writes the range value
+    /// of a new row, an existing row is never recomputed); a finding only in the release mode
+    /// </summary>
+    internal static void CheckRangeValues(RegulationData regulation, CheckResult result)
+    {
+        foreach (var lookup in regulation.Lookups.Where(x => x.IsRange))
+        {
+            foreach (var value in lookup.Values.Where(x => string.IsNullOrEmpty(x.RangeValue)))
+            {
+                result.RangeValueMissing++;
+                CheckResult.AddSample(result.RangeValueMissingSamples, lookup.Name + "." + value.Key);
+            }
+        }
+    }
+
+    /// <summary>
     /// Entries whose reference year differs from the validFrom year: listed as information for the review
     /// </summary>
     internal static void CheckReferenceYears(Manifest manifest, CheckResult result)

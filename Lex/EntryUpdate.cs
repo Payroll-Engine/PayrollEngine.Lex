@@ -20,6 +20,13 @@ public sealed class EntryUpdate
     /// <summary>New source quote; an empty text removes the quote</summary>
     public string SourceQuote { get; init; }
 
+    /// <summary>New range value (technical key of a new row in a range lookup); not a compliance value, it does not
+    /// invalidate the verification</summary>
+    public decimal? RangeValue { get; init; }
+
+    /// <summary>Remove the range value (not together with <see cref="RangeValue"/>)</summary>
+    public bool RemoveRangeValue { get; init; }
+
     /// <summary>New reference year (1990 to 2100)</summary>
     public int? ReferenceYear { get; init; }
 

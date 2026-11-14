@@ -31,7 +31,8 @@ public static class SourceVerifier
 
     /// <summary>Hint for zero properties of a bundle without a notApplicable exclusion</summary>
     // ReSharper disable once UnusedMember.Global
-    public const string UnjustifiedZeroHint = "zero values without justification";
+    public const string UnjustifiedZeroHint =
+        "zero values without justification (add an exclusion of kind notApplicable: pattern <Entry>.<Property>, reason with the legal basis)";
 
     /// <summary>
     /// Verification method of an automatic verification (tool and version), e.g. LexVerifySource 1.2.0

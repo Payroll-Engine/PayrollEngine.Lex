@@ -44,7 +44,7 @@ public static class CheckReport
                        "MissingLegalReference;ValidationErrors;FileProblems;ValidFromMatch;Findings;ChangedSources;" +
                        "VerifiedAuto;VerifiedManual;Unverified;MissingReview;Open;UnspecificLocations;" +
                        "SecondaryMainSource;Release;Ambiguous;QuoteNotFound;ExcludedAutoVerified;ExcludedDerived;" +
-                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence;NotVerifiable");
+                       "ExcludedNotApplicable;UnjustifiedZero;OtherReferenceYear;UnusedEvidence;NotVerifiable;RangeValueMissing");
         // one row per satellite, values in the order of the header
         foreach (var r in results)
         {
@@ -55,7 +55,8 @@ public static class CheckReport
                 r.FileProblems.Count, r.ValidFromMatch, r.HasFindings, r.ChangedSources.Count,
                 r.VerifiedAuto, r.VerifiedManual, r.Unverified, r.MissingReview, r.Open, r.UnspecificLocations,
                 r.SecondaryMainSource, r.Release, r.Ambiguous, r.QuoteNotFound, r.ExcludedAutoVerified, r.ExcludedDerived,
-                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear, r.UnusedEvidence, r.NotVerifiable));
+                r.ExcludedNotApplicable, r.UnjustifiedZero, r.OtherReferenceYear, r.UnusedEvidence, r.NotVerifiable,
+                r.RangeValueMissing));
         }
         return csv.ToString();
     }
@@ -101,6 +102,7 @@ public static class CheckReport
         text.AppendLine($"| Entries with zero values without justification | {results.Sum(r => (long)r.UnjustifiedZero)} |");
         text.AppendLine($"| Entries with a reference year other than the validFrom year | {results.Sum(r => (long)r.OtherReferenceYear)} |");
         text.AppendLine($"| Evidence files that back no entry | {results.Sum(r => (long)r.UnusedEvidence)} |");
+        text.AppendLine($"| Range lookup values without rangeValue | {results.Sum(r => (long)r.RangeValueMissing)} |");
         if (release)
         {
             text.AppendLine($"| Ambiguous entries without manual verification | {results.Sum(r => (long)r.Ambiguous)} |");
@@ -210,6 +212,10 @@ public static class CheckReport
             if (r.Release && r.UnusedEvidence > 0)
             {
                 text.AppendLine($"- Evidence files that back no entry ({r.UnusedEvidence}): {Join(r.UnusedEvidenceSamples, r.UnusedEvidence)}");
+            }
+            if (r.Release && r.RangeValueMissing > 0)
+            {
+                text.AppendLine($"- Range lookup values without rangeValue ({r.RangeValueMissing}): {Join(r.RangeValueMissingSamples, r.RangeValueMissing)}");
             }
             if (r.Release && r.NotVerifiable > 0)
             {

@@ -34,6 +34,15 @@ public sealed class Entry
     public string ContentMap { get; init; }
 
     /// <summary>
+    /// Technical range value of a new row in a range lookup (rangeMode other than None). LexApply derives it from
+    /// a key in the format yyyy-MM-dd (as the number yyyyMMdd); this field names it for keys without a date.
+    /// It is a technical key, not a compliance value: it does not change the verification of the entry and
+    /// never replaces the range value of an existing row.
+    /// </summary>
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public decimal? RangeValue { get; init; }
+
+    /// <summary>
     /// Reference to a local evidence document in the files[] array (e.g. "tax-rates-2026.pdf").
     /// The referenced file must be declared in the manifest's files[] array.
     /// </summary>

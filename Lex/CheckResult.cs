@@ -128,6 +128,13 @@ public sealed class CheckResult
     /// <summary>Samples of bundle entries with zero properties without justification</summary>
     public List<string> UnjustifiedZeroSamples { get; } = [];
 
+    /// <summary>Values of range lookups (rangeMode other than None) without a rangeValue: such a row sorts and
+    /// resolves wrongly; a finding only in the release mode</summary>
+    public int RangeValueMissing { get; internal set; }
+
+    /// <summary>Samples of range lookup values without a rangeValue (Lookup.Key)</summary>
+    public List<string> RangeValueMissingSamples { get; } = [];
+
     /// <summary>Entries with a reference year other than the validFrom year (information)</summary>
     public int OtherReferenceYear { get; internal set; }
 
@@ -235,7 +242,7 @@ public sealed class CheckResult
         (RequireVerification && Unverified > 0) || Open > 0 || MissingReview > 0 || !ValidFromMatch || Note != null ||
         (RequireLocation && UnspecificLocations > 0) ||
         (Release && (SecondaryMainSource > 0 || ManualVerificationRequired > 0 || UnjustifiedZero > 0 || UnusedEvidence > 0 ||
-                     NotVerifiable > 0));
+                     NotVerifiable > 0 || RangeValueMissing > 0));
 
     /// <summary>Maximum number of samples per finding in the report</summary>
     internal const int MaxSamples = 8;

@@ -74,6 +74,7 @@ public static class Checker
         CoverageCheck.CheckPropertyExclusions(manifest, lexDirectory, result);
         CoverageCheck.CheckZeros(manifest, lexDirectory, result);
         CoverageCheck.CheckReferenceYears(manifest, result);
+        CoverageCheck.CheckRangeValues(regulation, result);
         EvidenceCheck.CheckEvidence(manifest, lexDirectory, result);
         foreach (var exclusion in manifest.Exclusions)
         {

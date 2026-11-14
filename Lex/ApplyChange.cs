@@ -20,6 +20,9 @@ public sealed class ApplyChange
     /// <summary>Difference before the change</summary>
     public string Detail { get; init; }
 
+    /// <summary>Range value written into a new row of a range lookup (kind Added), null without</summary>
+    public decimal? RangeValue { get; init; }
+
     /// <summary>Table rows without lookup value (kind Table)</summary>
     public int AddedValues { get; init; }
 
