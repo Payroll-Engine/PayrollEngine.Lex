@@ -26,14 +26,27 @@ public sealed class EntryUpdate
     /// <summary>Remove the reference year (not together with <see cref="ReferenceYear"/>)</summary>
     public bool RemoveReferenceYear { get; init; }
 
+    /// <summary>
+    /// New evidence document (file name declared in files[]); an empty text removes the reference
+    /// </summary>
+    public string DocumentRef { get; init; }
+
     /// <summary>New description; an empty text removes the description</summary>
     public string Description { get; init; }
 
     /// <summary>
     /// True when a successful update should clear the verification record:
-    /// content, source URLs, source quote or reference year; not description or legal reference alone
+    /// content, source URLs, source quote or reference year; not description, legal reference or evidence
+    /// document alone (see <see cref="ChangesEvidence"/>)
     /// </summary>
     public bool InvalidatesVerification =>
         Content != null || SourceUrls != null || SourceQuote != null ||
         ReferenceYear != null || RemoveReferenceYear;
+
+    /// <summary>
+    /// True when the update names an evidence document (set or remove). An automatic verification record names the
+    /// evidence file it was checked against, so it no longer describes the entry after the evidence changed;
+    /// a manual record names its own evidence file and stays valid. The caller decides.
+    /// </summary>
+    public bool ChangesEvidence => DocumentRef != null;
 }

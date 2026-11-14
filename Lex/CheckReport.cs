@@ -229,6 +229,24 @@ public static class CheckReport
                 text.AppendLine($"- Note: {r.Note}");
             }
         }
+        // checks that could not run (e.g. git is not available) are no findings: the result is incomplete, so the
+        // report names them once per message with the satellites they concern
+        var warned = results
+            .SelectMany(r => r.Warnings.Select(w => (Warning: w, r.Satellite)))
+            .GroupBy(x => x.Warning)
+            .ToList();
+        if (warned.Count > 0)
+        {
+            text.AppendLine();
+            text.AppendLine("## Warnings");
+            text.AppendLine();
+            text.AppendLine("Checks that could not run; the result is incomplete for these satellites.");
+            text.AppendLine();
+            foreach (var group in warned)
+            {
+                text.AppendLine($"- {group.Key} ({string.Join(", ", group.Select(x => x.Satellite).Distinct())})");
+            }
+        }
         text.AppendLine();
         // verification table: one row per manifest, also for manifests without findings
         text.AppendLine("## Verification");

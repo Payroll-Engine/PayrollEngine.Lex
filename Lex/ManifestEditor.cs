@@ -200,6 +200,40 @@ public sealed class ManifestEditor
     }
 
     /// <summary>
+    /// Change the text properties of a declared source: description and legal basis. A property set to null stays,
+    /// an empty text removes it; url, review rule and official flag are not changed here. A changed property keeps
+    /// its position, a new property is inserted at its place in the source layout, unknown properties are kept.
+    /// </summary>
+    /// <param name="url">URL of the declared source (exact text)</param>
+    /// <param name="update">Properties to change</param>
+    /// <returns>Updated, Unchanged when all values already match, NotFound for an undeclared URL</returns>
+    /// <exception cref="ArgumentException">The description of a secondary source (official false) would be removed</exception>
+    public SourceUpdateResult UpdateSource(string url, SourceUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        var source = Items("sources").OfType<JsonObject>().FirstOrDefault(x =>
+            string.Equals(Text(x, "url"), url?.Trim(), StringComparison.Ordinal));
+        if (source == null)
+        {
+            return SourceUpdateResult.NotFound;
+        }
+        var secondary = source["official"] is JsonValue official && official.TryGetValue<bool>(out var flag) && !flag;
+        if (secondary && update.Description != null && string.IsNullOrWhiteSpace(update.Description))
+        {
+            throw new ArgumentException(
+                "A secondary source (official false) needs a description that states why it is secondary", nameof(update));
+        }
+        var changed = SetText(source, "description", update.Description?.Trim(), removeEmpty: true, layout: SourceLayout);
+        changed |= SetText(source, "legalBasis", update.LegalBasis?.Trim(), removeEmpty: true, layout: SourceLayout);
+        if (!changed)
+        {
+            return SourceUpdateResult.Unchanged;
+        }
+        Changes++;
+        return SourceUpdateResult.Updated;
+    }
+
+    /// <summary>
     /// Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
     /// FourEyes when any source requires it
     /// </summary>
@@ -320,6 +354,7 @@ public sealed class ManifestEditor
             }
         }
         changed |= SetText(entry, "legalReference", update.LegalReference);
+        changed |= SetText(entry, "documentRef", update.DocumentRef?.Trim(), removeEmpty: true);
         changed |= SetText(entry, "description", update.Description, removeEmpty: true);
 
         if (!changed)
@@ -602,6 +637,9 @@ public sealed class ManifestEditor
         "referenceYear", "legalReference", "documentRef", "description", "verification", "open"
     ];
 
+    /// <summary>Property order of a declared source</summary>
+    private static readonly string[] SourceLayout = ["url", "description", "legalBasis", "review", "official"];
+
     /// <summary>Property order of the manifest header and the arrays</summary>
     private static readonly string[] RootLayout =
     [
@@ -667,7 +705,8 @@ public sealed class ManifestEditor
     /// <summary>
     /// Set a text property: null leaves it, an empty text removes it when allowed, an equal text is no change
     /// </summary>
-    private static bool SetText(JsonObject entry, string name, string value, bool removeEmpty = false)
+    private static bool SetText(JsonObject entry, string name, string value, bool removeEmpty = false,
+        string[] layout = null)
     {
         if (value == null)
         {
@@ -681,24 +720,25 @@ public sealed class ManifestEditor
         {
             return false;
         }
-        SetProperty(entry, name, value);
+        SetProperty(entry, name, value, layout);
         return true;
     }
 
     /// <summary>
     /// Replace a property in place, or insert a new one after the nearest preceding property of the entry layout
     /// </summary>
-    private static void SetProperty(JsonObject entry, string name, JsonNode value)
+    private static void SetProperty(JsonObject entry, string name, JsonNode value, string[] layout = null)
     {
         if (entry.ContainsKey(name))
         {
             entry[name] = value;
             return;
         }
+        layout ??= EntryLayout;
         var index = 0;
-        for (var i = Array.IndexOf(EntryLayout, name) - 1; i >= 0; i--)
+        for (var i = Array.IndexOf(layout, name) - 1; i >= 0; i--)
         {
-            var before = entry.IndexOf(EntryLayout[i]);
+            var before = entry.IndexOf(layout[i]);
             if (before >= 0)
             {
                 index = before + 1;

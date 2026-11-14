@@ -1264,13 +1264,26 @@
         <member name="P:PayrollEngine.Lex.EntryUpdate.RemoveReferenceYear">
             <summary>Remove the reference year (not together with <see cref="P:PayrollEngine.Lex.EntryUpdate.ReferenceYear"/>)</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.DocumentRef">
+            <summary>
+            New evidence document (file name declared in files[]); an empty text removes the reference
+            </summary>
+        </member>
         <member name="P:PayrollEngine.Lex.EntryUpdate.Description">
             <summary>New description; an empty text removes the description</summary>
         </member>
         <member name="P:PayrollEngine.Lex.EntryUpdate.InvalidatesVerification">
             <summary>
             True when a successful update should clear the verification record:
-            content, source URLs, source quote or reference year; not description or legal reference alone
+            content, source URLs, source quote or reference year; not description, legal reference or evidence
+            document alone (see <see cref="P:PayrollEngine.Lex.EntryUpdate.ChangesEvidence"/>)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.EntryUpdate.ChangesEvidence">
+            <summary>
+            True when the update names an evidence document (set or remove). An automatic verification record names the
+            evidence file it was checked against, so it no longer describes the entry after the evidence changed;
+            a manual record names its own evidence file and stays valid. The caller decides.
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.EntryUpdateResult">
@@ -2233,6 +2246,17 @@
             <returns>True if the source was added, false if a source with the URL is already declared (nothing changes)</returns>
             <exception cref="T:System.ArgumentException">Missing or relative URL, or an unknown review rule</exception>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.UpdateSource(System.String,PayrollEngine.Lex.SourceUpdate)">
+            <summary>
+            Change the text properties of a declared source: description and legal basis. A property set to null stays,
+            an empty text removes it; url, review rule and official flag are not changed here. A changed property keeps
+            its position, a new property is inserted at its place in the source layout, unknown properties are kept.
+            </summary>
+            <param name="url">URL of the declared source (exact text)</param>
+            <param name="update">Properties to change</param>
+            <returns>Updated, Unchanged when all values already match, NotFound for an undeclared URL</returns>
+            <exception cref="T:System.ArgumentException">The description of a secondary source (official false) would be removed</exception>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.SourceReview(System.String)">
             <summary>
             Review rule of the sources of an entry (sources[].url listed in the sourceUrls of the entry):
@@ -2346,18 +2370,21 @@
         <member name="F:PayrollEngine.Lex.ManifestEditor.EntryLayout">
             <summary>Property order of an entry; a new property follows the nearest preceding property that is present</summary>
         </member>
+        <member name="F:PayrollEngine.Lex.ManifestEditor.SourceLayout">
+            <summary>Property order of a declared source</summary>
+        </member>
         <member name="F:PayrollEngine.Lex.ManifestEditor.RootLayout">
             <summary>Property order of the manifest header and the arrays</summary>
         </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.InsertRootProperty(System.String,System.Text.Json.Nodes.JsonNode)">
             <summary>Insert a new root property after the nearest preceding property of the root layout</summary>
         </member>
-        <member name="M:PayrollEngine.Lex.ManifestEditor.SetText(System.Text.Json.Nodes.JsonObject,System.String,System.String,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetText(System.Text.Json.Nodes.JsonObject,System.String,System.String,System.Boolean,System.String[])">
             <summary>
             Set a text property: null leaves it, an empty text removes it when allowed, an equal text is no change
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.ManifestEditor.SetProperty(System.Text.Json.Nodes.JsonObject,System.String,System.Text.Json.Nodes.JsonNode)">
+        <member name="M:PayrollEngine.Lex.ManifestEditor.SetProperty(System.Text.Json.Nodes.JsonObject,System.String,System.Text.Json.Nodes.JsonNode,System.String[])">
             <summary>
             Replace a property in place, or insert a new one after the nearest preceding property of the entry layout
             </summary>
@@ -3855,6 +3882,32 @@
         </member>
         <member name="F:PayrollEngine.Lex.SourceState.Missing">
             <summary>No local evidence file exists</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceUpdate">
+            <summary>
+            Text properties of a declared source to change (<see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateSource(System.String,PayrollEngine.Lex.SourceUpdate)"/>); a property set to
+            null stays as it is
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceUpdate.Description">
+            <summary>New description; an empty text removes the description</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.SourceUpdate.LegalBasis">
+            <summary>New legal basis; an empty text removes the legal basis</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.SourceUpdateResult">
+            <summary>
+            Outcome of <see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateSource(System.String,PayrollEngine.Lex.SourceUpdate)"/>
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceUpdateResult.Updated">
+            <summary>At least one property was changed</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceUpdateResult.Unchanged">
+            <summary>All given values already match the source</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.SourceUpdateResult.NotFound">
+            <summary>No source with the URL is declared</summary>
         </member>
         <member name="T:PayrollEngine.Lex.SourceVerifier">
             <summary>
