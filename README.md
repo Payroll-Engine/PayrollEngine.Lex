@@ -11,7 +11,8 @@ The library provides:
 - Manifest and snapshot model (`Manifest`, `Entry`, `Source`, `EvidenceFile`, `Exclusion`, `Verification`, `Snapshot`)
 - JSON schema of `lex.json` (`Schema`) and structural validation (`Validator`)
 - Editing of `lex.json` that keeps unknown properties and the property order (`ManifestEditor`): add entries and
-  files, set source locations, automatic and manual verification records and reviews
+  files, set source locations, automatic and manual verification records and reviews; change the reason of an
+  exclusion; remove exclusions, entries and source declarations (`ManifestReferences` lists what refers to them)
 - Download of source documents into the `.lex` folder (`Fetcher`)
 - Snapshot creation (`SnapshotWriter`) and verification against the manifest and the evidence files (`Verifier`)
 - Check of a manifest against the lookup values of its regulation: coverage, value differences, traceability fields,
@@ -471,6 +472,30 @@ editor.SetManualVerification("Rates.Standard", new Verification
 }, overwrite: false);
 await editor.SaveAsync(lexPath);
 ```
+
+Removing is mechanical in the editor; the caller plans it from the references first. `ManifestReferences` answers
+which entries an exclusion concerns, which exclusions concern an entry, which entries list a source URL, whether
+other entries use the same evidence document and whether an entry backs a regulation value:
+
+```csharp
+var manifest = JsonSerializer.Deserialize<Manifest>(json, options);
+var (all, exclusive) = ManifestReferences.ExclusionsOfEntry(manifest, "Rates.Old");
+var link = ManifestReferences.RegulationLinkOf(manifest, lexPath, "Rates.Old");
+if (!link.Linked)
+{
+    editor.RemoveEntry("Rates.Old");
+    foreach (var exclusion in exclusive)
+    {
+        editor.RemoveExclusion(exclusion.Kind, exclusion.Pattern);
+    }
+}
+editor.UpdateExclusion("orphan", "Legacy.*", new ExclusionUpdate { Reason = "Corrected reason" });
+editor.RemoveSource("https://example.org/old");   // throws while an entry still lists the URL
+```
+
+An entry that backs a regulation value is not removed by a tool: the value is changed in the regulation, never
+silently dropped. An evidence file that no entry uses any more stays in `files[]` and in the `.lex` folder (the check
+reports it as unused evidence).
 
 ### Source Documents
 

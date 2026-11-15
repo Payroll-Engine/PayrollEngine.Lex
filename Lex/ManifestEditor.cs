@@ -447,6 +447,108 @@ public sealed class ManifestEditor
     }
 
     /// <summary>
+    /// Change the reason of an exclusion. Kind and pattern are the identity of the exclusion and are never changed;
+    /// the position and unknown properties of the exclusion are kept.
+    /// </summary>
+    /// <param name="kind">Exclusion kind</param>
+    /// <param name="pattern">Exclusion pattern (exact text, trimmed)</param>
+    /// <param name="update">Properties to change</param>
+    /// <returns>Updated, Unchanged when the reason already matches, NotFound without such an exclusion</returns>
+    /// <exception cref="ArgumentException">The new reason is empty</exception>
+    public ExclusionUpdateResult UpdateExclusion(string kind, string pattern, ExclusionUpdate update)
+    {
+        ArgumentNullException.ThrowIfNull(update);
+        if (update.Reason != null && string.IsNullOrWhiteSpace(update.Reason))
+        {
+            throw new ArgumentException("Exclusion reason must not be empty", nameof(update));
+        }
+        var exclusion = FindExclusion(kind, pattern);
+        if (exclusion == null)
+        {
+            return ExclusionUpdateResult.NotFound;
+        }
+        if (!SetText(exclusion, "reason", update.Reason?.Trim()))
+        {
+            return ExclusionUpdateResult.Unchanged;
+        }
+        Changes++;
+        return ExclusionUpdateResult.Updated;
+    }
+
+    /// <summary>
+    /// Remove an exclusion. The consequences (findings that were documented by it) are not checked here.
+    /// </summary>
+    /// <param name="kind">Exclusion kind</param>
+    /// <param name="pattern">Exclusion pattern (exact text, trimmed)</param>
+    /// <returns>True if the exclusion was removed, false without such an exclusion</returns>
+    public bool RemoveExclusion(string kind, string pattern)
+    {
+        var exclusion = FindExclusion(kind, pattern);
+        if (exclusion == null || root["exclusions"] is not JsonArray exclusions)
+        {
+            return false;
+        }
+        exclusions.Remove(exclusion);
+        Changes++;
+        return true;
+    }
+
+    /// <summary>
+    /// Remove an entry from values[]. The references to it (exclusions, regulation value, evidence) are not checked
+    /// here, see <see cref="ManifestReferences"/>; an evidence file that only this entry used stays in files[] and
+    /// in the .lex folder.
+    /// </summary>
+    /// <param name="key">Entry key</param>
+    /// <returns>True if the entry was removed, false for an unknown key</returns>
+    public bool RemoveEntry(string key)
+    {
+        var entry = Entry(key);
+        if (entry == null || root["values"] is not JsonArray values)
+        {
+            return false;
+        }
+        values.Remove(entry);
+        Changes++;
+        return true;
+    }
+
+    /// <summary>
+    /// Remove a source declaration from sources[]. The evidence documents of the source stay.
+    /// </summary>
+    /// <param name="url">URL of the declared source (exact text)</param>
+    /// <returns>True if the declaration was removed, false for an undeclared URL</returns>
+    /// <exception cref="InvalidOperationException">An entry still lists the URL in its sourceUrls</exception>
+    public bool RemoveSource(string url)
+    {
+        var text = url?.Trim();
+        var source = Items("sources").OfType<JsonObject>().FirstOrDefault(x =>
+            string.Equals(Text(x, "url"), text, StringComparison.Ordinal));
+        if (source == null || root["sources"] is not JsonArray sources)
+        {
+            return false;
+        }
+        var used = Values()
+            .Where(x => (x["sourceUrls"] as JsonArray)?.Any(u => u is JsonValue v &&
+                                                                  v.TryGetValue<string>(out var s) &&
+                                                                  string.Equals(s.Trim(), text, StringComparison.Ordinal)) == true)
+            .Select(x => Text(x, "key"))
+            .ToList();
+        if (used.Count > 0)
+        {
+            throw new InvalidOperationException(
+                $"Source {text} is still used by {used.Count} entries ({string.Join(", ", used.Take(5))})");
+        }
+        sources.Remove(source);
+        Changes++;
+        return true;
+    }
+
+    private JsonObject FindExclusion(string kind, string pattern) =>
+        Items("exclusions").OfType<JsonObject>().FirstOrDefault(x =>
+            string.Equals(Text(x, "kind"), kind, StringComparison.Ordinal) &&
+            string.Equals(Text(x, "pattern"), pattern?.Trim(), StringComparison.Ordinal));
+
+    /// <summary>
     /// Declare a file in files[]
     /// </summary>
     /// <param name="file">File declaration</param>

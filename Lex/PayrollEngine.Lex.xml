@@ -1508,6 +1508,29 @@
             Test if a key is matched by this exclusion
             </summary>
         </member>
+        <member name="T:PayrollEngine.Lex.ExclusionUpdate">
+            <summary>
+            Properties of an exclusion to change (<see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateExclusion(System.String,System.String,PayrollEngine.Lex.ExclusionUpdate)"/>). Kind and pattern are the
+            identity of an exclusion and cannot be changed; a property set to null stays as it is.
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.ExclusionUpdate.Reason">
+            <summary>New justification (never empty)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ExclusionUpdateResult">
+            <summary>
+            Outcome of <see cref="M:PayrollEngine.Lex.ManifestEditor.UpdateExclusion(System.String,System.String,PayrollEngine.Lex.ExclusionUpdate)"/>
+            </summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ExclusionUpdateResult.Updated">
+            <summary>The reason was changed</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ExclusionUpdateResult.Unchanged">
+            <summary>All given values already match the exclusion</summary>
+        </member>
+        <member name="F:PayrollEngine.Lex.ExclusionUpdateResult.NotFound">
+            <summary>No exclusion with the kind and pattern exists</summary>
+        </member>
         <member name="T:PayrollEngine.Lex.Fetcher">
             <summary>
             Downloads a source document unchanged into the .lex folder
@@ -2353,6 +2376,42 @@
             <returns>True if the exclusion was added, false if an exclusion with the same kind and pattern exists</returns>
             <exception cref="T:System.ArgumentException">Unknown kind, missing pattern or reason, or an invalid property pattern</exception>
         </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.UpdateExclusion(System.String,System.String,PayrollEngine.Lex.ExclusionUpdate)">
+            <summary>
+            Change the reason of an exclusion. Kind and pattern are the identity of the exclusion and are never changed;
+            the position and unknown properties of the exclusion are kept.
+            </summary>
+            <param name="kind">Exclusion kind</param>
+            <param name="pattern">Exclusion pattern (exact text, trimmed)</param>
+            <param name="update">Properties to change</param>
+            <returns>Updated, Unchanged when the reason already matches, NotFound without such an exclusion</returns>
+            <exception cref="T:System.ArgumentException">The new reason is empty</exception>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RemoveExclusion(System.String,System.String)">
+            <summary>
+            Remove an exclusion. The consequences (findings that were documented by it) are not checked here.
+            </summary>
+            <param name="kind">Exclusion kind</param>
+            <param name="pattern">Exclusion pattern (exact text, trimmed)</param>
+            <returns>True if the exclusion was removed, false without such an exclusion</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RemoveEntry(System.String)">
+            <summary>
+            Remove an entry from values[]. The references to it (exclusions, regulation value, evidence) are not checked
+            here, see <see cref="T:PayrollEngine.Lex.ManifestReferences"/>; an evidence file that only this entry used stays in files[] and
+            in the .lex folder.
+            </summary>
+            <param name="key">Entry key</param>
+            <returns>True if the entry was removed, false for an unknown key</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestEditor.RemoveSource(System.String)">
+            <summary>
+            Remove a source declaration from sources[]. The evidence documents of the source stay.
+            </summary>
+            <param name="url">URL of the declared source (exact text)</param>
+            <returns>True if the declaration was removed, false for an undeclared URL</returns>
+            <exception cref="T:System.InvalidOperationException">An entry still lists the URL in its sourceUrls</exception>
+        </member>
         <member name="M:PayrollEngine.Lex.ManifestEditor.AddFile(PayrollEngine.Lex.EvidenceFile)">
             <summary>
             Declare a file in files[]
@@ -2468,6 +2527,66 @@
             Hash of a manifest file
             </summary>
             <param name="lexPath">Path of lex.json</param>
+        </member>
+        <member name="T:PayrollEngine.Lex.ManifestReferences">
+            <summary>
+            References between the parts of a manifest and to the regulation: which entries an exclusion or a source
+            concerns, which exclusions concern an entry and whether an entry backs a regulation value. The removal of an
+            entry, a source or an exclusion is planned from these references.
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.EntriesOfExclusion(PayrollEngine.Lex.Manifest,PayrollEngine.Lex.Exclusion)">
+            <summary>
+            Keys of the entries an exclusion concerns. A property exclusion (derived, notApplicable) concerns the entry
+            its pattern starts with; a coverage exclusion concerns regulation values, no entry.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="exclusion">Exclusion of the manifest</param>
+            <returns>Entry keys in document order</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.ExclusionsOfEntry(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Exclusions that concern an entry
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="key">Entry key</param>
+            <returns>The exclusions that concern the entry, and those among them that concern no other entry
+            (they lose their purpose with the entry)</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.EntriesOfSource(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Keys of the entries that list a source URL in their sourceUrls
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="url">Source URL (exact text)</param>
+            <returns>Entry keys in document order</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.FilesOfSource(PayrollEngine.Lex.Manifest,System.String)">
+            <summary>
+            Names of the declared files that list a source URL in their sourceUrls
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="url">Source URL (exact text)</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.OtherEntriesOfDocument(PayrollEngine.Lex.Manifest,System.String,System.String)">
+            <summary>
+            Keys of the other entries that use the same evidence document (documentRef)
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="key">Entry key</param>
+            <param name="documentRef">Evidence file of the entry</param>
+        </member>
+        <member name="M:PayrollEngine.Lex.ManifestReferences.RegulationLinkOf(PayrollEngine.Lex.Manifest,System.String,System.String)">
+            <summary>
+            Regulation value or lookup an entry backs: the mapping of the check and the apply. An entry for a value that
+            does not exist yet in an existing lookup (apply adds it), an entry without regulation target and a reference
+            entry are not linked.
+            </summary>
+            <param name="manifest">Manifest</param>
+            <param name="lexPath">Full path of lex.json (the regulation is read from the satellite folder)</param>
+            <param name="key">Entry key</param>
+            <returns>The link; not linked for an unknown key</returns>
+            <exception cref="T:System.InvalidOperationException">The regulation JSON cannot be read</exception>
         </member>
         <member name="T:PayrollEngine.Lex.ManifestVerifier">
             <summary>
@@ -2808,6 +2927,20 @@
             <summary>
             Adds a value to the list of its key
             </summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.RegulationLink">
+            <summary>
+            Regulation lookup value or lookup that an entry of the manifest maps to (same mapping as the check and the apply)
+            </summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLink.Linked">
+            <summary>The entry backs an existing regulation value or lookup</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLink.Target">
+            <summary>Lookup name and value key the entry maps to (<c>Lookup.Key</c>, or <c>Lookup</c> for a whole lookup)</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.RegulationLink.Values">
+            <summary>Number of regulation values the entry backs (all values of the lookup for a whole lookup)</summary>
         </member>
         <member name="T:PayrollEngine.Lex.RegulationLookup">
             <summary>
