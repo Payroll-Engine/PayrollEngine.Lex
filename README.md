@@ -155,7 +155,7 @@ Citations whose year is the year of the enactment, not of the value, are ignored
 A date after a validity phrase stays a validity start, not a citation.
 
 **Tax years.** A manifest whose `validFrom` is not 1 January covers a tax year with the start year of `validFrom`
-(`2025-04-01` → tax year 2025, India, Australia, United Kingdom); `referenceYear` is the start year too. In such a
+(`2025-04-01` → tax year 2025; a July start works the same way); `referenceYear` is the start year too. In such a
 manifest periods are rated: `2025-26`, `2025/26`, `2025-2026`, `2025 to 2026`, `FY 2025-26`, `FY26`,
 `financial year 2025-26`, `income year 2025–26`, and the assessment year as the following year
 (`AY 2026-27`, `YA 2026`, `assessment year 2026-27` = tax year 2025). A period starting in the entry year is

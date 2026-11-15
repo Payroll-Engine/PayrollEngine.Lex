@@ -5,8 +5,8 @@ namespace PayrollEngine.Lex.Tests;
 
 public class PeriodTests
 {
-    private const string India = "2026-04-01";
-    private const string Australia = "2025-07-01";
+    private const string AprilStart = "2026-04-01";
+    private const string JulyStart = "2025-07-01";
     private const string Kingdom = "2026-04-06";
     private const string Calendar = "2026-01-01";
 
@@ -143,7 +143,7 @@ public class PeriodTests
     [InlineData("In April 2027 the limit is 1,75,000.", SourceMatch.Ambiguous)]
     [InlineData("On 01.04.2027 the limit is 1,75,000.", SourceMatch.Ambiguous)]
     public void TaxYear_DatedYear_IsAssignedToTaxYear(string text, SourceMatch expected) =>
-        Assert.Equal(expected, Verify("175000", text, India));
+        Assert.Equal(expected, Verify("175000", text, AprilStart));
 
     [Theory]
     [InlineData("On 5 April 2027 the limit is 4,567.", SourceMatch.Found)]
@@ -160,7 +160,7 @@ public class PeriodTests
     [InlineData("For the assessment year commencing on the 1st day of April, 2026, the limit is 1,75,000.",
         SourceMatch.Ambiguous)]
     public void TaxYear_AssessmentYearByStartDate(string text, SourceMatch expected) =>
-        Assert.Equal(expected, Verify("175000", text, India));
+        Assert.Equal(expected, Verify("175000", text, AprilStart));
 
     [Theory]
     [InlineData("In January 2026 the limit is 1,50,000.", SourceMatch.Found)]
@@ -176,8 +176,8 @@ public class PeriodTests
     [InlineData(FinancialYears, "150000", SourceMatch.Ambiguous)]
     [InlineData(AssessmentYears, "175000", SourceMatch.Found)]
     [InlineData(AssessmentYears, "150000", SourceMatch.Ambiguous)]
-    public void India_TaxYearTable(string text, string content, SourceMatch expected) =>
-        Assert.Equal(expected, Verify(content, text, India));
+    public void AprilStart_TaxYearTable(string text, string content, SourceMatch expected) =>
+        Assert.Equal(expected, Verify(content, text, AprilStart));
 
     private const string IncomeYears = "Threshold $12,340 (2024\u201325); threshold $12,560 (2025\u201326).";
 
@@ -185,8 +185,8 @@ public class PeriodTests
     [InlineData(IncomeYears, "12560", SourceMatch.Found)]
     [InlineData(IncomeYears, "12340", SourceMatch.Ambiguous)]
     [InlineData("For the 2025-2026 income year the threshold is $12,560.", "12560", SourceMatch.Found)]
-    public void Australia_TaxYearTable(string text, string content, SourceMatch expected) =>
-        Assert.Equal(expected, Verify(content, text, Australia));
+    public void JulyStart_TaxYearTable(string text, string content, SourceMatch expected) =>
+        Assert.Equal(expected, Verify(content, text, JulyStart));
 
     [Theory]
     [InlineData("4567", SourceMatch.Found)]
@@ -201,7 +201,7 @@ public class PeriodTests
     [InlineData("In 2025 the limit is 1,75,000.", SourceMatch.Ambiguous)]
     [InlineData("In 2028 the limit is 1,75,000.", SourceMatch.Found)]
     public void TaxYear_SingleYear(string text, SourceMatch expected) =>
-        Assert.Equal(expected, Verify("175000", text, India));
+        Assert.Equal(expected, Verify("175000", text, AprilStart));
 
     [Theory]
     [InlineData("With effect from 1st April, 2025, the limit is 1,75,000.")]
@@ -209,11 +209,11 @@ public class PeriodTests
     [InlineData("Applicable from 1 April 2025: limit 1,75,000.")]
     [InlineData("From 1 April 2025 the limit is 1,75,000.")]
     public void TaxYear_ValidityUpToPeriodStart_IsNeutral(string text) =>
-        Assert.Equal(SourceMatch.Found, Verify("175000", text, India));
+        Assert.Equal(SourceMatch.Found, Verify("175000", text, AprilStart));
 
     [Fact]
     public void TaxYear_ReferenceYear_IsStartYear() =>
-        Assert.Equal(SourceMatch.Found, Verify("150000", FinancialYears, India, referenceYear: 2025));
+        Assert.Equal(SourceMatch.Found, Verify("150000", FinancialYears, AprilStart, referenceYear: 2025));
 
     [Theory]
     [InlineData("Limit FY 2026-27: 1,75,000", SourceMatch.Found)]
@@ -222,7 +222,7 @@ public class PeriodTests
     public void TaxYear_Quote_IsRatedWithinQuote(string quote, SourceMatch expected) =>
         Assert.Equal(expected,
             SourceVerifier.Verify(Entry("175000", quote: quote),
-                Sections("Limit FY 2025-26: 1,75,000. Limit FY 2026-27: 1,75,000. Limit: 1,75,000."), India).Match);
+                Sections("Limit FY 2025-26: 1,75,000. Limit FY 2026-27: 1,75,000. Limit: 1,75,000."), AprilStart).Match);
 
     // calendar year rating -------------------------------------------------------
 
