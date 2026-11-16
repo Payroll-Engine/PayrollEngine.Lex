@@ -1546,14 +1546,18 @@
             Download a source document into the .lex folder. The manifest (lex.json) and the snapshot
             (snapshot.json) are never a target: an explicit file name is rejected before the request,
             a file name derived from the URL after the download and before anything is written.
+            A target that is a link out of the .lex folder is neither read nor written.
             </summary>
             <param name="client">HTTP client</param>
             <param name="url">Source URL (http or https)</param>
             <param name="lexDirectory">Folder of lex.json</param>
             <param name="fileName">Target file name, default from the URL</param>
             <param name="overwrite">Replace an existing file with different content</param>
-            <exception cref="T:System.ArgumentException">Invalid URL, or a file name that is invalid or reserved
-            (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/>), parameter <c>fileName</c></exception>
+            <exception cref="T:System.ArgumentException">Invalid URL, or an invalid file name, parameter <c>fileName</c></exception>
+            <exception cref="T:PayrollEngine.Lex.ReservedFileNameException">The target is the manifest or the snapshot
+            (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/> or the same normalized path), parameter <c>fileName</c></exception>
+            <exception cref="T:PayrollEngine.Lex.FetchTargetLinkException">The target is a link that resolves outside the .lex folder,
+            to the manifest or the snapshot, or to no existing file, or cannot be resolved</exception>
             <exception cref="T:System.Net.Http.HttpRequestException">The source could not be loaded</exception>
         </member>
         <member name="M:PayrollEngine.Lex.Fetcher.FetchAsync(System.Net.Http.HttpClient,System.String,System.String,System.String,System.Boolean,System.Action{System.String})">
@@ -1561,16 +1565,37 @@
             Download a source document into the .lex folder, with a check of the target path. The manifest
             (lex.json) and the snapshot (snapshot.json) are never a target: an explicit file name is rejected
             before the request, a file name derived from the URL after the download and before anything is written.
+            A target that is a link out of the .lex folder is neither read nor written.
             </summary>
+            <remarks>
+            Order of the checks; each failed check stops the fetch and nothing is written:
+            <list type="number">
+            <item>source URL</item>
+            <item>explicit file name, before the request: no folder, not reserved, no trailing dot or space, link check</item>
+            <item>HTTP request</item>
+            <item>file name derived from the URL: not reserved</item>
+            <item>link check of the target</item>
+            <item><paramref name="targetGuard"/> with the full target path</item>
+            <item>read and compare an existing target, write</item>
+            </list>
+            The link check applies when the target exists as a symbolic link (or junction): its final target,
+            with all links in the path resolved, must be an existing file inside the real .lex folder (links in
+            the path of the .lex folder itself are resolved) and must not have a reserved name. Hard links are
+            not detected.
+            </remarks>
             <param name="client">HTTP client</param>
             <param name="url">Source URL (http or https)</param>
             <param name="lexDirectory">Folder of lex.json</param>
             <param name="fileName">Target file name, null or empty for the name from the URL</param>
             <param name="overwrite">Replace an existing file with different content</param>
-            <param name="targetGuard">Check of the full target path, called before the target file is
-            read or written; an exception on the guard stops the fetch and nothing is written. Null for no check</param>
-            <exception cref="T:System.ArgumentException">Invalid URL, or a file name that is invalid or reserved
-            (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/>), parameter <c>fileName</c></exception>
+            <param name="targetGuard">Check of the full target path, called after the name and link checks and
+            before the target file is read or written; an exception on the guard stops the fetch and nothing is
+            written. Null for no check</param>
+            <exception cref="T:System.ArgumentException">Invalid URL, or an invalid file name, parameter <c>fileName</c></exception>
+            <exception cref="T:PayrollEngine.Lex.ReservedFileNameException">The target is the manifest or the snapshot
+            (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/> or the same normalized path), parameter <c>fileName</c></exception>
+            <exception cref="T:PayrollEngine.Lex.FetchTargetLinkException">The target is a link that resolves outside the .lex folder,
+            to the manifest or the snapshot, or to no existing file, or cannot be resolved</exception>
             <exception cref="T:System.Net.Http.HttpRequestException">The source could not be loaded</exception>
         </member>
         <member name="M:PayrollEngine.Lex.Fetcher.FileNameFromUrl(System.Uri,System.String)">
@@ -1590,6 +1615,17 @@
         <member name="M:PayrollEngine.Lex.Fetcher.EnsureNotReserved(System.String,System.String)">
             <summary>
             Rejects a reserved file name, by name and by the normalized target path
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Fetcher.EnsureTargetNotLinkedOut(System.String,System.String)">
+            <summary>
+            Rejects a target that is a link resolving outside the real .lex folder, to a reserved file name,
+            or to no existing file. A target that does not exist or is no link passes
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Fetcher.RealPath(System.String,System.Int32)">
+            <summary>
+            Full path with every link in the path resolved to its final target
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.FetchResult">
@@ -1628,6 +1664,28 @@
         </member>
         <member name="F:PayrollEngine.Lex.FetchState.Differs">
             <summary>The existing file differs and was kept (requires overwrite)</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.FetchTargetLinkException">
+            <summary>
+            The fetch target in the .lex folder is a symbolic link (or junction) that resolves outside the
+            real .lex folder, to the manifest (lex.json) or the snapshot (snapshot.json), or to no existing file,
+            or that cannot be resolved. The target was neither read nor written
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.FetchTargetLinkException.#ctor(System.String,System.String,System.String)">
+            <summary>
+            Create a new fetch target link exception
+            </summary>
+            <param name="fileName">File name of the link in the .lex folder</param>
+            <param name="resolvedPath">Final target of the link, or its immediate target if it cannot be resolved</param>
+            <param name="reason">Why the target is refused</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.FetchTargetLinkException.FileName">
+            <summary>File name of the link in the .lex folder</summary>
+        </member>
+        <member name="P:PayrollEngine.Lex.FetchTargetLinkException.ResolvedPath">
+            <summary>Final target of the link (all links in the path resolved), or its immediate target
+            if it cannot be resolved</summary>
         </member>
         <member name="T:PayrollEngine.Lex.FileResolver">
             <summary>
@@ -3266,6 +3324,22 @@
         </member>
         <member name="P:PayrollEngine.Lex.RemovedVerification.VerifiedOn">
             <summary>Verification date in YYYY-MM-DD format</summary>
+        </member>
+        <member name="T:PayrollEngine.Lex.ReservedFileNameException">
+            <summary>
+            The fetch target is reserved for the manifest (lex.json) or the snapshot (snapshot.json),
+            by its name (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/>) or by its normalized path.
+            The parameter name is <c>fileName</c> and the message starts with <c>Reserved file name</c>
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.ReservedFileNameException.#ctor(System.String)">
+            <summary>
+            Create a new reserved file name exception
+            </summary>
+            <param name="fileName">The rejected file name, explicit or derived from the URL</param>
+        </member>
+        <member name="P:PayrollEngine.Lex.ReservedFileNameException.FileName">
+            <summary>The rejected file name, explicit or derived from the URL</summary>
         </member>
         <member name="T:PayrollEngine.Lex.Rollover">
             <summary>

@@ -13,19 +13,24 @@ namespace PayrollEngine.Lex;
 public static class Fetcher
 {
     private const string ManifestFileName = "lex.json";
+    private const int MaxLinkDepth = 40;
 
     /// <summary>
     /// Download a source document into the .lex folder. The manifest (lex.json) and the snapshot
     /// (snapshot.json) are never a target: an explicit file name is rejected before the request,
     /// a file name derived from the URL after the download and before anything is written.
+    /// A target that is a link out of the .lex folder is neither read nor written.
     /// </summary>
     /// <param name="client">HTTP client</param>
     /// <param name="url">Source URL (http or https)</param>
     /// <param name="lexDirectory">Folder of lex.json</param>
     /// <param name="fileName">Target file name, default from the URL</param>
     /// <param name="overwrite">Replace an existing file with different content</param>
-    /// <exception cref="ArgumentException">Invalid URL, or a file name that is invalid or reserved
-    /// (<see cref="IsReservedFileName"/>), parameter <c>fileName</c></exception>
+    /// <exception cref="ArgumentException">Invalid URL, or an invalid file name, parameter <c>fileName</c></exception>
+    /// <exception cref="ReservedFileNameException">The target is the manifest or the snapshot
+    /// (<see cref="IsReservedFileName"/> or the same normalized path), parameter <c>fileName</c></exception>
+    /// <exception cref="FetchTargetLinkException">The target is a link that resolves outside the .lex folder,
+    /// to the manifest or the snapshot, or to no existing file, or cannot be resolved</exception>
     /// <exception cref="HttpRequestException">The source could not be loaded</exception>
     public static Task<FetchResult> FetchAsync(HttpClient client, string url, string lexDirectory,
         string fileName = null, bool overwrite = false) =>
@@ -35,16 +40,37 @@ public static class Fetcher
     /// Download a source document into the .lex folder, with a check of the target path. The manifest
     /// (lex.json) and the snapshot (snapshot.json) are never a target: an explicit file name is rejected
     /// before the request, a file name derived from the URL after the download and before anything is written.
+    /// A target that is a link out of the .lex folder is neither read nor written.
     /// </summary>
+    /// <remarks>
+    /// Order of the checks; each failed check stops the fetch and nothing is written:
+    /// <list type="number">
+    /// <item>source URL</item>
+    /// <item>explicit file name, before the request: no folder, not reserved, no trailing dot or space, link check</item>
+    /// <item>HTTP request</item>
+    /// <item>file name derived from the URL: not reserved</item>
+    /// <item>link check of the target</item>
+    /// <item><paramref name="targetGuard"/> with the full target path</item>
+    /// <item>read and compare an existing target, write</item>
+    /// </list>
+    /// The link check applies when the target exists as a symbolic link (or junction): its final target,
+    /// with all links in the path resolved, must be an existing file inside the real .lex folder (links in
+    /// the path of the .lex folder itself are resolved) and must not have a reserved name. Hard links are
+    /// not detected.
+    /// </remarks>
     /// <param name="client">HTTP client</param>
     /// <param name="url">Source URL (http or https)</param>
     /// <param name="lexDirectory">Folder of lex.json</param>
     /// <param name="fileName">Target file name, null or empty for the name from the URL</param>
     /// <param name="overwrite">Replace an existing file with different content</param>
-    /// <param name="targetGuard">Check of the full target path, called before the target file is
-    /// read or written; an exception on the guard stops the fetch and nothing is written. Null for no check</param>
-    /// <exception cref="ArgumentException">Invalid URL, or a file name that is invalid or reserved
-    /// (<see cref="IsReservedFileName"/>), parameter <c>fileName</c></exception>
+    /// <param name="targetGuard">Check of the full target path, called after the name and link checks and
+    /// before the target file is read or written; an exception on the guard stops the fetch and nothing is
+    /// written. Null for no check</param>
+    /// <exception cref="ArgumentException">Invalid URL, or an invalid file name, parameter <c>fileName</c></exception>
+    /// <exception cref="ReservedFileNameException">The target is the manifest or the snapshot
+    /// (<see cref="IsReservedFileName"/> or the same normalized path), parameter <c>fileName</c></exception>
+    /// <exception cref="FetchTargetLinkException">The target is a link that resolves outside the .lex folder,
+    /// to the manifest or the snapshot, or to no existing file, or cannot be resolved</exception>
     /// <exception cref="HttpRequestException">The source could not be loaded</exception>
     public static async Task<FetchResult> FetchAsync(HttpClient client, string url, string lexDirectory,
         string fileName, bool overwrite, Action<string> targetGuard)
@@ -67,6 +93,7 @@ public static class Fetcher
             {
                 throw new ArgumentException($"Invalid file name (trailing dot or space): {fileName}", nameof(fileName));
             }
+            EnsureTargetNotLinkedOut(lexDirectory, fileName);
         }
 
         using var response = await client.GetAsync(uri);
@@ -82,6 +109,8 @@ public static class Fetcher
             fileName = FileNameFromUrl(uri, mediaType);
             EnsureNotReserved(lexDirectory, fileName);
         }
+        // an explicit name a second time: the target can change during the download
+        EnsureTargetNotLinkedOut(lexDirectory, fileName);
         var filePath = Path.Combine(lexDirectory, fileName);
         targetGuard?.Invoke(Path.GetFullPath(filePath));
         var hash = Convert.ToHexStringLower(SHA256.HashData(content));
@@ -167,9 +196,78 @@ public static class Fetcher
             string.Equals(targetPath, Path.GetFullPath(Path.Combine(lexDirectory, ManifestFileName)), StringComparison.OrdinalIgnoreCase) ||
             string.Equals(targetPath, Path.GetFullPath(Path.Combine(lexDirectory, SnapshotOperation.SnapshotFileName)), StringComparison.OrdinalIgnoreCase))
         {
-            throw new ArgumentException(
-                $"Reserved file name (the manifest and the snapshot are no fetch target): {fileName}", nameof(fileName));
+            throw new ReservedFileNameException(fileName);
         }
+    }
+
+    /// <summary>
+    /// Rejects a target that is a link resolving outside the real .lex folder, to a reserved file name,
+    /// or to no existing file. A target that does not exist or is no link passes
+    /// </summary>
+    private static void EnsureTargetNotLinkedOut(string lexDirectory, string fileName)
+    {
+        var targetPath = Path.GetFullPath(Path.Combine(lexDirectory, fileName));
+        var linkTarget = new FileInfo(targetPath).LinkTarget;
+        if (linkTarget == null)
+        {
+            return;
+        }
+
+        var realDirectory = RealPath(Path.GetFullPath(lexDirectory), 0);
+        string resolvedPath;
+        try
+        {
+            resolvedPath = RealPath(targetPath, 0);
+        }
+        catch (IOException)
+        {
+            // broken chain or link cycle
+            throw new FetchTargetLinkException(fileName, linkTarget, "cannot be resolved");
+        }
+        var comparison = OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal;
+        var directoryPrefix = Path.EndsInDirectorySeparator(realDirectory)
+            ? realDirectory
+            : realDirectory + Path.DirectorySeparatorChar;
+        if (!resolvedPath.StartsWith(directoryPrefix, comparison))
+        {
+            throw new FetchTargetLinkException(fileName, resolvedPath, "leaves the .lex folder");
+        }
+        if (IsReservedFileName(Path.GetFileName(resolvedPath)))
+        {
+            throw new FetchTargetLinkException(fileName, resolvedPath, "points to the manifest or the snapshot");
+        }
+        if (!File.Exists(resolvedPath))
+        {
+            throw new FetchTargetLinkException(fileName, resolvedPath, "points to no existing file");
+        }
+    }
+
+    /// <summary>
+    /// Full path with every link in the path resolved to its final target
+    /// </summary>
+    private static string RealPath(string fullPath, int depth)
+    {
+        if (depth > MaxLinkDepth)
+        {
+            throw new IOException($"Too many levels of links: {fullPath}");
+        }
+        var root = Path.GetPathRoot(fullPath) ?? string.Empty;
+        var current = root;
+        var segments = fullPath[root.Length..].Split(
+            [Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar], StringSplitOptions.RemoveEmptyEntries);
+        foreach (var segment in segments)
+        {
+            current = Path.Combine(current, segment);
+            FileSystemInfo info = Directory.Exists(current) ? new DirectoryInfo(current) : new FileInfo(current);
+            if (info.LinkTarget == null)
+            {
+                continue;
+            }
+            var target = info.ResolveLinkTarget(returnFinalTarget: true);
+            // the final target is no link, but its parent folders can be
+            current = target == null ? current : RealPath(Path.GetFullPath(target.FullName), depth + 1);
+        }
+        return current;
     }
 
     private static bool IsPlainFileName(string fileName) =>

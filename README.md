@@ -447,7 +447,8 @@ var map = TextTableMap.Load("tariff.map.json");
 await using var stream = File.OpenRead("tariff-a.txt");
 var table = TextTable.Read(stream, map);
 
-// download a source document into the .lex folder
+// download a source document into the .lex folder; lex.json and snapshot.json are refused
+// (ReservedFileNameException), as is a target that is a link out of the .lex folder (FetchTargetLinkException)
 using var client = SourceDocument.CreateHttpClient();
 var fetched = await Fetcher.FetchAsync(client, "https://example.org/tax-rates-2026.pdf", lexDirectory);
 
