@@ -24,13 +24,30 @@ public static class Fetcher
     /// <param name="lexDirectory">Folder of lex.json</param>
     /// <param name="fileName">Target file name, default from the URL</param>
     /// <param name="overwrite">Replace an existing file with different content</param>
-    /// <param name="targetGuard">Optional check of the full target path, called before the target file is
-    /// read or written; an exception on the guard stops the fetch and nothing is written</param>
+    /// <exception cref="ArgumentException">Invalid URL, or a file name that is invalid or reserved
+    /// (<see cref="IsReservedFileName"/>), parameter <c>fileName</c></exception>
+    /// <exception cref="HttpRequestException">The source could not be loaded</exception>
+    public static Task<FetchResult> FetchAsync(HttpClient client, string url, string lexDirectory,
+        string fileName = null, bool overwrite = false) =>
+        FetchAsync(client, url, lexDirectory, fileName, overwrite, targetGuard: null);
+
+    /// <summary>
+    /// Download a source document into the .lex folder, with a check of the target path. The manifest
+    /// (lex.json) and the snapshot (snapshot.json) are never a target: an explicit file name is rejected
+    /// before the request, a file name derived from the URL after the download and before anything is written.
+    /// </summary>
+    /// <param name="client">HTTP client</param>
+    /// <param name="url">Source URL (http or https)</param>
+    /// <param name="lexDirectory">Folder of lex.json</param>
+    /// <param name="fileName">Target file name, null or empty for the name from the URL</param>
+    /// <param name="overwrite">Replace an existing file with different content</param>
+    /// <param name="targetGuard">Check of the full target path, called before the target file is
+    /// read or written; an exception on the guard stops the fetch and nothing is written. Null for no check</param>
     /// <exception cref="ArgumentException">Invalid URL, or a file name that is invalid or reserved
     /// (<see cref="IsReservedFileName"/>), parameter <c>fileName</c></exception>
     /// <exception cref="HttpRequestException">The source could not be loaded</exception>
     public static async Task<FetchResult> FetchAsync(HttpClient client, string url, string lexDirectory,
-        string fileName = null, bool overwrite = false, Action<string> targetGuard = null)
+        string fileName, bool overwrite, Action<string> targetGuard)
     {
         if (!Uri.TryCreate(url, UriKind.Absolute, out var uri) ||
             (uri.Scheme != Uri.UriSchemeHttp && uri.Scheme != Uri.UriSchemeHttps))

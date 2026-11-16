@@ -146,7 +146,7 @@ public sealed class FetcherTests : IDisposable
         var existedAtGuard = true;
 
         var result = await Fetcher.FetchAsync(Client(), "https://example.org/rates.pdf", directory,
-            targetGuard: path =>
+            fileName: null, overwrite: false, targetGuard: path =>
             {
                 guarded = path;
                 existedAtGuard = File.Exists(path);
@@ -163,14 +163,72 @@ public sealed class FetcherTests : IDisposable
         await Fetcher.FetchAsync(Client(), "https://example.org/rates.pdf", directory);
 
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Fetcher.FetchAsync(Client("rates 9.0"), "https://example.org/rates.pdf", directory, overwrite: true,
-                targetGuard: _ => throw new UnauthorizedAccessException("outside")));
+            Fetcher.FetchAsync(Client("rates 9.0"), "https://example.org/rates.pdf", directory, null, true,
+                _ => throw new UnauthorizedAccessException("outside")));
         await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
-            Fetcher.FetchAsync(Client(), "https://example.org/other.pdf", directory,
+            Fetcher.FetchAsync(Client(), "https://example.org/other.pdf", directory, fileName: null, overwrite: false,
                 targetGuard: _ => throw new UnauthorizedAccessException("outside")));
 
         Assert.Equal("rates 8.5", await File.ReadAllTextAsync(Path.Combine(directory, "rates.pdf")));
         Assert.False(File.Exists(Path.Combine(directory, "other.pdf")));
+    }
+
+    [Fact]
+    public async Task Fetch_NullTargetGuard_Writes()
+    {
+        var result = await Fetcher.FetchAsync(Client(), "https://example.org/rates.pdf", directory, null, false, null);
+
+        Assert.Equal(FetchState.Created, result.State);
+        Assert.Equal("rates 8.5", await File.ReadAllTextAsync(Path.Combine(directory, "rates.pdf")));
+    }
+
+    [Fact]
+    public void FetchAsync_SignatureWithoutTargetGuard_IsPublic()
+    {
+        var method = typeof(Fetcher).GetMethod(nameof(Fetcher.FetchAsync),
+            [typeof(HttpClient), typeof(string), typeof(string), typeof(string), typeof(bool)]);
+
+        Assert.NotNull(method);
+        Assert.True(method.IsPublic);
+        Assert.True(method.IsStatic);
+        Assert.Equal(typeof(Task<FetchResult>), method.ReturnType);
+        Assert.True(method.GetParameters()[3].IsOptional);
+        Assert.True(method.GetParameters()[4].IsOptional);
+    }
+
+    [Fact]
+    public void FetchAsync_SignatureWithTargetGuard_IsPublic()
+    {
+        var method = typeof(Fetcher).GetMethod(nameof(Fetcher.FetchAsync),
+            [typeof(HttpClient), typeof(string), typeof(string), typeof(string), typeof(bool), typeof(Action<string>)]);
+
+        Assert.NotNull(method);
+        Assert.True(method.IsPublic);
+        Assert.All(method.GetParameters(), parameter => Assert.False(parameter.IsOptional));
+    }
+
+    [Fact]
+    public async Task Fetch_SignatureWithoutTargetGuard_KeepsBehavior()
+    {
+        var manifest = WriteManifest();
+        var handler = new BodyHandler(HttpStatusCode.OK, "rates 8.5", "application/pdf");
+        var client = new HttpClient(handler);
+        const string fileName = "rates.pdf";
+        const bool overwrite = false;
+
+        // ReSharper disable once RedundantArgumentDefaultValue
+        var created = await Fetcher.FetchAsync(client, "https://example.org/x", directory, fileName, overwrite);
+        // ReSharper disable once RedundantArgumentDefaultValue
+        var unchanged = await Fetcher.FetchAsync(client, "https://example.org/x", directory, fileName, overwrite);
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            Fetcher.FetchAsync(client, "https://example.org/x", directory, "lex.json", true));
+
+        Assert.Equal(FetchState.Created, created.State);
+        Assert.Equal(Path.Combine(directory, fileName), created.FilePath);
+        Assert.Equal(FetchState.Unchanged, unchanged.State);
+        Assert.Equal("fileName", exception.ParamName);
+        Assert.Equal(2, handler.Requests);
+        Assert.Equal(manifest, await File.ReadAllBytesAsync(Path.Combine(directory, "lex.json")));
     }
 
     /// <summary>Writes a manifest into the test folder and returns its bytes</summary>
