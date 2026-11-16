@@ -129,6 +129,7 @@ public static class EvidenceCheck
         var ignored = ignoredTask.Result.Files;
         // without git (or outside a repository) nothing is listed: say so instead of passing silently
         var problem = untrackedTask.Result.Problem ?? ignoredTask.Result.Problem;
+        result.EvidenceVersioningChecked = problem == null;
         if (problem != null)
         {
             result.Warnings.Add($"{problem}: evidence versioning not checked");

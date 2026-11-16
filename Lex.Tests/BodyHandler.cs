@@ -5,7 +5,7 @@ namespace PayrollEngine.Lex.Tests;
 
 internal sealed class BodyHandler(HttpStatusCode status, string body, string mediaType) : HttpMessageHandler
 {
-    private int Requests { get; set; }
+    public int Requests { get; private set; }
 
     protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
     {

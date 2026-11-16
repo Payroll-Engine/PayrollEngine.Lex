@@ -124,6 +124,27 @@ public class EvidenceCheckGitTests
                                                x.StartsWith("not inside a git repository", StringComparison.Ordinal)));
         // a missing git is a warning, not a finding
         Assert.DoesNotContain(result.FileProblems, x => x.Contains("git", StringComparison.OrdinalIgnoreCase));
+        Assert.False(result.EvidenceVersioningChecked);
+    }
+
+    [Fact]
+    public void Check_InsideARepository_MarksEvidenceVersioningChecked()
+    {
+        using var satellite = new TestSatellite();
+        satellite.WriteRegulation("[ { \"name\": \"Rates\", \"values\": [ { \"key\": \"A\", \"value\": \"1\" } ] } ]");
+        var init = new ProcessStartInfo("git");
+        init.ArgumentList.Add("init");
+        init.ArgumentList.Add("--quiet");
+        if (EvidenceCheck.RunListing(init, satellite.Root, TimeSpan.FromSeconds(30)).Problem != null)
+        {
+            // without git there is no repository to check against
+            return;
+        }
+
+        var result = Checker.Check(TestSatellite.Manifest(), satellite.LexPath);
+
+        Assert.True(result.EvidenceVersioningChecked);
+        Assert.DoesNotContain(result.Warnings, x => x.Contains("evidence versioning not checked", StringComparison.Ordinal));
     }
 
     /// <summary>A child process that stays alive without writing anything</summary>

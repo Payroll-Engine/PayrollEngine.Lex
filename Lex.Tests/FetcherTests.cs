@@ -70,6 +70,118 @@ public sealed class FetcherTests : IDisposable
     }
 
     [Theory]
+    [InlineData("lex.json")]
+    [InlineData("snapshot.json")]
+    [InlineData("LEX.JSON")]
+    [InlineData("Snapshot.Json")]
+    [InlineData("lex.json.")]
+    [InlineData("lex.json ")]
+    [InlineData("snapshot.json. ")]
+    public async Task Fetch_ReservedExplicitFileName_IsRejectedBeforeTheRequest(string fileName)
+    {
+        var manifest = WriteManifest();
+        var handler = new BodyHandler(HttpStatusCode.OK, "{ \"replaced\": true }", "application/json");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            Fetcher.FetchAsync(new HttpClient(handler), "https://example.org/rates.pdf", directory, fileName, overwrite: true));
+
+        Assert.Equal("fileName", exception.ParamName);
+        Assert.Equal(0, handler.Requests);
+        Assert.Equal(manifest, await File.ReadAllBytesAsync(Path.Combine(directory, "lex.json")));
+        Assert.False(File.Exists(Path.Combine(directory, "snapshot.json")));
+        Assert.Single(Directory.GetFiles(directory));
+    }
+
+    [Theory]
+    [InlineData("https://example.org/data/snapshot.json")]
+    [InlineData("https://example.org/data/lex")]
+    [InlineData("https://example.org/data/LEX.JSON")]
+    public async Task Fetch_ReservedDerivedFileName_IsRejectedBeforeWriting(string url)
+    {
+        var manifest = WriteManifest();
+        var handler = new BodyHandler(HttpStatusCode.OK, "{ \"replaced\": true }", "application/json");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            Fetcher.FetchAsync(new HttpClient(handler), url, directory, overwrite: true));
+
+        Assert.Equal("fileName", exception.ParamName);
+        Assert.Equal(1, handler.Requests);
+        Assert.Equal(manifest, await File.ReadAllBytesAsync(Path.Combine(directory, "lex.json")));
+        Assert.False(File.Exists(Path.Combine(directory, "snapshot.json")));
+        Assert.Single(Directory.GetFiles(directory));
+    }
+
+    [Theory]
+    [InlineData("rates.pdf.")]
+    [InlineData("rates.pdf ")]
+    public async Task Fetch_ExplicitFileNameWithTrailingDotOrSpace_IsRejected(string fileName)
+    {
+        var handler = new BodyHandler(HttpStatusCode.OK, "rates 8.5", "application/pdf");
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+            Fetcher.FetchAsync(new HttpClient(handler), "https://example.org/rates.pdf", directory, fileName));
+
+        Assert.Equal("fileName", exception.ParamName);
+        Assert.Equal(0, handler.Requests);
+        Assert.Empty(Directory.GetFiles(directory));
+    }
+
+    [Theory]
+    [InlineData("lex.json", true)]
+    [InlineData("SNAPSHOT.JSON", true)]
+    [InlineData("lex.json. .", true)]
+    [InlineData("lex.json.pdf", false)]
+    [InlineData("snapshot.json.bak", false)]
+    [InlineData("lex", false)]
+    [InlineData("rates.pdf", false)]
+    [InlineData("", false)]
+    [InlineData(null, false)]
+    public void IsReservedFileName(string fileName, bool expected) =>
+        Assert.Equal(expected, Fetcher.IsReservedFileName(fileName));
+
+    [Fact]
+    public async Task Fetch_TargetGuard_GetsTheFullPathBeforeWriting()
+    {
+        string guarded = null;
+        var existedAtGuard = true;
+
+        var result = await Fetcher.FetchAsync(Client(), "https://example.org/rates.pdf", directory,
+            targetGuard: path =>
+            {
+                guarded = path;
+                existedAtGuard = File.Exists(path);
+            });
+
+        Assert.Equal(FetchState.Created, result.State);
+        Assert.Equal(Path.GetFullPath(Path.Combine(directory, "rates.pdf")), guarded);
+        Assert.False(existedAtGuard);
+    }
+
+    [Fact]
+    public async Task Fetch_TargetGuardThrows_WritesNothing()
+    {
+        await Fetcher.FetchAsync(Client(), "https://example.org/rates.pdf", directory);
+
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Fetcher.FetchAsync(Client("rates 9.0"), "https://example.org/rates.pdf", directory, overwrite: true,
+                targetGuard: _ => throw new UnauthorizedAccessException("outside")));
+        await Assert.ThrowsAsync<UnauthorizedAccessException>(() =>
+            Fetcher.FetchAsync(Client(), "https://example.org/other.pdf", directory,
+                targetGuard: _ => throw new UnauthorizedAccessException("outside")));
+
+        Assert.Equal("rates 8.5", await File.ReadAllTextAsync(Path.Combine(directory, "rates.pdf")));
+        Assert.False(File.Exists(Path.Combine(directory, "other.pdf")));
+    }
+
+    /// <summary>Writes a manifest into the test folder and returns its bytes</summary>
+    private byte[] WriteManifest()
+    {
+        var bytes = "{ \"validFrom\": \"2026-01-01\", \"values\": [] }"u8.ToArray();
+        File.WriteAllBytes(Path.Combine(directory, "lex.json"), bytes);
+        return bytes;
+    }
+
+    [Theory]
     [InlineData("https://example.org/docs/rates", "text/html", "rates.html")]
     [InlineData("https://example.org/docs/rates", "application/pdf", "rates.pdf")]
     [InlineData("https://example.org/docs/rates%202026.pdf", "application/pdf", "rates-2026.pdf")]

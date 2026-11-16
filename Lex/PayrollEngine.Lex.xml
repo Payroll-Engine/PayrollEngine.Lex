@@ -754,6 +754,11 @@
         <member name="P:PayrollEngine.Lex.CheckResult.Warnings">
             <summary>Checks that could not run (e.g. git is not available): no finding, but the result is incomplete</summary>
         </member>
+        <member name="P:PayrollEngine.Lex.CheckResult.EvidenceVersioningChecked">
+            <summary>The git state of the evidence (untracked or ignored files) was read. False when git is not
+            available, the folder is not inside a repository, git failed or the evidence check did not run;
+            <see cref="P:PayrollEngine.Lex.CheckResult.Warnings"/> then names the reason. Never a finding by itself.</summary>
+        </member>
         <member name="P:PayrollEngine.Lex.CheckResult.LexValidFrom">
             <summary>validFrom of the manifest</summary>
         </member>
@@ -1536,20 +1541,40 @@
             Downloads a source document unchanged into the .lex folder
             </summary>
         </member>
-        <member name="M:PayrollEngine.Lex.Fetcher.FetchAsync(System.Net.Http.HttpClient,System.String,System.String,System.String,System.Boolean)">
+        <member name="M:PayrollEngine.Lex.Fetcher.FetchAsync(System.Net.Http.HttpClient,System.String,System.String,System.String,System.Boolean,System.Action{System.String})">
             <summary>
-            Download a source document into the .lex folder
+            Download a source document into the .lex folder. The manifest (lex.json) and the snapshot
+            (snapshot.json) are never a target: an explicit file name is rejected before the request,
+            a file name derived from the URL after the download and before anything is written.
             </summary>
             <param name="client">HTTP client</param>
             <param name="url">Source URL (http or https)</param>
             <param name="lexDirectory">Folder of lex.json</param>
             <param name="fileName">Target file name, default from the URL</param>
             <param name="overwrite">Replace an existing file with different content</param>
+            <param name="targetGuard">Optional check of the full target path, called before the target file is
+            read or written; an exception on the guard stops the fetch and nothing is written</param>
+            <exception cref="T:System.ArgumentException">Invalid URL, or a file name that is invalid or reserved
+            (<see cref="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)"/>), parameter <c>fileName</c></exception>
             <exception cref="T:System.Net.Http.HttpRequestException">The source could not be loaded</exception>
         </member>
         <member name="M:PayrollEngine.Lex.Fetcher.FileNameFromUrl(System.Uri,System.String)">
             <summary>
             File name from the last URL segment; without extension one is derived from the media type
+            </summary>
+        </member>
+        <member name="M:PayrollEngine.Lex.Fetcher.IsReservedFileName(System.String)">
+            <summary>
+            The file name is reserved for the manifest (lex.json) or the snapshot (snapshot.json) and is never
+            a fetch target. The comparison ignores case and trailing dots and spaces (Windows resolves such
+            names to the same file).
+            </summary>
+            <param name="fileName">File name without folder</param>
+            <returns>True for a reserved name, false for any other name, null or empty</returns>
+        </member>
+        <member name="M:PayrollEngine.Lex.Fetcher.EnsureNotReserved(System.String,System.String)">
+            <summary>
+            Rejects a reserved file name, by name and by the normalized target path
             </summary>
         </member>
         <member name="T:PayrollEngine.Lex.FetchResult">

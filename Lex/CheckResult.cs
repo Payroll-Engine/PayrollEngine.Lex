@@ -215,6 +215,11 @@ public sealed class CheckResult
     /// <summary>Checks that could not run (e.g. git is not available): no finding, but the result is incomplete</summary>
     public List<string> Warnings { get; } = [];
 
+    /// <summary>The git state of the evidence (untracked or ignored files) was read. False when git is not
+    /// available, the folder is not inside a repository, git failed or the evidence check did not run;
+    /// <see cref="Warnings"/> then names the reason. Never a finding by itself.</summary>
+    public bool EvidenceVersioningChecked { get; internal set; }
+
     // validFrom
     /// <summary>validFrom of the manifest</summary>
     public string LexValidFrom { get; internal set; }
